@@ -14,4 +14,5 @@ Sponsor: Dr. Joshua Veazey
 
 This YouTube link will help with merging live data and widgets together:
 https://www.youtube.com/watch?v=u3NnzRIwjH8
+
 Note: there are a playlist of videos to help create the GUI
