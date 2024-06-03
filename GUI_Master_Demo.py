@@ -1,13 +1,26 @@
 from tkinter import *
+from tkinter import messagebox
+from tkinter import ttk
+import threading
+from PIL import Image, ImageTk
+import PIL
+import customtkinter
+
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 class RootGUI:
     def __init__(self):
-        self.root = Tk()
+        self.root = customtkinter.CTk()
         self.root.title("Homepage")
         self.root.config(bg="skyblue")
         self.root.geometry("1000x650")
+        
+    def close_window(self):
+        print("Closing window and exiting") # debug, delete later 
+        self.root.destroy()
 
-# widget for measurements in homepage
+# class for measurements/text box widgets in homepage
 class MeasGUI():
     def __init__(self,root):
         self.root = root
@@ -80,11 +93,11 @@ class MeasGUI():
         
         self.frame7.grid(row=4, column=7, padx=5, pady=5)
         self.label7.grid(row=2, column=1) 
-        self.label8.grid(row=1, column=3, pady=5)
-        self.label9.grid(row=1, column=2, pady=5)
+        self.label8.grid(row=1, column=2, pady=5)
+        self.label9.grid(row=1, column=1, pady=5, sticky="e")
         
         # file drop-down menu
-        self.drop_menu.grid(row=0,column=0, padx=self.padx, pady=self.pady)
+        self.drop_menu.grid(row=0, column=0, padx=self.padx, pady=self.pady)
         self.drop_menu.grid(row=0, column=0, padx=self.padx)
         
     # file drop-down menu
@@ -102,7 +115,43 @@ class MeasGUI():
         self.drop_menu = OptionMenu(self.root, self.menu_options, *options)
         self.drop_menu.config(width=10)
  
-         
+# class for graph in homepage
+class GraphGUI():
+    def __init__(self, root):
+        self.root = root
+        #self.serial = serial
+        #self.data = data
+        self.fig = []
+        
+        #def AddGraph(self):
+
+# class for creating buttons
+class ButtonGUI():
+    def __init__(self, root):
+        self.root = root
+        
+        # define images
+        self.add_btn_image1 = ImageTk.PhotoImage(Image.open("Images/Retract_Tip_Btn.png"))
+        self.add_btn_image2 = ImageTk.PhotoImage(Image.open("Images/Fine_Adjust_Btn_Up.png"))
+        self.add_btn_image3 = ImageTk.PhotoImage(Image.open("Images/Fine_Adjust_Btn_Down.png"))
+        
+        # create buttons
+        self.retract_tip_btn = customtkinter.CTkButton(master=root, image=self.add_btn_image1, text="", compound="bottom", width=20, height=40)
+        self.fine_adjust_btn_up = customtkinter.CTkButton(master=root, image=self.add_btn_image2, text="", compound="bottom", width=20, height=20)
+        self.fine_adjust_btn_down = customtkinter.CTkButton(master=root, image=self.add_btn_image3, text="", compound="bottom", width=20, height=20)
+        
+        self.DisplayGUI()
+        
+    def DisplayGUI(self):
+        '''
+        Method to display all button widgets
+        '''
+        self.retract_tip_btn.grid(column=9, row=1, padx=5)
+        self.fine_adjust_btn_up.grid(column=10, row=1)
+        self.fine_adjust_btn_down.grid(column=10, row=2)
+                     
 if __name__ == "__main__":
     RootGUI()
     MeasGUI()
+    GraphGUI()
+    ButtonGUI()
