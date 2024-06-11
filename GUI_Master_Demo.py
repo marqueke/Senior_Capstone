@@ -91,8 +91,8 @@ class MeasGUI():
         self.frame6.grid(row=3, column=3, padx=5, pady=5)
         self.label6.grid(row=2, column=1) 
         
-        self.frame7.grid(row=4, column=7, padx=5, pady=5)
-        self.label7.grid(row=2, column=1) 
+        self.frame7.grid(row=13, column=7, padx=5, pady=5)
+        self.label7.grid(row=13, column=1) 
         self.label8.grid(row=1, column=2, pady=5)
         self.label9.grid(row=1, column=1, pady=5, sticky="e")
         
@@ -134,11 +134,21 @@ class ButtonGUI():
         self.add_btn_image1 = ImageTk.PhotoImage(Image.open("Images/Retract_Tip_Btn.png"))
         self.add_btn_image2 = ImageTk.PhotoImage(Image.open("Images/Fine_Adjust_Btn_Up.png"))
         self.add_btn_image3 = ImageTk.PhotoImage(Image.open("Images/Fine_Adjust_Btn_Down.png"))
+        self.add_btn_image4 = ImageTk.PhotoImage(Image.open("Images/Start_Btn.png"))
+        self.add_btn_image5 = ImageTk.PhotoImage(Image.open("Images/Stop_Btn.png"))
+        self.add_btn_image6 = ImageTk.PhotoImage(Image.open("Images/Acquire_IV.png"))
+        self.add_btn_image7 = ImageTk.PhotoImage(Image.open("Images/Acquire_IZ.png"))
+        self.add_btn_image8 = ImageTk.PhotoImage(Image.open("Images/Stop_LED.png"))
         
         # create buttons
-        self.retract_tip_btn = customtkinter.CTkButton(master=root, image=self.add_btn_image1, text="", compound="bottom", width=20, height=40)
-        self.fine_adjust_btn_up = customtkinter.CTkButton(master=root, image=self.add_btn_image2, text="", compound="bottom", width=20, height=20)
-        self.fine_adjust_btn_down = customtkinter.CTkButton(master=root, image=self.add_btn_image3, text="", compound="bottom", width=20, height=20)
+        self.retract_tip_btn = customtkinter.CTkButton(master=root, image=self.add_btn_image1, text="", compound="bottom", width=20, height=40, fg_color="skyblue", bg_color="skyblue", corner_radius=0)
+        self.fine_adjust_btn_up = customtkinter.CTkButton(master=root, image=self.add_btn_image2, text="", compound="bottom", width=20, height=20, fg_color="skyblue", bg_color="skyblue", corner_radius=0)
+        self.fine_adjust_btn_down = customtkinter.CTkButton(master=root, image=self.add_btn_image3, text="", compound="bottom", width=20, height=20, fg_color="skyblue", bg_color="skyblue", corner_radius=0)
+        self.start_btn = customtkinter.CTkButton(master=root, image=self.add_btn_image4, text="", compound="bottom", width=20, height=20, fg_color="skyblue", bg_color="skyblue", corner_radius=0)
+        self.stop_btn = customtkinter.CTkButton(master=root, image=self.add_btn_image5, text="", compound="bottom", width=20, height=20, fg_color="skyblue", bg_color="skyblue", corner_radius=0)
+        self.acquire_iv_btn = customtkinter.CTkButton(master=root, image=self.add_btn_image6, text="", compound="bottom", width=20, height=20, fg_color="skyblue", bg_color="skyblue", corner_radius=0)
+        self.acquire_iz_btn = customtkinter.CTkButton(master=root, image=self.add_btn_image7, text="", compound="bottom", width=20, height=20, fg_color="skyblue", bg_color="skyblue", corner_radius=0)
+        self.stop_led_btn = customtkinter.CTkButton(master=root, image=self.add_btn_image8, text="", compound="bottom", width=15, height=40, fg_color="skyblue", bg_color="skyblue", corner_radius=0)
         
         self.DisplayGUI()
         
@@ -146,9 +156,15 @@ class ButtonGUI():
         '''
         Method to display all button widgets
         '''
-        self.retract_tip_btn.grid(column=9, row=1, padx=5)
-        self.fine_adjust_btn_up.grid(column=10, row=1)
-        self.fine_adjust_btn_down.grid(column=10, row=2)
+        self.retract_tip_btn.grid(column=1, row=10, padx=5, pady=5)
+        self.fine_adjust_btn_up.grid(column=2, row=10, padx=5, pady=5)
+        self.fine_adjust_btn_down.grid(column=2, row=11, padx=5, pady=5)
+        self.start_btn.grid(column=9, row=1, padx=5, pady=5)
+        self.stop_btn.grid(column=9, row=2, padx=5, pady=5)
+        self.acquire_iv_btn.grid(column=9, row=3, padx=5, pady=5)
+        self.acquire_iz_btn.grid(column=9, row=4, padx=5, pady=5)
+        self.stop_led_btn.grid(column=10, row=1, padx=5, pady=5)
+        
                      
 if __name__ == "__main__":
     RootGUI()
