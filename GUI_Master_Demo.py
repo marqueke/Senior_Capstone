@@ -92,5 +92,5 @@ class MeasGUI():
  
          
 if __name__ == "__main__":
-    RootGUI()
-    MeasGUI()
+    root_gui = RootGUI()
+    MeasGUI(root_gui)
