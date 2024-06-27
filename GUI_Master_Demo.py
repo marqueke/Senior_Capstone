@@ -79,20 +79,12 @@ class ComGUI():
         '''
         # Generate the list of available coms
 
-        coms = ["-",
-                "COM1",
-                "COM2", 
-                "COM3",
-                "COM4",
-                "COM5",
-                "COM6",
-                "COM7",
-                "COM8"]
+        self.serial.getCOMList()
 
         self.clicked_com = StringVar()
-        self.clicked_com.set(coms[0])
+        self.clicked_com.set(self.serial.com_list[0])
         self.drop_com = OptionMenu(
-            self.frame, self.clicked_com, *coms, command=self.connect_ctrl)
+            self.frame, self.clicked_com, *self.serial.com_list, command=self.connect_ctrl)
 
         self.drop_com.config(width=10)
 
@@ -128,6 +120,7 @@ class ComGUI():
         conditions are not cleared
         '''
         print("Connect ctrl")
+        
         if "-" in self.clicked_com.get() or "-" in self.clicked_bd.get():
             self.btn_connect["state"] = "disable"
         else:
@@ -146,13 +139,25 @@ class ComGUI():
             self.serial.SerialOpen(self)
             if self.serial.ser.status:
                 self.btn_connect["text"] = "Disconnect"
-                self.btn_refresh["text"] = "Disable"
-                self.drop_baud["state"] = "Disable"
-                self.drop_com["state"] = "Disable"
+                self.btn_refresh["text"] = "disable"
+                self.drop_baud["state"] = "disable"
+                self.drop_com["state"] = "disable"
+                InfoMsg = f"Successful UART connection using {self.clicked_com.get()}."
+                messagebox.showinfo("Success", InfoMsg)
+            else:
+                ErrorMsg = f"Failure to establish UART connection using {self.clicked_com.get()}."
+                messagebox.showerror("Error", ErrorMsg)
         else:
-            # start closing the connection
-            pass
-    
+            # closing serial COM
+            # close sesrial communication
+            self.serial.SerialClose(self)
+            
+            InfoMsg = f"UART connection using {self.clicked_com.get()} is now closed."
+            messagebox.showwarning("Warning", InfoMsg)
+            self.btn_connect["text"] = "Connect"
+            self.btn_refresh["state"] = "active"
+            self.drop_baud["state"] = "active"
+            self.drop_com["state"] = "active"
     
 # class for measurements/text box widgets in homepage
 class MeasGUI:
