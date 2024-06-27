@@ -128,8 +128,13 @@ class MeasGUI:
 
 #style.use('ggplot')
 
+<<<<<<< Updated upstream
 #fig = plt.figure()
 #graph = fig.add_subplot(1,1,1)
+=======
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+>>>>>>> Stashed changes
 
 # class for graph in homepage
 class GraphGUI:
@@ -137,6 +142,12 @@ class GraphGUI:
         self.root = root
         self.create_graph()
         #self.animate()
+<<<<<<< Updated upstream
+=======
+        ani = animation.FuncAnimation(fig, GraphGUI.animate, interval=1000, cache_frame_data=False)
+        plt.show()
+
+>>>>>>> Stashed changes
         
     def create_graph(self):
         # Create a figure
@@ -152,6 +163,7 @@ class GraphGUI:
 
 #getting crazy
 
+<<<<<<< Updated upstream
     #def animate(self):
     #    graph_data = open(DATA_FILE_PATH, 'r').read()
     #    lines = graph_data.split('\n')
@@ -168,6 +180,24 @@ class GraphGUI:
     #    plt.title('Sample Data Live Graph')
     #    plt.xlabel('X Sample Label')
     #    plt.ylabel('Y Sample Label')
+=======
+    def animate(self):
+        graph_data = open(DATA_FILE_PATH, 'r').read()
+        lines = graph_data.split('\n')
+        xdata = []
+        ydata = []
+        for line in lines:
+            if len(line) > 1:
+                x, y = line.split(',')
+                xdata.append(float(x))
+                ydata.append(float(y))
+        ax.clear()
+        ax.plot(xdata,ydata, c='#64B9FF')
+        
+        plt.title('Sample Data Live Graph')
+        plt.xlabel('X Sample Label')
+        plt.ylabel('Y Sample Label')
+>>>>>>> Stashed changes
     
 
 
