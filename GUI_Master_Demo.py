@@ -6,9 +6,15 @@ from PIL import Image, ImageTk
 import PIL
 import customtkinter as ctk
 import tkinter as tk
+import serial
 
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+
+from IV_Window import IVWindow  # import the IV Window Class
+from Data_Com_Ctrl import SerialController
+
+# NOTE: ADD drop down list for sample rates
 
 class RootGUI:
     def __init__(self):
@@ -20,8 +26,22 @@ class RootGUI:
         # Add a method to quit the application
         self.root.protocol("WM_DELETE_WINDOW", self.quit_application)
         
+        '''
+        # Initialize measurement GUI
+        self.meas_gui = MeasGUI(self.root)
+        
+        # Initialize serial controller
+        self.serial_controller = SerialController(
+            port='COM7',  # Update with your COM port
+            baudrate=9600,
+            callback=self.meas_gui.update_distance
+        )
+        self.serial_controller.start(self.root)
+        '''
+        
     def quit_application(self):
         print("Quitting application")
+        #self.serial_controller.stop()
         self.root.quit()
 
 # class to setup and create the communication manager with the MCU
@@ -51,7 +71,7 @@ class ComGUI():
                                   width=10, state="disabled",  command=self.serial_connect)
 
         # Optional Graphic parameters
-        self.padx = 20
+        self.padx = 10
         self.pady = 5
 
         # Put on the grid all the elements
@@ -61,7 +81,7 @@ class ComGUI():
         '''
          Method to display all the Widget of the main frame
         '''
-        self.frame.grid(row=0, column=0, rowspan=3,
+        self.frame.grid(row=1, column=0, rowspan=3,
                         columnspan=3, padx=5, pady=5)
         self.label_com.grid(column=0, row=2)
         self.label_bd.grid(column=0, row=3)
@@ -78,14 +98,10 @@ class ComGUI():
          and list them into the drop menu
         '''
         # Generate the list of available coms
-
         self.serial.getCOMList()
-
         self.clicked_com = StringVar()
         self.clicked_com.set(self.serial.com_list[0])
-        self.drop_com = OptionMenu(
-            self.frame, self.clicked_com, *self.serial.com_list, command=self.connect_ctrl)
-
+        self.drop_com = OptionMenu(self.frame, self.clicked_com, *self.serial.com_list, command=self.connect_ctrl)
         self.drop_com.config(width=10)
 
     def baudOptionMenu(self):
@@ -135,17 +151,23 @@ class ComGUI():
         
 
     def serial_connect(self):
+        selected_port = self.clicked_com.get()
+        self.serial.port = selected_port
+        
         if self.btn_connect["text"] in "Connect":
-            self.serial.SerialOpen(self)
-            if self.serial.ser.status:
-                self.btn_connect["text"] = "Disconnect"
-                self.btn_refresh["text"] = "disable"
-                self.drop_baud["state"] = "disable"
-                self.drop_com["state"] = "disable"
-                InfoMsg = f"Successful UART connection using {self.clicked_com.get()}."
-                messagebox.showinfo("Success", InfoMsg)
+            if self.serial.SerialOpen(self):
+                if self.serial.ser.status:
+                    self.btn_connect["text"] = "Disconnect"
+                    self.btn_refresh["text"] = "disable"
+                    self.drop_baud["state"] = "disable"
+                    self.drop_com["state"] = "disable"
+                    InfoMsg = f"Successful UART connection using {self.clicked_com.get()}."
+                    messagebox.showinfo("Success", InfoMsg)
+                else:
+                    ErrorMsg = f"Failure to establish UART connection using {self.clicked_com.get()}."
+                    messagebox.showerror("Error", ErrorMsg)
             else:
-                ErrorMsg = f"Failure to establish UART connection using {self.clicked_com.get()}."
+                ErrorMsg = f"Failed to open serial port {selected_port}."
                 messagebox.showerror("Error", ErrorMsg)
         else:
             # closing serial COM
@@ -166,31 +188,31 @@ class MeasGUI:
         
         # current distance
         self.frame1 = LabelFrame(root, text="Distance (nm)", padx=10, pady=2, bg="gray")
-        self.label1 = Entry(self.frame1, bg="white", width=25)
+        self.label1 = Entry(self.frame1, bg="white", width=20)
         
         # current
         self.frame2 = LabelFrame(root, text="Critical Distance (nm)", padx=10, pady=2, bg="gray")
-        self.label2 = Entry(self.frame2, bg="white", width=25)
+        self.label2 = Entry(self.frame2, bg="white", width=20)
         
         # critical distance
         self.frame3 = LabelFrame(root, text="Current (nA)", padx=10, pady=2, bg="gray")
-        self.label3 = Entry(self.frame3, bg="white", width=25)
+        self.label3 = Entry(self.frame3, bg="white", width=20)
         
         # critical current
         self.frame4 = LabelFrame(root, text="Critical Current (nA)", padx=10, pady=2, bg="gray")
-        self.label4 = Entry(self.frame4, bg="white", width=25)
+        self.label4 = Entry(self.frame4, bg="white", width=20)
         
         # current setpoint
         self.frame5 = LabelFrame(root, text="Current Setpoint (nA)", padx=10, pady=2, bg="#7393B3")
-        self.label5 = Entry(self.frame5, bg="white", width=25)
+        self.label5 = Entry(self.frame5, bg="white", width=20)
         
         # current offset
         self.frame6 = LabelFrame(root, text="Current Offset (nA)", padx=10, pady=2, bg="#7393B3")
-        self.label6 = Entry(self.frame6, bg="white", width=25)
+        self.label6 = Entry(self.frame6, bg="white", width=20)
         
         # user notes text box
         self.frame7 = LabelFrame(root, text="NOTES", padx=10, pady=5, bg="gray")
-        self.label7 = Text(self.frame7, height=5, width=30)
+        self.label7 = Text(self.frame7, height=7, width=30)
         self.label8 = Text(self.frame7, height=1, width=5)
         self.label9 = Label(self.frame7, text="Date:", height=1, width=5)
         
@@ -205,33 +227,37 @@ class MeasGUI:
         self.publish()
     
     def publish(self):
-        self.frame1.grid(row=5, column=2, padx=5, pady=20, sticky="nw")
-        self.label1.grid(row=0, column=0, padx=5, pady=5, rowspan=2)
+        self.frame1.grid(row=11, column=4, padx=5, pady=5, sticky="sw")
+        self.label1.grid(row=0, column=0, padx=5, pady=5)
         
-        self.frame2.grid(row=5, column=2, padx=5, pady=20, sticky="sw")
-        self.label2.grid(row=0, column=0, padx=5, pady=5)   
+        self.frame2.grid(row=11, column=5, padx=5, pady=5, sticky="sw")
+        self.label2.grid(row=0, column=1, padx=5, pady=5)   
         
-        self.frame3.grid(row=5, column=3, padx=5, pady=20, sticky="sw")
-        self.label3.grid(row=0, column=0, padx=5, pady=5) 
+        self.frame3.grid(row=12, column=4, padx=5, pady=5, sticky="w")
+        self.label3.grid(row=1, column=0, padx=5, pady=5) 
         
-        self.frame4.grid(row=5, column=3, padx=5, pady=20, sticky="nw")
-        self.label4.grid(row=0, column=0, padx=5, pady=5, rowspan=2) 
+        self.frame4.grid(row=12, column=5, padx=5, pady=5, sticky="w")
+        self.label4.grid(row=1, column=1, padx=5, pady=5) 
         
-        self.frame5.grid(row=5, column=4, padx=5, pady=20, sticky="nw")
-        self.label5.grid(row=0, column=0, padx=5, pady=5, rowspan=2) 
+        self.frame5.grid(row=13, column=4, padx=5, pady=5, sticky="nw")
+        self.label5.grid(row=2, column=0, padx=5, pady=5) 
         
-        self.frame6.grid(row=5, column=4, padx=5, pady=20, sticky="sw")
-        self.label6.grid(row=0, column=0, padx=5, pady=5) 
+        self.frame6.grid(row=13, column=5, padx=5, pady=5, sticky="nw")
+        self.label6.grid(row=2, column=1, padx=5, pady=5) 
         
         # Positioning the notes section
-        self.frame7.grid(row=6, column=5, rowspan=2, padx=5, pady=5)
-        self.label7.grid(row=1, column=0, padx=5, pady=5) 
-        self.label8.grid(row=0, column=2, pady=5)
+        self.frame7.grid(row=11, column=7, rowspan=3, pady=5, sticky="n")
+        self.label7.grid(row=1, column=0, pady=5, columnspan=3, rowspan=3) 
+        self.label8.grid(row=0, column=2, pady=5, sticky="e")
         self.label9.grid(row=0, column=1, pady=5, sticky="e")
         
         # Positioning the file drop-down menu
-        self.drop_menu.grid(row=0, column=0, padx=5, pady=5)
-        
+        self.drop_menu.grid(row=0, column=0, padx=5, pady=5, sticky="w")
+    
+    def update_distance(self, data):
+        self.label1.delete(0, END)
+        self.label1.insert(0, data)
+             
     # file drop-down menu
     def DropDownMenu(self):
         '''
@@ -261,7 +287,7 @@ class GraphGUI:
         
         # Create a canvas to embed the figure in Tkinter
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.root)
-        self.canvas.get_tk_widget().grid(row=0, column=2, columnspan=6, rowspan=5, padx=10, pady=5)
+        self.canvas.get_tk_widget().grid(row=0, column=3, columnspan=6, rowspan=10, padx=10, pady=5)
 
 # class for creating buttons
 class ButtonGUI:
@@ -292,34 +318,37 @@ class ButtonGUI:
         self.fine_adjust_btn_up = ctk.CTkButton(master=self.fine_adjust_frame, image=self.add_btn_image2, text = "", width=40, height=40, compound="bottom", fg_color="#ADD8E6", bg_color="#ADD8E6", corner_radius=0)
         self.fine_adjust_btn_down = ctk.CTkButton(master=self.fine_adjust_frame, image=self.add_btn_image3, text="", compound="bottom", width=40, height=40, fg_color="#ADD8E6", bg_color="#ADD8E6", corner_radius=0)
         
+        self.vbias_frame = LabelFrame(root, text="Vbias", padx=10, pady=2, bg="#7393B3")
+        self.vbias_label = Entry(self.vbias_frame, bg="white", width=15)
+        
         self.DisplayGUI()
         
     def DisplayGUI(self):
         '''
         Method to display all button widgets
         '''
-        self.retract_tip_frame.grid(row=5, column=0)
-        self.retract_tip_btn.grid(row=5, column=0, rowspan=2)
+        self.retract_tip_frame.grid(row=11, column=0, rowspan=3, columnspan=2, padx=20, sticky="e")
+        self.retract_tip_btn.grid(row=11, column=0)
         
-        self.fine_adjust_frame.grid(row=5, column=1)
-        self.fine_adjust_btn_up.grid(row=5, column=1)
-        self.fine_adjust_btn_down.grid(row=6, column=1)
+        self.fine_adjust_frame.grid(row=11, column=1, rowspan=3, columnspan=2, padx=5, sticky="e")
+        self.fine_adjust_btn_up.grid(row=11, column=0)
+        self.fine_adjust_btn_down.grid(row=12, column=0)
         
-        self.start_btn.grid(row=1, column=5, sticky="e")
-        self.stop_btn.grid(row=2, column=5, sticky="ne")
-        self.acquire_iv_btn.grid(row=3, column=5, sticky="ne")
-        self.acquire_iz_btn.grid(row=4, column=5, sticky="ne")
-        self.stop_led_btn.grid(row=1, column=6, sticky="e")
+        self.start_btn.grid(row=2, column=9, sticky="e")
+        self.stop_btn.grid(row=3, column=9, sticky="ne")
+        self.acquire_iv_btn.grid(row=4, column=9, sticky="ne")
+        self.acquire_iz_btn.grid(row=5, column=9, sticky="ne")
+        self.stop_led_btn.grid(row=2, column=10, sticky="e")
 
+        self.vbias_frame.grid(row=6, column=9, padx=5, pady=5, sticky="ne")
+        self.vbias_label.grid(row=6, column=9, padx=5, pady=5)
+        
     def open_iv_window(self):
         '''
         Method to open a new window when the "Acquire I-V" button is clicked
         '''
         new_window = ctk.CTkToplevel(self.root)
-        new_window.title("I-V Acquisition")
-        new_window.geometry("1000x600")
-        label = ctk.CTkLabel(new_window, text="I-V Acquisition Data")
-        label.pack(padx=20, pady=20)
+        IVWindow(new_window)
 
     def open_iz_window(self):
         '''
