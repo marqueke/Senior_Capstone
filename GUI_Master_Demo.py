@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 from IV_Window import IVWindow  # import the IV Window Class
+from IZ_Window import IZWindow  # import the IV Window Class
 from Data_Com_Ctrl import SerialController
 
 # NOTE: ADD drop down list for sample rates
@@ -20,7 +21,7 @@ class RootGUI:
     def __init__(self):
         self.root = ctk.CTk()
         self.root.title("Homepage")
-        self.root.config(bg="#ADD8E6")
+        self.root.config(bg="#eeeeee")
         self.root.geometry("1100x650")
         
         # Add a method to quit the application
@@ -203,18 +204,18 @@ class MeasGUI:
         self.label4 = Entry(self.frame4, bg="white", width=20)
         
         # current setpoint
-        self.frame5 = LabelFrame(root, text="Current Setpoint (nA)", padx=10, pady=2, bg="#7393B3")
+        self.frame5 = LabelFrame(root, text="Current Setpoint (nA)", padx=10, pady=2, bg="#ADD8E6")
         self.label5 = Entry(self.frame5, bg="white", width=20)
         
         # current offset
-        self.frame6 = LabelFrame(root, text="Current Offset (nA)", padx=10, pady=2, bg="#7393B3")
+        self.frame6 = LabelFrame(root, text="Current Offset (nA)", padx=10, pady=2, bg="#ADD8E6")
         self.label6 = Entry(self.frame6, bg="white", width=20)
         
         # user notes text box
-        self.frame7 = LabelFrame(root, text="NOTES", padx=10, pady=5, bg="gray")
+        self.frame7 = LabelFrame(root, text="NOTES", padx=10, pady=5, bg="#ADD8E6")
         self.label7 = Text(self.frame7, height=7, width=30)
-        self.label8 = Text(self.frame7, height=1, width=5)
-        self.label9 = Label(self.frame7, text="Date:", height=1, width=5)
+        self.label8 = Text(self.frame7, height=1, width=8)
+        self.label9 = Label(self.frame7, padx=10, text="Date:", height=1, width=5)
         
         # setup the drop option menu
         self.DropDownMenu()
@@ -249,7 +250,7 @@ class MeasGUI:
         self.frame7.grid(row=11, column=7, rowspan=3, pady=5, sticky="n")
         self.label7.grid(row=1, column=0, pady=5, columnspan=3, rowspan=3) 
         self.label8.grid(row=0, column=2, pady=5, sticky="e")
-        self.label9.grid(row=0, column=1, pady=5, sticky="e")
+        self.label9.grid(row=0, column=2, pady=5, sticky="w")
         
         # Positioning the file drop-down menu
         self.drop_menu.grid(row=0, column=0, padx=5, pady=5, sticky="w")
@@ -305,18 +306,18 @@ class ButtonGUI:
         self.add_btn_image8 = ctk.CTkImage(Image.open("Images/Stop_LED.png"), size=(35,35))
         
         # create buttons with proper sizes
-        self.start_btn = ctk.CTkButton(master=root, image=self.add_btn_image4, text="", width=90, height=35, fg_color="#ADD8E6", bg_color="#ADD8E6", corner_radius=0)
-        self.stop_btn = ctk.CTkButton(master=root, image=self.add_btn_image5, text="", width=90, height=35, fg_color="#ADD8E6", bg_color="#ADD8E6", corner_radius=0)
-        self.acquire_iv_btn = ctk.CTkButton(master=root, image=self.add_btn_image6, text="", width=90, height=35, fg_color="#ADD8E6", bg_color="#ADD8E6", corner_radius=0, command=self.open_iv_window)
-        self.acquire_iz_btn = ctk.CTkButton(master=root, image=self.add_btn_image7, text="", width=90, height=35, fg_color="#ADD8E6", bg_color="#ADD8E6", corner_radius=0, command=self.open_iz_window)
-        self.stop_led_btn = ctk.CTkButton(master=root, image=self.add_btn_image8, text="", width=30, height=35, fg_color="#ADD8E6", bg_color="#ADD8E6", corner_radius=0)
+        self.start_btn = ctk.CTkButton(master=root, image=self.add_btn_image4, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0)
+        self.stop_btn = ctk.CTkButton(master=root, image=self.add_btn_image5, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0)
+        self.acquire_iv_btn = ctk.CTkButton(master=root, image=self.add_btn_image6, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.open_iv_window)
+        self.acquire_iz_btn = ctk.CTkButton(master=root, image=self.add_btn_image7, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.open_iz_window)
+        self.stop_led_btn = ctk.CTkButton(master=root, image=self.add_btn_image8, text="", width=30, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0)
         
-        self.retract_tip_frame = LabelFrame(root, text="Retract Tip", padx=10, pady=5, bg="#ADD8E6")
-        self.retract_tip_btn = ctk.CTkButton(master=self.retract_tip_frame, image=self.add_btn_image1, width=40, height=100, text="", compound="bottom", fg_color="#ADD8E6", bg_color="#ADD8E6", corner_radius=0)
+        self.retract_tip_frame = LabelFrame(root, text="Retract Tip", padx=10, pady=5, bg="#eeeeee")
+        self.retract_tip_btn = ctk.CTkButton(master=self.retract_tip_frame, image=self.add_btn_image1, width=40, height=100, text="", compound="bottom", fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0)
         
-        self.fine_adjust_frame = LabelFrame(root, text="Fine Adjust", padx=10, pady=5, bg="#ADD8E6")
-        self.fine_adjust_btn_up = ctk.CTkButton(master=self.fine_adjust_frame, image=self.add_btn_image2, text = "", width=40, height=40, compound="bottom", fg_color="#ADD8E6", bg_color="#ADD8E6", corner_radius=0)
-        self.fine_adjust_btn_down = ctk.CTkButton(master=self.fine_adjust_frame, image=self.add_btn_image3, text="", compound="bottom", width=40, height=40, fg_color="#ADD8E6", bg_color="#ADD8E6", corner_radius=0)
+        self.fine_adjust_frame = LabelFrame(root, text="Fine Adjust", padx=10, pady=5, bg="#eeeeee")
+        self.fine_adjust_btn_up = ctk.CTkButton(master=self.fine_adjust_frame, image=self.add_btn_image2, text = "", width=40, height=40, compound="bottom", fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0)
+        self.fine_adjust_btn_down = ctk.CTkButton(master=self.fine_adjust_frame, image=self.add_btn_image3, text="", compound="bottom", width=40, height=40, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0)
         
         self.vbias_frame = LabelFrame(root, text="Vbias", padx=10, pady=2, bg="#7393B3")
         self.vbias_label = Entry(self.vbias_frame, bg="white", width=15)
@@ -355,10 +356,7 @@ class ButtonGUI:
         Method to open a new window when the "Acquire I-Z" button is clicked
         '''
         new_window = ctk.CTkToplevel(self.root)
-        new_window.title("I-Z Acquisition")
-        new_window.geometry("1000x600")
-        label = ctk.CTkLabel(new_window, text="I-Z Acquisition Data")
-        label.pack(padx=20, pady=20)
+        IZWindow(new_window)
 
 if __name__ == "__main__":
     root_gui = RootGUI()
