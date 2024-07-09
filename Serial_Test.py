@@ -3,25 +3,34 @@ from tkinter import scrolledtext
 import serial
 import threading
 
-
 class SerialReader:
     def __init__(self, port, baudrate, callback):
-        self.serial_port = serial.Serial(port, baudrate)
-        self.callback = callback
-        self.running = True
-        self.thread = threading.Thread(target=self.read_serial)
-        self.thread.start()
+        try:
+            self.serial_port = serial.Serial(port=port, baudrate=baudrate, timeout=1)
+            self.callback = callback
+            self.running = True
+            self.thread = threading.Thread(target=self.read_serial)
+            self.thread.start()
+        except serial.SerialException as e:
+            print(f"Error opening serial port: {e}")
+            self.serial_port = None
 
     def read_serial(self):
-        while self.running:
-            if self.serial_port.in_waiting > 0:
-                data = self.serial_port.readline().decode('utf-8').strip()
-                self.callback(data)
+        while self.running and self.serial_port:
+            try:
+                if self.serial_port.in_waiting > 0:
+                    data = self.serial_port.read(self.serial_port.in_waiting).decode('utf-8', errors='replace').strip()
+                    print(f"Received data: {data}")  # Debugging print statement
+                    self.callback(data)
+            except serial.SerialException as e:
+                print(f"Error reading serial port: {e}")
+                self.running = False
 
     def stop(self):
         self.running = False
-        self.thread.join()
-        self.serial_port.close()
+        if self.serial_port:
+            self.thread.join()
+            self.serial_port.close()
 
 class App:
     def __init__(self, root):
@@ -37,7 +46,7 @@ class App:
         self.text_area = scrolledtext.ScrolledText(self.frame, wrap=tk.WORD, height=20, width=60)
         self.text_area.pack(fill=tk.BOTH, expand=True)
 
-        self.serial_reader = SerialReader(port='COM7', baudrate=9600, callback=self.update_text)
+        self.serial_reader = SerialReader(port='COM9', baudrate=9600, callback=self.update_text)
 
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
 
