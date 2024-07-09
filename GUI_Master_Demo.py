@@ -2,6 +2,7 @@ from tkinter import *
 from tkinter import messagebox
 from tkinter import ttk
 import threading
+from tkinter import scrolledtext
 from PIL import Image, ImageTk
 import PIL
 import customtkinter as ctk
@@ -29,20 +30,42 @@ class RootGUI:
         # Add a method to quit the application
         self.root.protocol("WM_DELETE_WINDOW", self.quit_application)
         
+        # initialize serial controller
+        self.serial_controller = SerialCtrl()
+        #self.serial = SerialCtrl()
+        
+        # Initialize other components
+        self.meas_gui = MeasGUI(self.root)
+        self.graph_gui = GraphGUI(self.root)
+        self.button_gui = ButtonGUI(self.root, self)
+        self.com_gui = ComGUI(self.root, self.serial_controller, self)
+        
     def quit_application(self):
         print("Quitting application")
-        #self.serial_controller.stop()
+        if hasattr(self, 'serial_controller'):
+            self.serial_controller.SerialClose(self.com_gui)
         self.root.quit()
     
+    def start_reading(self):
+        if hasattr(self, 'serial_controller') and hasattr(self, 'meas_gui'):
+            self.reading_thread = threading.Thread(target=self.read_data)
+            self.reading_thread.start()
+        
+    def read_data(self):
+        while True:
+            if self.serial_controller.ser.in_waiting > 0:
+                data = self.serial_controller.ser.read_all().decode('utf-8').strip()
+                self.meas_gui.update_distance(data)
 
 # Class to setup and create the communication manager with MCU
 class ComGUI():
-    def __init__(self, root, serial):
+    def __init__(self, root, serial, parent):
         '''
         Initialize the connexion GUI and initialize the main widgets 
         '''
         # Initializing the Widgets
         self.root = root
+        self.parent = parent
         self.serial = serial
         self.frame = LabelFrame(root, text="Com Manager",
                                 padx=5, pady=5, bg="white")
@@ -129,7 +152,8 @@ class ComGUI():
         if self.btn_connect["text"] in "Connect":
             # Start the serial communication
             self.serial.SerialOpen(self)
-
+            self.parent.serial_controller = self.serial
+            
             # If connection established move on
             if self.serial.ser.status:
                 # Update the COM manager
@@ -264,8 +288,9 @@ class GraphGUI:
 
 # class for creating buttons
 class ButtonGUI:
-    def __init__(self, root):
+    def __init__(self, root, parent):
         self.root = root
+        self.parent = parent
         
         # define images
         self.add_btn_image1 = ctk.CTkImage(Image.open("Images/Retract_Tip_Btn.png"), size=(40,80))
@@ -278,7 +303,7 @@ class ButtonGUI:
         self.add_btn_image8 = ctk.CTkImage(Image.open("Images/Stop_LED.png"), size=(35,35))
         
         # create buttons with proper sizes
-        self.start_btn = ctk.CTkButton(master=root, image=self.add_btn_image4, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0)
+        self.start_btn = ctk.CTkButton(master=root, image=self.add_btn_image4, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.parent.start_reading)
         self.stop_btn = ctk.CTkButton(master=root, image=self.add_btn_image5, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0)
         self.acquire_iv_btn = ctk.CTkButton(master=root, image=self.add_btn_image6, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.open_iv_window)
         self.acquire_iz_btn = ctk.CTkButton(master=root, image=self.add_btn_image7, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.open_iz_window)

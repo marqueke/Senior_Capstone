@@ -102,8 +102,8 @@ class IVWindow:
     
     def init_graph_widgets(self):
         self.fig, self.ax = plt.subplots()
-        self.ax.set_xlabel('Time (s)')
-        self.ax.set_ylabel('Tunneling Current (nA)')
+        self.ax.set_xlabel('Bias (V)')
+        self.ax.set_ylabel('Current (A)')
         self.fig.set_figwidth(8)
         self.fig.set_figheight(5.5)
         

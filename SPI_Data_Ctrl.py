@@ -22,15 +22,16 @@
 # For more content visit the WeeW Stack Channel on YouTube
 
 import serial.tools.list_ports  # pip install pyserial
+import serial
 # Secure the UART serial communication with MCU
-
+# This will be where the serial connection is decoded
 
 class SerialCtrl():
     def __init__(self):
         '''
         Initializing the main varialbles for the serial data
         '''
-        pass
+        self.ser = None
 
     def getCOMList(self):
         '''
@@ -47,29 +48,22 @@ class SerialCtrl():
         '''
 
         try:
-            self.ser.is_open
-        except:
-            PORT = ComGUI.clicked_com.get()
-            BAUD = 9600
-            self.ser = serial.Serial()
-            self.ser.baudrate = BAUD
-            self.ser.port = PORT
-            self.ser.timeout = 0.1
-
-        try:
-            if self.ser.is_open:
-                print("Already Open")
-                self.ser.status = True
-            else:
+            if self.ser is None:
                 PORT = ComGUI.clicked_com.get()
                 BAUD = 9600
                 self.ser = serial.Serial()
                 self.ser.baudrate = BAUD
                 self.ser.port = PORT
-                self.ser.timeout = 0.01
+                self.ser.timeout = 0.1
+
+            if self.ser.is_open:
+                print("Already Open")
+                self.ser.status = True
+            else:
                 self.ser.open()
                 self.ser.status = True
-        except:
+        except Exception as e:
+            print(f"Error opening serial port: {e}")
             self.ser.status = False
 
     def SerialClose(self, ComGUI):
@@ -80,5 +74,6 @@ class SerialCtrl():
             self.ser.is_open
             self.ser.close()
             self.ser.status = False
-        except:
+        except Exception as e:
+            print(f"Error closing serial port: {e}")
             self.ser.status = False

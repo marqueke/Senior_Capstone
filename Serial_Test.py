@@ -2,18 +2,18 @@ import tkinter as tk
 from tkinter import scrolledtext
 import serial
 import threading
+from PIL import Image, ImageTk
+import PIL
+import customtkinter as ctk
 
 class SerialReader:
     def __init__(self, port, baudrate, callback):
-        try:
-            self.serial_port = serial.Serial(port=port, baudrate=baudrate, timeout=1)
-            self.callback = callback
-            self.running = True
-            self.thread = threading.Thread(target=self.read_serial)
-            self.thread.start()
-        except serial.SerialException as e:
-            print(f"Error opening serial port: {e}")
-            self.serial_port = None
+        self.port = port
+        self.baudrate = baudrate
+        self.callback = callback
+        self.serial_port = None
+        self.thread = None
+        self.running = False
 
     def read_serial(self):
         while self.running and self.serial_port:
@@ -25,6 +25,17 @@ class SerialReader:
             except serial.SerialException as e:
                 print(f"Error reading serial port: {e}")
                 self.running = False
+
+    def start(self):
+        if not self.running:
+            try:
+                self.serial_port = serial.Serial(port=self.port, baudrate=self.baudrate, timeout=1)
+                self.running = True
+                self.thread = threading.Thread(target=self.read_serial)
+                self.thread.start()
+            except serial.SerialException as e:
+                print(f"Error opening serial port: {e}")
+                self.serial_port = None
 
     def stop(self):
         self.running = False
@@ -48,11 +59,18 @@ class App:
 
         self.serial_reader = SerialReader(port='COM9', baudrate=9600, callback=self.update_text)
 
+        self.add_btn_image4 = ctk.CTkImage(Image.open("Images/Start_Btn.png"), size=(90,35))
+        self.start_btn = ctk.CTkButton(master=root, image=self.add_btn_image4, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.start_reading)
+        self.start_btn.pack(pady=10)  # Using pack to add the button
+
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
 
     def update_text(self, data):
         self.text_area.insert(tk.END, data + '\n')
         self.text_area.see(tk.END)
+
+    def start_reading(self):
+        self.serial_reader.start()
 
     def on_closing(self):
         self.serial_reader.stop()

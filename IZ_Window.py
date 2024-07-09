@@ -20,11 +20,11 @@ class IZWindow:
         
     def init_meas_widgets(self):
         # piezo extension
-        self.frame1 = LabelFrame(self.root, text="Piezo Extension (nm)", padx=10, pady=2, bg="gray")
+        self.frame1 = LabelFrame(self.root, text="ΔZ (nm)", padx=10, pady=2, bg="gray")
         self.label1 = Entry(self.frame1, bg="white", width=25)
         
         # critical piezo extension
-        self.frame2 = LabelFrame(self.root, text="Critical Piezo Extension (nm)", padx=10, pady=2, bg="gray")
+        self.frame2 = LabelFrame(self.root, text="Critical ΔZ (nm)", padx=10, pady=2, bg="gray")
         self.label2 = Entry(self.frame2, bg="white", width=25)
 
         # piezo voltage
@@ -118,8 +118,8 @@ class IZWindow:
     
     def init_graph_widgets(self):
         self.fig, self.ax = plt.subplots()
-        self.ax.set_xlabel('Time (s)')
-        self.ax.set_ylabel('Tunneling Current (nA)')
+        self.ax.set_xlabel('Delta Z (nm)')
+        self.ax.set_ylabel('Tunneling Current (A)')
         self.fig.set_figwidth(8)
         self.fig.set_figheight(5.5)
         

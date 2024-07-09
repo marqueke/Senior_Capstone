@@ -3,6 +3,8 @@ from tkinter import scrolledtext
 import serial
 import threading
 
+# this will be where the headers messages are sorted
+
 class SerialReader:
     def __init__(self, port, baudrate, callback):
         self.serial_port = serial.Serial(port, baudrate)
