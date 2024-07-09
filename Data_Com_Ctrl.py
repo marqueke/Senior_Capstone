@@ -1,58 +1,69 @@
-import tkinter as tk
-from tkinter import scrolledtext
 import serial
 import threading
+import queue
+import serial.tools.list_ports
+from tkinter import messagebox
 
-class SerialReader:
+class SerialController:
     def __init__(self, port, baudrate, callback):
-        self.serial_port = serial.Serial(port, baudrate)
+        self.port = port
+        self.baudrate = baudrate
         self.callback = callback
-        self.running = True
-        self.thread = threading.Thread(target=self.read_serial)
-        self.thread.start()
+        self.serial_connection = None
+        self.running = False
+        self.thread = None
+        self.queue = queue.Queue()
 
-    def read_serial(self):
+    def start(self, root):
+        try:
+            self.serial_connection = serial.Serial(self.port, self.baudrate, timeout=1)
+            self.running = True
+            self.thread = threading.Thread(target=self.read_data)
+            self.thread.start()
+            self.process_queue(root)
+        except serial.SerialException as e:
+            print(f"Error opening serial port: {e}")
+            messagebox.showerror("Serial Error", f"Error opening serial port: {e}")
+
+    def read_data(self):
         while self.running:
-            if self.serial_port.in_waiting > 0:
-                data = self.serial_port.readline().decode('utf-8').strip()
-                self.callback(data)
+            try:
+                data = self.serial_connection.readline().decode(errors='replace').strip()
+                if data:
+                    self.queue.put(data)
+            except serial.SerialException as e:
+                print(f"Serial read error: {e}")
+                self.stop()
+
+    def process_queue(self, root):
+        while not self.queue.empty():
+            data = self.queue.get()
+            self.callback(data)
+        if self.running:
+            root.after(100, self.process_queue, root)
 
     def stop(self):
         self.running = False
-        self.thread.join()
-        self.serial_port.close()
+        if self.thread:
+            self.thread.join()
+        if self.serial_connection:
+            self.serial_connection.close()
 
-class App:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("STM32 Serial Data Display")
+    def SerialOpen(self, com_gui):
+        try:
+            self.serial_connection = serial.Serial(self.port, self.baudrate)
+            self.running = True
+            self.thread = threading.Thread(target=self.read_data)
+            self.thread.start()
+            return True
+        except Exception as e:
+            print(f"Failed to open serial port: {e}")
+            return False
 
-        self.label = tk.Label(root, text="Received Data:")
-        self.label.pack(pady=10)
+    def SerialClose(self, com_gui):
+        self.stop()
 
-        self.frame = tk.Frame(root, relief=tk.RAISED, borderwidth=2)
-        self.frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-
-        self.text_area = scrolledtext.ScrolledText(self.frame, wrap=tk.WORD, height=20, width=60)
-        self.text_area.pack(fill=tk.BOTH, expand=True)
-
-<<<<<<< HEAD
-        self.serial_reader = SerialReader(port='COM4', baudrate=9600, callback=self.update_text)
-=======
-        self.serial_reader = SerialReader(port='COM9', baudrate=9600, callback=self.update_text)
->>>>>>> kelseys_GUI
-
-        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
-
-    def update_text(self, data):
-        self.text_area.insert(tk.END, data + '\n')
-        self.text_area.see(tk.END)
-
-    def on_closing(self):
-        self.serial_reader.stop()
-        self.root.destroy()
-
-if __name__ == "__main__":
-    root = tk.Tk()
-    app = App(root)
-    root.mainloop()
+    def getCOMList(self):
+        self.com_list = [port.device for port in serial.tools.list_ports.comports()]
+        if not self.com_list:
+            self.com_list = ['No COM ports found']
