@@ -1,12 +1,7 @@
 from tkinter import *
 from tkinter import messagebox
-from tkinter import ttk
-import threading
-from tkinter import scrolledtext
-from PIL import Image, ImageTk
-import PIL
+from PIL import Image
 import customtkinter as ctk
-import tkinter as tk
 import serial
 import serial.tools.list_ports
 
@@ -17,7 +12,7 @@ from IV_Window import IVWindow  # import the IV Window Class
 from IZ_Window import IZWindow  # import the IV Window Class
 from SPI_Data_Ctrl import SerialCtrl
 from Data_Com_Ctrl import DataCtrl
-from value_conversion import Convert
+#from value_conversion import Convert
 
 # NOTE: ADD drop down list for sample rates
 
@@ -31,8 +26,9 @@ class RootGUI:
         # Add a method to quit the application
         self.root.protocol("WM_DELETE_WINDOW", self.quit_application)
         
-        # initialize serial controller
-        self.serial_controller = None
+        # initialize data and serial control
+        self.data_ctrl = DataCtrl(self.update_distance)
+        self.serial_ctrl = SerialCtrl('COM9', 9600, self.data_ctrl.decode_data)
         
         # Initialize other components
         self.meas_gui = MeasGUI(self.root)
@@ -42,23 +38,23 @@ class RootGUI:
         
     def quit_application(self):
         print("Quitting application")
-        if self.serial_controller:
-            print("Serial controller has stopped.")
-            self.serial_controller.stop()
+        if self.serial_ctrl:
+            #print("Serial controller has stopped.")
+            self.serial_ctrl.stop()
         self.root.quit()
     
     def start_reading(self):
         print("Starting to read data...")
-        if self.serial_controller:
+        if self.serial_ctrl:
             print("Serial controller is initialized, starting now...")
-            self.serial_controller.start()
+            self.serial_ctrl.start()
         else:
             print("Serial controller is not initialized.")
-        print(f"Current serial controller: {self.serial_controller}")
+        #print(f"Current serial controller: {self.serial_ctrl}")
     
     def stop_reading(self):
         print("Stopped reading data...")
-        self.serial_controller.stop()
+        self.serial_ctrl.stop()
         
     def update_distance(self, data):
         print(f"Updating distance with data: {data}")
@@ -69,7 +65,7 @@ class ComGUI:
     def __init__(self, root, parent):
         self.root = root
         self.parent = parent
-        #self.serial_controller = None
+        #self.serial_ctrl = None
         self.frame = LabelFrame(root, text="Com Manager", padx=5, pady=5, bg="white")
         self.label_com = Label(self.frame, text="Available Port(s): ", bg="white", width=15, anchor="w")
         
@@ -119,26 +115,35 @@ class ComGUI:
     def serial_connect(self):
         if self.btn_connect["text"] == "Connect":
             port = self.clicked_com.get()
-            self.serial_controller = SerialCtrl(port, 9600, self.parent.update_distance)
-            self.parent.serial_controller = self.serial_controller  # Add this line
-            print(f"Connecting to {port}...")
-            self.btn_connect["text"] = "Disconnect"
-            self.btn_refresh["state"] = "disable"
-            self.drop_com["state"] = "disable"
-            InfoMsg = f"Successful UART connection using {self.clicked_com.get()}"
-            messagebox.showinfo("showinfo", InfoMsg)
-            print("Serial controller initialized:", self.serial_controller is not None)
+            try:
+                # Attempt to open the serial port to check if it is already in use
+                test_serial = serial.Serial(port)
+                test_serial.close()
+
+                # If the port is available, proceed with the connection
+                self.parent.serial_ctrl.port = port
+                print(f"Connecting to {port}...")
+                self.btn_connect["text"] = "Disconnect"
+                self.btn_refresh["state"] = "disable"
+                self.drop_com["state"] = "disable"
+                InfoMsg = f"Successful UART connection using {self.clicked_com.get()}"
+                messagebox.showinfo("Connected", InfoMsg)
+            except serial.SerialException as e:
+                InfoMsg = f"Failed to connect to {port}: {e}"
+                messagebox.showerror("Connection Error", InfoMsg)
+                print(f"Failed to connect to {port}: {e}")
         else:
-            if self.serial_controller:
-                ErrorMsg = f"Failure to estabish UART connection using {self.clicked_com.get()} "
-                messagebox.showerror("showerror", ErrorMsg)
-                self.serial_controller.stop()
+            if self.parent.serial_ctrl:
+                self.parent.serial_ctrl.stop()
             self.btn_connect["text"] = "Connect"
             self.btn_refresh["state"] = "active"
             self.drop_com["state"] = "active"
-            InfoMsg = f"UART connection using {self.clicked_com.get()} is now closed"
-            messagebox.showwarning("showinfo", InfoMsg)
+            InfoMsg = f"UART connection using {self.clicked_com.get()} is now closed."
+            messagebox.showwarning("Disconnected", InfoMsg)
             print("Disconnected")
+
+
+
 
             
 #InfoMsg = f"UART connection using {self.clicked_com.get()} is now closed"
