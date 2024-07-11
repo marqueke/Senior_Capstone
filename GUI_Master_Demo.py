@@ -16,6 +16,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from IV_Window import IVWindow  # import the IV Window Class
 from IZ_Window import IZWindow  # import the IV Window Class
 from SPI_Data_Ctrl import SerialCtrl
+from Data_Com_Ctrl import DataCtrl
 from value_conversion import Convert
 
 # NOTE: ADD drop down list for sample rates
@@ -31,56 +32,54 @@ class RootGUI:
         self.root.protocol("WM_DELETE_WINDOW", self.quit_application)
         
         # initialize serial controller
-        self.serial_controller = SerialCtrl()
-        #self.serial = SerialCtrl()
+        self.serial_controller = None
         
         # Initialize other components
         self.meas_gui = MeasGUI(self.root)
         self.graph_gui = GraphGUI(self.root)
         self.button_gui = ButtonGUI(self.root, self)
-        self.com_gui = ComGUI(self.root, self.serial_controller, self)
+        self.com_gui = ComGUI(self.root, self)
         
     def quit_application(self):
         print("Quitting application")
-        if hasattr(self, 'serial_controller'):
-            self.serial_controller.SerialClose(self.com_gui)
+        if self.serial_controller:
+            print("Serial controller has stopped.")
+            self.serial_controller.stop()
         self.root.quit()
     
     def start_reading(self):
-        if hasattr(self, 'serial_controller') and hasattr(self, 'meas_gui'):
-            self.reading_thread = threading.Thread(target=self.read_data)
-            self.reading_thread.start()
+        print("Starting to read data...")
+        if self.serial_controller:
+            print("Serial controller is initialized, starting now...")
+            self.serial_controller.start()
+        else:
+            print("Serial controller is not initialized.")
+        print(f"Current serial controller: {self.serial_controller}")
+    
+    def stop_reading(self):
+        print("Stopped reading data...")
+        self.serial_controller.stop()
         
-    def read_data(self):
-        while True:
-            if self.serial_controller.ser.in_waiting > 0:
-                data = self.serial_controller.ser.read_all().decode('utf-8').strip()
-                self.meas_gui.update_distance(data)
+    def update_distance(self, data):
+        print(f"Updating distance with data: {data}")
+        self.meas_gui.update_distance(data)
 
 # Class to setup and create the communication manager with MCU
-class ComGUI():
-    def __init__(self, root, serial, parent):
-        '''
-        Initialize the connexion GUI and initialize the main widgets 
-        '''
-        # Initializing the Widgets
+class ComGUI:
+    def __init__(self, root, parent):
         self.root = root
         self.parent = parent
-        self.serial = serial
-        self.frame = LabelFrame(root, text="Com Manager",
-                                padx=5, pady=5, bg="white")
-        self.label_com = Label(
-            self.frame, text="Available Port(s): ", bg="white", width=15, anchor="w")
-
+        #self.serial_controller = None
+        self.frame = LabelFrame(root, text="Com Manager", padx=5, pady=5, bg="white")
+        self.label_com = Label(self.frame, text="Available Port(s): ", bg="white", width=15, anchor="w")
+        
         # Setup the Drop option menu
         self.ComOptionMenu()
 
         # Add the control buttons for refreshing the COMs & Connect
-        self.btn_refresh = Button(self.frame, text="Refresh",
-                                  width=10,  command=self.com_refresh)
-        self.btn_connect = Button(self.frame, text="Connect",
-                                  width=10, state="disabled",  command=self.serial_connect)
-
+        self.btn_refresh = Button(self.frame, text="Refresh", width=10, command=self.com_refresh)
+        self.btn_connect = Button(self.frame, text="Connect", width=10, state="disabled", command=self.serial_connect)
+        
         # Optional Graphic parameters
         self.padx = 7
         self.pady = 5
@@ -89,95 +88,61 @@ class ComGUI():
         self.publish()
 
     def publish(self):
-        '''
-         Method to display all the Widget of the main frame
-        '''
-        self.frame.grid(row=1, column=0, rowspan=3,
-                        columnspan=3, padx=5, pady=5)
+        self.frame.grid(row=1, column=0, rowspan=3, columnspan=3, padx=5, pady=5)
         self.label_com.grid(column=1, row=2)
-
         self.drop_com.grid(column=2, row=2, padx=self.padx)
-
         self.btn_refresh.grid(column=3, row=2, padx=self.padx)
         self.btn_connect.grid(column=3, row=3, padx=self.padx)
 
     def ComOptionMenu(self):
-        '''
-         Method to Get the available COMs connected to the PC
-         and list them into the drop menu
-        '''
-        # Generate the list of available coms
-
-        self.serial.getCOMList()
-
+        ports = serial.tools.list_ports.comports()
+        self.serial_ports = [port.device for port in ports]
         self.clicked_com = StringVar()
-        self.clicked_com.set(self.serial.com_list[0])
-        self.drop_com = OptionMenu(
-            self.frame, self.clicked_com, *self.serial.com_list, command=self.connect_ctrl)
-
+        self.clicked_com.set(self.serial_ports[0] if self.serial_ports else "No COM port found")
+        self.drop_com = OptionMenu(self.frame, self.clicked_com, *self.serial_ports, command=self.connect_ctrl)
         self.drop_com.config(width=10)
 
     def connect_ctrl(self, widget):
-        '''
-        Mehtod to keep the connect button disabled if all the 
-        conditions are not cleared
-        '''
-        print("Connect ctrl")
-        # Checking the logic consistency to keep the connection btn
-        if "-" in self.clicked_com.get():         
+        if "-" in self.clicked_com.get():
             self.btn_connect["state"] = "disabled"
         else:
             self.btn_connect["state"] = "active"
 
     def com_refresh(self):
         print("Refresh")
-        # Get the Widget destroyed
         self.drop_com.destroy()
-
-        # Refresh the list of available Coms
         self.ComOptionMenu()
-
-        # Publish the this new droplet
         self.drop_com.grid(column=2, row=2, padx=self.padx)
-
-        # Just in case to secure the connect logic
         logic = []
         self.connect_ctrl(logic)
 
     def serial_connect(self):
-        '''
-        Method that Updates the GUI during connect / disconnect status
-        Manage serials and data flows during connect / disconnect status
-        '''
-        if self.btn_connect["text"] in "Connect":
-            # Start the serial communication
-            self.serial.SerialOpen(self)
-            self.parent.serial_controller = self.serial
-            
-            # If connection established move on
-            if self.serial.ser.status:
-                # Update the COM manager
-                self.btn_connect["text"] = "Disconnect"
-                self.btn_refresh["state"] = "disable"
-                self.drop_com["state"] = "disable"
-                InfoMsg = f"Successful UART connection using {self.clicked_com.get()}"
-                messagebox.showinfo("showinfo", InfoMsg)
-
-            else:
+        if self.btn_connect["text"] == "Connect":
+            port = self.clicked_com.get()
+            self.serial_controller = SerialCtrl(port, 9600, self.parent.update_distance)
+            self.parent.serial_controller = self.serial_controller  # Add this line
+            print(f"Connecting to {port}...")
+            self.btn_connect["text"] = "Disconnect"
+            self.btn_refresh["state"] = "disable"
+            self.drop_com["state"] = "disable"
+            InfoMsg = f"Successful UART connection using {self.clicked_com.get()}"
+            messagebox.showinfo("showinfo", InfoMsg)
+            print("Serial controller initialized:", self.serial_controller is not None)
+        else:
+            if self.serial_controller:
                 ErrorMsg = f"Failure to estabish UART connection using {self.clicked_com.get()} "
                 messagebox.showerror("showerror", ErrorMsg)
-        else:
-
-            # Closing the Serial COM
-            # Close the serial communication
-            self.serial.SerialClose(self)
-
-            InfoMsg = f"UART connection using {self.clicked_com.get()} is now closed"
-            messagebox.showwarning("showinfo", InfoMsg)
+                self.serial_controller.stop()
             self.btn_connect["text"] = "Connect"
             self.btn_refresh["state"] = "active"
             self.drop_com["state"] = "active"
-    
+            InfoMsg = f"UART connection using {self.clicked_com.get()} is now closed"
+            messagebox.showwarning("showinfo", InfoMsg)
+            print("Disconnected")
+
+            
+#InfoMsg = f"UART connection using {self.clicked_com.get()} is now closed"
+#messagebox.showwarning("showinfo", InfoMsg)    
 # class for measurements/text box widgets in homepage
 class MeasGUI:
     def __init__(self, root):
@@ -186,6 +151,8 @@ class MeasGUI:
         # current distance
         self.frame1 = LabelFrame(root, text="Distance (nm)", padx=10, pady=2, bg="gray")
         self.label1 = Entry(self.frame1, bg="white", width=20)
+        self.frame1.grid(row=11, column=4, padx=5, pady=5, sticky="sw")
+        self.label1.grid(row=0, column=0, padx=5, pady=5)
         
         # current
         self.frame2 = LabelFrame(root, text="Critical Distance (nm)", padx=10, pady=2, bg="gray")
@@ -224,8 +191,6 @@ class MeasGUI:
         self.publish()
     
     def publish(self):
-        self.frame1.grid(row=11, column=4, padx=5, pady=5, sticky="sw")
-        self.label1.grid(row=0, column=0, padx=5, pady=5)
         
         self.frame2.grid(row=11, column=5, padx=5, pady=5, sticky="sw")
         self.label2.grid(row=0, column=1, padx=5, pady=5)   
@@ -252,6 +217,7 @@ class MeasGUI:
         self.drop_menu.grid(row=0, column=0, padx=5, pady=5, sticky="w")
     
     def update_distance(self, data):
+        print(f"Updating distance entry with data: {data}")
         self.label1.delete(0, END)
         self.label1.insert(0, data)
              
@@ -303,8 +269,8 @@ class ButtonGUI:
         self.add_btn_image8 = ctk.CTkImage(Image.open("Images/Stop_LED.png"), size=(35,35))
         
         # create buttons with proper sizes
-        self.start_btn = ctk.CTkButton(master=root, image=self.add_btn_image4, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.parent.start_reading)
-        self.stop_btn = ctk.CTkButton(master=root, image=self.add_btn_image5, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0)
+        self.start_btn = ctk.CTkButton(master=root, image=self.add_btn_image4, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.start_reading)
+        self.stop_btn = ctk.CTkButton(master=root, image=self.add_btn_image5, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.stop_reading)
         self.acquire_iv_btn = ctk.CTkButton(master=root, image=self.add_btn_image6, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.open_iv_window)
         self.acquire_iz_btn = ctk.CTkButton(master=root, image=self.add_btn_image7, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.open_iz_window)
         self.stop_led_btn = ctk.CTkButton(master=root, image=self.add_btn_image8, text="", width=30, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0)
@@ -355,12 +321,16 @@ class ButtonGUI:
         new_window = ctk.CTkToplevel(self.root)
         IZWindow(new_window)
     
+    def start_reading(self):
+        print("ButtonGUI: Start button pressed")
+        self.parent.start_reading()
+    
+    def stop_reading(self):
+        print("ButtonGUI: Stop button pressed")
+        self.parent.stop_reading()
+    
     
 
 if __name__ == "__main__":
     root_gui = RootGUI()
-    MeasGUI(root_gui.root)
-    GraphGUI(root_gui.root)
-    ButtonGUI(root_gui.root)
-    ComGUI(root_gui.root)
     root_gui.root.mainloop()
