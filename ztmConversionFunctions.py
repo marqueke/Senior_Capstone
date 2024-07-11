@@ -1,0 +1,85 @@
+class ztmConvert:    
+    def  __init__(self,val):
+        self.val=val
+    def get_curr_float_nA(curr_int18) -> float:
+        """
+        Converts tunneling current in 18-bit fixed point integer format to
+        floating point format with units of nA
+
+        :param curr_int18: Tunneling Current in 18-bit format used by ADC
+
+        :return val: Tunneling Current as a float with a unit of nA
+        """
+        # Converts unsigned int to signed int
+        curr_float_nA = curr_int18 - (2 * (curr_int18 & (2 ** 17))) 
+        # Converts fixed point int to float
+        curr_float_nA = (curr_float_nA * 5 * 1000000000) / (200000000 * (2 ** 18))
+        return curr_float_nA
+
+    def get_curr_int18(curr_float_nA) -> int:
+        """
+        Converts tunneling current in floating point format with units of nA to 
+        18-bit fixed point integer format
+
+        :param curr_float_nA: Tunneling Current as a float with a unit of nA
+
+        :return val: Tunneling Current in 18-bit format used by ADC
+        """
+        # Convert to int
+        curr_int18 = round((curr_float_nA * 200000000 * (2 ** 18)) / (5 * 1000000000)) 
+
+        # Convert to 2's complement if negative
+        if curr_int18 < 0:
+            curr_int18 = curr_int18 * -1
+            curr_int18 = curr_int18 | (2 ** 17)
+            curr_int18 = (curr_int18 ^ ((2 ** 17) - 1)) + 1
+        return curr_int18
+
+    def get_Vbias_float_V(Vbias_int) -> float:
+        """
+        Converts Vbias voltage in 16-bit fixed point integer format to floating
+        point format with a unit of Volts
+
+        :param Vbias_int: Vbias in 16-bit format used by DAC
+
+        :return val: Vbias as a float with a unit of Volts
+        """
+        Vbias_float_V = ((4 * 5 * Vbias_int) / (2 ** 16)) - 10
+        return Vbias_float_V
+
+    def get_Vbias_int(Vbias_float_V) -> int:
+        """
+        Converts Vbias voltage in floating point format with units of Volts to 
+        16-bit fixed point integer format
+
+        :param Vbias_float_V: Vbias voltage as a float with a unit of Volts
+
+        :return val: Vbias Voltage in 16-bit format used by DAC
+        """
+        Vbias_int = round(((Vbias_float_V + 10) * (2 ** 16)) / (4 * 5))
+        return Vbias_int
+
+    def get_Vpiezo_float_V(Vpiezo_int16) -> float:
+        """
+        Converts Vpiezo voltage in 16-bit fixed point integer format to floating
+        point format with a unit of Volts
+
+        :param Vbias_int: Vpiezo in 16-bit format used by DAC
+
+        :return val: Vpiezo as a float with a unit of Volts
+        """
+        Vpiezo_float_V = (2 * 5 * Vpiezo_int16) / (2 ** 16)
+        return Vpiezo_float_V
+
+    def get_Vpiezo_int16(Vpiezo_float_V) -> int:
+        """
+        Converts Vpiezo voltage in floating point format with units of Volts to 
+        16-bit fixed point integer format
+
+        :param Vpiezo_float_V: Vpiezo voltage as a float with a unit of Volts
+
+        :return val: Vpiezo Voltage in 16-bit format used by DAC
+        """
+        Vpiezo_int16 = round(Vpiezo_float_V * (2 ** 16) / (2 * 5))
+        return Vpiezo_int16
+    
