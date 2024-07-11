@@ -36,7 +36,7 @@ class IVWindow:
         self.label4 = Entry(self.frame4, bg="white", width=25)
         
         # sample rate
-        self.frame5 = LabelFrame(self.root, text="Sample Rate", padx=10, pady=2, bg="#b1ddf0")
+        self.frame5 = LabelFrame(self.root, text="Sample Rate", padx=10, pady=2, bg="#7393B3")
         self.label5 = Entry(self.frame5, bg="white", width=25)
         
         # user notes text box

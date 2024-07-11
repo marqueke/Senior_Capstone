@@ -19,12 +19,12 @@ class IZWindow:
         self.init_graph_widgets()
         
     def init_meas_widgets(self):
-        # piezo extension
-        self.frame1 = LabelFrame(self.root, text="Piezo Extension (nm)", padx=10, pady=2, bg="gray")
+        # current
+        self.frame1 = LabelFrame(self.root, text="Current (nA)", padx=10, pady=2, bg="gray")
         self.label1 = Entry(self.frame1, bg="white", width=25)
         
-        # critical piezo extension
-        self.frame2 = LabelFrame(self.root, text="Critical Piezo Extension (nm)", padx=10, pady=2, bg="gray")
+        # critical current
+        self.frame2 = LabelFrame(self.root, text="Critical Current (nA)", padx=10, pady=2, bg="gray")
         self.label2 = Entry(self.frame2, bg="white", width=25)
 
         # piezo voltage
@@ -35,16 +35,16 @@ class IZWindow:
         self.frame4 = LabelFrame(self.root, text="Critical Piezo Voltage (V)", padx=10, pady=2, bg="gray")
         self.label4 = Entry(self.frame4, bg="white", width=25)
         
-        # current
-        self.frame5 = LabelFrame(self.root, text="Current (nA)", padx=10, pady=2, bg="gray")
+        # piezo extension
+        self.frame5 = LabelFrame(self.root, text="Piezo Extension (nm)", padx=10, pady=2, bg="gray")
         self.label5 = Entry(self.frame5, bg="white", width=25)
         
-        # critical current
-        self.frame6 = LabelFrame(self.root, text="Critical Current (nA)", padx=10, pady=2, bg="gray")
+        # critical piezo extension
+        self.frame6 = LabelFrame(self.root, text="Critical Piezo Extension (nm)", padx=10, pady=2, bg="gray")
         self.label6 = Entry(self.frame6, bg="white", width=25)
         
         # sample rate
-        self.frame7 = LabelFrame(self.root, text="Sample Rate", padx=10, pady=2, bg="#d0cee2")
+        self.frame7 = LabelFrame(self.root, text="Sample Rate", padx=10, pady=2, bg="#7393B3")
         self.label7 = Entry(self.frame7, bg="white", width=25)
         
         # user notes text box
@@ -64,11 +64,11 @@ class IZWindow:
         self.publish_meas_widgets()
     
     def publish_meas_widgets(self):
-        # piezo extension
+        # current
         self.frame1.grid(row=1, column=10, padx=5, pady=5)
         self.label1.grid(row=0, column=0, padx=5, pady=5)
         
-        # critical piezo extension
+        # critical current
         self.frame2.grid(row=1, column=11, padx=5, pady=5)
         self.label2.grid(row=0, column=0, padx=5, pady=5)   
         
@@ -80,11 +80,11 @@ class IZWindow:
         self.frame4.grid(row=2, column=11, padx=5, pady=5)
         self.label4.grid(row=0, column=0, padx=5, pady=5) 
         
-        # critical piezo voltage
+        # piezo extension
         self.frame5.grid(row=3, column=10, padx=5, pady=5)
         self.label5.grid(row=0, column=0, padx=5, pady=5) 
         
-        # critical piezo voltage
+        # critical piezo extension
         self.frame6.grid(row=3, column=11, padx=5, pady=5)
         self.label6.grid(row=0, column=0, padx=5, pady=5) 
         

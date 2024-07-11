@@ -1,4 +1,3 @@
-<<<<<<< Updated upstream
 from tkinter import *
 from tkinter import messagebox
 from tkinter import ttk
@@ -258,6 +257,8 @@ class GraphGUI:
         self.fig, self.ax = plt.subplots()
         self.ax.set_xlabel('Time (s)')
         self.ax.set_ylabel('Tunneling Current (nA)')
+        self.fig.set_figwidth(8)
+        self.fig.set_figheight(5.5)
         
         # Create a canvas to embed the figure in Tkinter
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.root)

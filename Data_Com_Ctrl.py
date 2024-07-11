@@ -36,11 +36,7 @@ class App:
         self.text_area = scrolledtext.ScrolledText(self.frame, wrap=tk.WORD, height=20, width=60)
         self.text_area.pack(fill=tk.BOTH, expand=True)
 
-<<<<<<< HEAD
         self.serial_reader = SerialReader(port='COM4', baudrate=9600, callback=self.update_text)
-=======
-        self.serial_reader = SerialReader(port='COM9', baudrate=9600, callback=self.update_text)
->>>>>>> kelseys_GUI
 
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
 
