@@ -4,9 +4,11 @@ from enum import Enum
 import serial
 import time
 
-MSG_A = 0X0A
-MSG_E = 0X0E
-MSG_F = 0X0F
+MSG_A = 0x0A
+MSG_B = 0x0B
+MSG_C = 0x0C
+MSG_D = 0x0D
+MSG_E = 0x0E
 
 msgBytes = 10
 

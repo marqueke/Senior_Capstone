@@ -27,7 +27,7 @@ class RootGUI:
         self.root.protocol("WM_DELETE_WINDOW", self.quit_application)
         
         # initialize data and serial control
-        self.data_ctrl = DataCtrl(self.update_distance)
+        self.data_ctrl = DataCtrl(9600, self.handle_data)
         self.serial_ctrl = SerialCtrl('COM9', 9600, self.data_ctrl.decode_data)
         
         # Initialize other components
@@ -39,7 +39,6 @@ class RootGUI:
     def quit_application(self):
         print("Quitting application")
         if self.serial_ctrl:
-            #print("Serial controller has stopped.")
             self.serial_ctrl.stop()
         self.root.quit()
     
@@ -50,15 +49,23 @@ class RootGUI:
             self.serial_ctrl.start()
         else:
             print("Serial controller is not initialized.")
-        #print(f"Current serial controller: {self.serial_ctrl}")
     
     def stop_reading(self):
         print("Stopped reading data...")
         self.serial_ctrl.stop()
         
-    def update_distance(self, data):
-        print(f"Updating distance with data: {data}")
-        self.meas_gui.update_distance(data)
+    def update_distance(self, adc_curr, vbias, vpzo):
+        print(f"RootGUI: Updating distance with data: ADC_CURR={adc_curr}, VBIAS={vbias}, VPZO={vpzo}")
+        self.meas_gui.update_distance(adc_curr, vbias, vpzo)
+    
+    def handle_data(self, raw_data):
+        print(f"Handling raw data: {raw_data.hex()}")
+        decoded_data = self.data_ctrl.decode_data(raw_data)
+        if decoded_data:
+            print("Data is being decoded...")
+            self.update_distance(*decoded_data)
+        else:
+            print("Data decoding failed or data is incomplete")
 
 # Class to setup and create the communication manager with MCU
 class ComGUI:
@@ -126,7 +133,7 @@ class ComGUI:
                 self.btn_connect["text"] = "Disconnect"
                 self.btn_refresh["state"] = "disable"
                 self.drop_com["state"] = "disable"
-                InfoMsg = f"Successful UART connection using {self.clicked_com.get()}"
+                InfoMsg = f"Successful UART connection using {self.clicked_com.get()}."
                 messagebox.showinfo("Connected", InfoMsg)
             except serial.SerialException as e:
                 InfoMsg = f"Failed to connect to {port}: {e}"
@@ -142,12 +149,7 @@ class ComGUI:
             messagebox.showwarning("Disconnected", InfoMsg)
             print("Disconnected")
 
-
-
-
-            
-#InfoMsg = f"UART connection using {self.clicked_com.get()} is now closed"
-#messagebox.showwarning("showinfo", InfoMsg)    
+  
 # class for measurements/text box widgets in homepage
 class MeasGUI:
     def __init__(self, root):
@@ -167,8 +169,8 @@ class MeasGUI:
         self.frame3 = LabelFrame(root, text="Current (nA)", padx=10, pady=2, bg="gray")
         self.label3 = Entry(self.frame3, bg="white", width=20)
         
-        # critical current
-        self.frame4 = LabelFrame(root, text="Critical Current (nA)", padx=10, pady=2, bg="gray")
+        # vbias
+        self.frame4 = LabelFrame(root, text="Voltage Bias (V)", padx=10, pady=2, bg="#ADD8E6")
         self.label4 = Entry(self.frame4, bg="white", width=20)
         
         # current setpoint
@@ -191,6 +193,12 @@ class MeasGUI:
         # optional graphic parameters
         self.padx = 20
         self.pady = 10
+        
+        # Initialize data attributes for continuous update
+        self.adc_curr = 0
+        self.vbias = 0
+        self.vpzo = 0
+        self.update_label()
         
         # put on the grid all the elements
         self.publish()
@@ -221,11 +229,34 @@ class MeasGUI:
         # Positioning the file drop-down menu
         self.drop_menu.grid(row=0, column=0, padx=5, pady=5, sticky="w")
     
-    def update_distance(self, data):
-        print(f"Updating distance entry with data: {data}")
+    '''
+    def update_distance(self, adc_curr, vbias, vpzo):
+        print(f"MeasGUI: Updating labels with ADC_CURR={adc_curr}, VBIAS={vbias}, VPZO={vpzo}")
         self.label1.delete(0, END)
-        self.label1.insert(0, data)
-             
+        self.label1.insert(0, f"{adc_curr:.3f}")
+        
+        self.label2.delete(0, END)
+        self.label2.insert(0, f"{vbias:.3f}")
+        
+        self.label3.delete(0, END)
+        self.label3.insert(0, f"{vpzo:.3f}")
+    '''
+      
+    def update_distance(self, adc_curr, vbias, vpzo):
+        print(f"MeasGUI: Updating distance with data: ADC_CURR={adc_curr}, VBIAS={vbias}, VPZO={vpzo}")
+        self.adc_curr = adc_curr
+        self.vbias = vbias
+        self.vpzo = vpzo
+        self.update_label()
+
+    def update_label(self):
+        self.label1.configure(text=f"{self.adc_curr:.3f} nA")
+        self.label2.delete(0, END)
+        self.label2.insert(0, f"{self.vbias:.3f}")
+        self.label3.delete(0, END)
+        self.label3.insert(0, f"{self.vpzo:.3f}")
+        self.label1.after(1000, self.update_label)
+                 
     # file drop-down menu
     def DropDownMenu(self):
         '''
