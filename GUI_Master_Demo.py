@@ -83,6 +83,13 @@ class ComGUI:
         self.btn_refresh = Button(self.frame, text="Refresh", width=10, command=self.com_refresh)
         self.btn_connect = Button(self.frame, text="Connect", width=10, state="disabled", command=self.serial_connect)
         
+        # Initialize sample rate menu
+        self.label_sample_rate = Label(self.frame, text="Sample Rate: ", bg="white", width=15, anchor="w")
+        self.sample_rate_var = StringVar()
+        self.sample_rate_var.set("-")
+        self.sample_rate_menu = OptionMenu(self.frame, self.sample_rate_var, "25 kHz", "12.5 kHz", "37.5 kHz", "10 kHz", "5 kHz", command=self.sample_rate_selected)
+        self.sample_rate_menu.config(width=10)
+        
         # Optional Graphic parameters
         self.padx = 7
         self.pady = 5
@@ -94,6 +101,8 @@ class ComGUI:
         self.frame.grid(row=1, column=0, rowspan=3, columnspan=3, padx=5, pady=5)
         self.label_com.grid(column=1, row=2)
         self.drop_com.grid(column=2, row=2, padx=self.padx)
+        self.label_sample_rate.grid(column=1, row=3)
+        self.sample_rate_menu.grid(column=2, row=3, padx=self.padx)
         self.btn_refresh.grid(column=3, row=2, padx=self.padx)
         self.btn_connect.grid(column=3, row=3, padx=self.padx)
 
@@ -101,12 +110,18 @@ class ComGUI:
         ports = serial.tools.list_ports.comports()
         self.serial_ports = [port.device for port in ports]
         self.clicked_com = StringVar()
-        self.clicked_com.set(self.serial_ports[0] if self.serial_ports else "No COM port found")
+        self.clicked_com.set("-" if self.serial_ports else "No COM port found")
         self.drop_com = OptionMenu(self.frame, self.clicked_com, *self.serial_ports, command=self.connect_ctrl)
         self.drop_com.config(width=10)
 
+    def sample_rate_selected(self, _):
+        if self.sample_rate_var.get() != "-" and self.clicked_com.get() != "-":
+            self.btn_connect["state"] = "active"
+        else:
+            self.btn_connect["state"] = "disabled"
+            
     def connect_ctrl(self, widget):
-        if "-" in self.clicked_com.get():
+        if self.clicked_com.get() == "-" and self.sample_rate_var.get == "-":
             self.btn_connect["state"] = "disabled"
         else:
             self.btn_connect["state"] = "active"
@@ -162,30 +177,26 @@ class MeasGUI:
         self.label1.grid(row=0, column=0, padx=5, pady=5)
         
         # current
-        self.frame2 = LabelFrame(root, text="Critical Distance (nm)", padx=10, pady=2, bg="gray")
+        self.frame2 = LabelFrame(root, text="Current (nA)", padx=10, pady=2, bg="gray")
         self.label2 = Entry(self.frame2, bg="white", width=20)
         
-        # critical distance
-        self.frame3 = LabelFrame(root, text="Current (nA)", padx=10, pady=2, bg="gray")
+        # vbias
+        self.frame3 = LabelFrame(root, text="Current Setpoint (nA)", padx=10, pady=2, bg="#ADD8E6")
         self.label3 = Entry(self.frame3, bg="white", width=20)
         
-        # vbias
-        self.frame4 = LabelFrame(root, text="Voltage Bias (V)", padx=10, pady=2, bg="#ADD8E6")
+        # current setpoint
+        self.frame4 = LabelFrame(root, text="Current Offset (nA)", padx=10, pady=2, bg="#ADD8E6")
         self.label4 = Entry(self.frame4, bg="white", width=20)
         
-        # current setpoint
-        self.frame5 = LabelFrame(root, text="Current Setpoint (nA)", padx=10, pady=2, bg="#ADD8E6")
+        # current offset
+        self.frame5 = LabelFrame(root, text="Sample Bias (V)", padx=10, pady=2, bg="#ADD8E6")
         self.label5 = Entry(self.frame5, bg="white", width=20)
         
-        # current offset
-        self.frame6 = LabelFrame(root, text="Current Offset (nA)", padx=10, pady=2, bg="#ADD8E6")
-        self.label6 = Entry(self.frame6, bg="white", width=20)
-        
         # user notes text box
-        self.frame7 = LabelFrame(root, text="NOTES", padx=10, pady=5, bg="#ADD8E6")
-        self.label7 = Text(self.frame7, height=7, width=30)
-        self.label8 = Text(self.frame7, height=1, width=8)
-        self.label9 = Label(self.frame7, padx=10, text="Date:", height=1, width=5)
+        self.frame6 = LabelFrame(root, text="NOTES", padx=10, pady=5, bg="#ADD8E6")
+        self.label6 = Text(self.frame6, height=7, width=30)
+        self.label7 = Text(self.frame6, height=1, width=8)
+        self.label8 = Label(self.frame6, padx=10, text="Date:", height=1, width=5)
         
         # setup the drop option menu
         self.DropDownMenu()
@@ -217,14 +228,11 @@ class MeasGUI:
         self.frame5.grid(row=13, column=4, padx=5, pady=5, sticky="nw")
         self.label5.grid(row=2, column=0, padx=5, pady=5) 
         
-        self.frame6.grid(row=13, column=5, padx=5, pady=5, sticky="nw")
-        self.label6.grid(row=2, column=1, padx=5, pady=5) 
-        
         # Positioning the notes section
-        self.frame7.grid(row=11, column=7, rowspan=3, pady=5, sticky="n")
-        self.label7.grid(row=1, column=0, pady=5, columnspan=3, rowspan=3) 
-        self.label8.grid(row=0, column=2, pady=5, sticky="e")
-        self.label9.grid(row=0, column=2, pady=5, sticky="w")
+        self.frame6.grid(row=11, column=7, rowspan=3, pady=5, sticky="n")
+        self.label6.grid(row=1, column=0, pady=5, columnspan=3, rowspan=3) 
+        self.label7.grid(row=0, column=2, pady=5, sticky="e")
+        self.label8.grid(row=0, column=2, pady=5, sticky="w")
         
         # Positioning the file drop-down menu
         self.drop_menu.grid(row=0, column=0, padx=5, pady=5, sticky="w")
@@ -318,8 +326,10 @@ class ButtonGUI:
         self.fine_adjust_btn_up = ctk.CTkButton(master=self.fine_adjust_frame, image=self.add_btn_image2, text = "", width=40, height=40, compound="bottom", fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0)
         self.fine_adjust_btn_down = ctk.CTkButton(master=self.fine_adjust_frame, image=self.add_btn_image3, text="", compound="bottom", width=40, height=40, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0)
         
+        '''
         self.vbias_frame = LabelFrame(root, text="Vbias", padx=10, pady=2, bg="#7393B3")
         self.vbias_label = Entry(self.vbias_frame, bg="white", width=15)
+        '''
         
         self.DisplayGUI()
         
@@ -340,8 +350,10 @@ class ButtonGUI:
         self.acquire_iz_btn.grid(row=5, column=9, sticky="ne")
         self.stop_led_btn.grid(row=2, column=10, sticky="e")
 
+    '''
         self.vbias_frame.grid(row=6, column=9, padx=5, pady=5, sticky="ne")
         self.vbias_label.grid(row=6, column=9, padx=5, pady=5)
+    '''
         
     def open_iv_window(self):
         '''
