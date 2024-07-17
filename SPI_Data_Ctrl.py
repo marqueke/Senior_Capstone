@@ -9,30 +9,29 @@ class SerialCtrl:
         self.serial_port = None
         self.thread = None
         self.running = False
+        self.buffer = bytearray()
 
     def read_serial(self):
         while self.running and self.serial_port:
             try:
                 if self.serial_port.in_waiting > 0:
-                    raw_data = self.serial_port.read(10)    # Read 10 byte data frame
-                    data = raw_data.decode('utf-8', errors='replace').strip()
-                    #data = self.serial_port.read(self.serial_port.in_waiting).decode('utf-8', errors='replace').strip()
-                    print(f"Raw data: {raw_data}")  # Debugging print statement
-                    print(f"Processed data: {data}")
-                    self.callback(data)
+                    raw_data = self.serial_port.read(self.serial_port.in_waiting)
+                    #print(f"Raw data received (length {len(raw_data)}): {raw_data.hex}")
+                    self.buffer.extend(raw_data)
+                    
+                    # Process complete frames (10 bytes each)
+                    while len(self.buffer) >= 10:
+                        frame = self.buffer[:10]
+                        self.buffer = self.buffer[10:]
+                        #print(f"Processing frame: {frame.hex}")
+                        self.callback(frame)
             except serial.SerialException as e:
                 print(f"Error reading serial port: {e}")
                 self.running = False
-
+    
+    # WRITE FUNCTION TO SEND DATA BACK TO MCU
     def write_serial(self):
-        while self.running and self.serial_port:
-            try:
-                if self.serial_port.out_waiting > 0:
-                    raw_data = self.serial_port.write(10)
-                    
-            except serial.SerialException as e:
-                print(f"Error writing to serial port: {e}")
-                self.running = False
+        pass
 
     def start(self):
         if not self.running:
@@ -43,8 +42,9 @@ class SerialCtrl:
                 self.running = True
                 self.thread = threading.Thread(target=self.read_serial)
                 self.thread.start()
+                print("Reading thread started.")
             except serial.SerialException as e:
-                print(f"Error reading serial port: {e}")
+                print(f"Error opening serial port: {e}")
                 self.serial_port = None
 
     def stop(self):

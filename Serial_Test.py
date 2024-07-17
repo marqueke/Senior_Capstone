@@ -26,6 +26,18 @@ class SerialReader:
                 print(f"Error reading serial port: {e}")
                 self.running = False
 
+    def write_serial(self, bytes):
+        while self.running and self.serial_port:
+            try:
+                ser = serial.Serial("COM6", serial.EIGHTBITS)
+                ser.write(bytes)
+                # print(f"Sending data: {bytes}")
+                ser.close()
+                    
+            except serial.SerialException as e:
+                print(f"Error writing to serial port: {e}")
+                self.running = False
+
     def stop(self):
         self.running = False
         if self.serial_port:
@@ -46,7 +58,13 @@ class App:
         self.text_area = scrolledtext.ScrolledText(self.frame, wrap=tk.WORD, height=20, width=60)
         self.text_area.pack(fill=tk.BOTH, expand=True)
 
+        
         self.serial_reader = SerialReader(port='COM6', baudrate=9600, callback=self.update_text)
+
+        self.serial_reader.write_serial()
+        data_bytes = [0xEE, 0xFF, 0xAA, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
+        data_to_send = bytes(data_bytes)
+        self.serial_reader.write_serial(data_to_send)
 
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
 
