@@ -3,9 +3,18 @@ from enum import Enum
 #import numpy as np
 import serial
 import time
+<<<<<<< HEAD
 MSG_A = 0X0A
 MSG_E = 0X0E
 MSG_F = 0X0F
+=======
+
+MSG_A = 0x0A
+MSG_B = 0x0B
+MSG_C = 0x0C
+MSG_D = 0x0D
+MSG_E = 0x0E
+>>>>>>> kelseys_GUI
 
 msgBytes = 10
 
@@ -46,8 +55,22 @@ class ztmCMD(Enum):
     CMD_ABORT , \
     CMD_ADC_CAL_MODE , \
     CMD_ADC_CAL_LOAD_CURR , \
+<<<<<<< HEAD
     CMD_ADC_CAL_MEAS_0V , \
     CMD_ADC_CAL_MEAS_TEST_CURR = range(0 , 22)
+=======
+    CMD_ADC_CAL_MEAS_GND , \
+    CMD_ADC_CAL_MEAS_TEST_CURR, \
+    CMD_ADC_CAL_STOP, \
+    CMD_DAC_CAL_MODE_VBIAS, \
+    CMD_DAC_CAL_MODE_VPZO, \
+    CMD_DAC_CAL_SET_0V, \
+    CMD_DAC_CAL_STORE_0V, \
+    CMD_DAC_CAL_SET_MID_SCALE, \
+    CMD_DAC_CAL_STORE_MID_SCALE, \
+    CMD_DAC_CAL_CHECK, \
+    CMD_DAC_CAL_STOP = range(0 , 31)
+>>>>>>> kelseys_GUI
 
 class ztmSTATUS(Enum):
     STATUS_ACK, \
@@ -61,6 +84,7 @@ class ztmSTATUS(Enum):
     STATUS_BUSY, \
     STATUS_ERROR = range(0 , 10)
 
+<<<<<<< HEAD
 class usbMsgFunctions:
     def __init__(self,val):
         self.val=val
@@ -145,3 +169,16 @@ class usbMsgFunctions:
         # clear buffer    
         ztmComms.flush()
         
+=======
+
+# the usbMsgFunctions could probably all be replaced by a single elaborate function that 
+# allows the user to select the msg/cmd/status/payload values, but for simplicity & speed of 
+# development a different function was made for each message used in the cal procedure
+class usbMsgFunctions:
+    def send_command(ztmComms, MsgId, CmdByte, Payload=[]):
+        message = [MsgId, CmdByte] + Payload + [0x00] * (msgBytes - 3 - len(Payload))
+        message = serial.to_bytes(message)
+        ztmComms.write(message)
+        time.sleep(usbDelay)
+        ztmComms.flush()
+>>>>>>> kelseys_GUI

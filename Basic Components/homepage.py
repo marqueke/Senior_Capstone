@@ -1,26 +1,22 @@
-# import modules
 from tkinter import *
+from tkinter import ttk
+import tkinter as tk
 
-# create homepage window
-root = Tk()
-root.title("Homepage")
-root.config(bg="skyblue")
+class A:
+    def __init__(self, master):
+        self.label=tk.Label(master)
+        self.label.grid(row=0, column=0)
+        self.label.configure(text='nothing')
+        self.count = 0
+        self.update_label()
 
-#set geometry
-root.geometry("1000x650")
+    def update_label(self):
+        if self.count < 10:
+            self.label.configure(text = 'count: {}'.format(self.count))
+            self.label.after(1000, self.update_label) # call this method again in 1,000 milliseconds
+            self.count += 1
+        print(self.count)
 
-# label for graph
-graph_name = Label(root, text = "Live Graph", bg = "skyblue").place(x=250, y=5)
-
-# create frame widget
-home_frame = Frame(root, width = 500, height = 300).place(x = 50, y = 25)
-#home_frame.pack(pady = 25)
-
-# create graph frame within left_frame
-graph_frame = Frame(home_frame, width = 490, height = 290, bg="gray").place(x = 55, y = 30)
-#graph_frame.pack(padx = 5, pady = 5)
-
-# create label above home frame
-# Label(root, text="Graphs").grid(row=1, column=0, padx=5, pady=5)
-
+root = tk.Tk()
+A(root)
 root.mainloop()
