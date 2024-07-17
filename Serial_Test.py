@@ -26,7 +26,6 @@ class SerialReader:
                 print(f"Error reading serial port: {e}")
                 self.running = False
 
-<<<<<<< HEAD
     def write_serial(self, bytes):
         while self.running and self.serial_port:
             try:
@@ -38,7 +37,7 @@ class SerialReader:
             except serial.SerialException as e:
                 print(f"Error writing to serial port: {e}")
                 self.running = False
-=======
+
     def start(self):
         if not self.running:
             try:
@@ -49,7 +48,6 @@ class SerialReader:
             except serial.SerialException as e:
                 print(f"Error opening serial port: {e}")
                 self.serial_port = None
->>>>>>> kelseys_GUI
 
     def stop(self):
         self.running = False
@@ -78,6 +76,7 @@ class App:
         data_bytes = [0xEE, 0xFF, 0xAA, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
         data_to_send = bytes(data_bytes)
         self.serial_reader.write_serial(data_to_send)
+        self.serial_reader = SerialReader(port='COM9', baudrate=9600, callback=self.update_text)
 
         self.add_btn_image4 = ctk.CTkImage(Image.open("Images/Start_Btn.png"), size=(90,35))
         self.start_btn = ctk.CTkButton(master=root, image=self.add_btn_image4, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.start_reading)
@@ -98,5 +97,7 @@ class App:
 
 if __name__ == "__main__":
     root = tk.Tk()
-    app = App(root)
+    # app = App(root)
+
+    
     root.mainloop()

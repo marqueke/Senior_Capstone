@@ -3,18 +3,12 @@ from enum import Enum
 #import numpy as np
 import serial
 import time
-<<<<<<< HEAD
-MSG_A = 0X0A
-MSG_E = 0X0E
-MSG_F = 0X0F
-=======
 
 MSG_A = 0x0A
 MSG_B = 0x0B
 MSG_C = 0x0C
 MSG_D = 0x0D
 MSG_E = 0x0E
->>>>>>> kelseys_GUI
 
 msgBytes = 10
 
@@ -55,10 +49,6 @@ class ztmCMD(Enum):
     CMD_ABORT , \
     CMD_ADC_CAL_MODE , \
     CMD_ADC_CAL_LOAD_CURR , \
-<<<<<<< HEAD
-    CMD_ADC_CAL_MEAS_0V , \
-    CMD_ADC_CAL_MEAS_TEST_CURR = range(0 , 22)
-=======
     CMD_ADC_CAL_MEAS_GND , \
     CMD_ADC_CAL_MEAS_TEST_CURR, \
     CMD_ADC_CAL_STOP, \
@@ -70,7 +60,6 @@ class ztmCMD(Enum):
     CMD_DAC_CAL_STORE_MID_SCALE, \
     CMD_DAC_CAL_CHECK, \
     CMD_DAC_CAL_STOP = range(0 , 31)
->>>>>>> kelseys_GUI
 
 class ztmSTATUS(Enum):
     STATUS_ACK, \
@@ -84,92 +73,6 @@ class ztmSTATUS(Enum):
     STATUS_BUSY, \
     STATUS_ERROR = range(0 , 10)
 
-<<<<<<< HEAD
-class usbMsgFunctions:
-    def __init__(self,val):
-        self.val=val
-
-    def startAdcCalMode(ztmComms):
-        ''' send data byte by byte'''
-
-        MsgId   = [0xf]
-        CmdByte = [ztmCMD.CMD_ADC_CAL_MODE.value]
-        padByte = [0x0]
-
-        # send ID
-        ztmComms.write(serial.to_bytes(MsgId))
-        time.sleep(usbDelay)
-        # send CMD
-        ztmComms.write(serial.to_bytes(CmdByte))
-        time.sleep(usbDelay)
-
-        for i in range(0, 8):
-            ztmComms.write(serial.to_bytes(padByte))
-            time.sleep(usbDelay)
-        # clear buffer    
-        ztmComms.flush()
-
-    def sendAdcTestCurrent(ztmComms, testCurrent):
-        ''' send data byte by byte'''
-
-        MsgId   = [0xf]
-        CmdByte = [ztmCMD.CMD_ADC_CAL_LOAD_CURR.value]
-        padByte = [0x0]
-      
-        # extract bytes
-        testCurrBytes = [0, 0, 0]
-        testCurrBytes[0] =  testCurrent & 0x0000FF
-        testCurrBytes[1] = (testCurrent >> 8) & 0x0000FF
-        testCurrBytes[2] = (testCurrent >> 16) & 0x0000FF
-        #debug
-            # Print each element of testCurrBytes in hexadecimal format
-        #print([hex(byte) for byte in testCurrBytes])
-
-        # send ID
-        ztmComms.write(serial.to_bytes(MsgId))
-        time.sleep(usbDelay)
-        # send CMD
-        ztmComms.write(serial.to_bytes(CmdByte))
-        time.sleep(usbDelay)
-
-        # send empty Status
-        ztmComms.write(serial.to_bytes(padByte))
-        time.sleep(usbDelay)        
-
-        #send current
-        for byte in testCurrBytes:
-            ztmComms.write(serial.to_bytes([byte]))
-            time.sleep(usbDelay)
-
-        for i in range(0, 4):
-            ztmComms.write(serial.to_bytes(padByte))
-            time.sleep(usbDelay)
-
-        # clear buffer    
-        ztmComms.flush()
-
-    def adcCalCmd_0V(ztmComms):
-        ''' send data byte by byte'''
-
-        MsgId   = [0xf]
-        CmdByte = [ztmCMD.CMD_ADC_CAL_MEAS_0V.value]
-        padByte = [0x0]
-
-        # send ID
-        ztmComms.write(serial.to_bytes(MsgId))
-        time.sleep(usbDelay)
-        # send CMD
-        ztmComms.write(serial.to_bytes(CmdByte))
-        time.sleep(usbDelay)
-
-        for i in range(0, 8):
-            ztmComms.write(serial.to_bytes(padByte))
-            time.sleep(usbDelay)
-
-        # clear buffer    
-        ztmComms.flush()
-        
-=======
 
 # the usbMsgFunctions could probably all be replaced by a single elaborate function that 
 # allows the user to select the msg/cmd/status/payload values, but for simplicity & speed of 
@@ -181,4 +84,3 @@ class usbMsgFunctions:
         ztmComms.write(message)
         time.sleep(usbDelay)
         ztmComms.flush()
->>>>>>> kelseys_GUI
