@@ -29,9 +29,27 @@ class SerialCtrl:
                 print(f"Error reading serial port: {e}")
                 self.running = False
     
-    # WRITE FUNCTION TO SEND DATA BACK TO MCU
-    def write_serial(self):
-        pass
+    '''    
+    to send a byte string:
+    
+    data_bytes = [0x0E, 0x01, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
+    data_to_send = bytes(data_bytes)
+    serial_port.write_serial(data_to_send)
+
+    to send an array of bytes: (i believe this is what we want)
+    
+    data_bytes = [0x0E, 0x01, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
+    serial_port.write_serial(data_bytes)
+    '''
+    def write_serial(self, data):
+        if self.serial_port:
+            try:
+                self.serial_port.write(data)
+                print(f"Sent data: {data}")
+            except serial.SerialException as e:
+                print(f"Failed to write to serial port: {e}")
+        else:
+            print("Serial port is not open.")
 
     def start(self):
         if not self.running:
