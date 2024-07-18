@@ -30,8 +30,15 @@ class SerialCtrl:
                 self.running = False
     
     # WRITE FUNCTION TO SEND DATA BACK TO MCU
-    def write_serial(self):
-        pass
+    def write_serial(self, data):
+        if self.serial_port:
+            try:
+                self.serial_port.write(data)
+                print(f"Sent data: {data.hex()}")
+            except serial.SerialException as e:
+                print(f"Failed to write to serial port: {e}")
+        else:
+            print("Serial port is not open. Call start() first.")
 
     def start(self):
         if not self.running:

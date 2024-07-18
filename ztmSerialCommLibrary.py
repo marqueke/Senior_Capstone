@@ -46,6 +46,8 @@ class ztmCMD(Enum):
     CMD_IV_PARAM_STORE, \
     CMD_IV_SWP_START, \
     CMD_IV_SWP_STOP, \
+    CMD_RETURN_HOME, \
+    CMD_STEPPER_RESET_POSITION, \
     CMD_ABORT , \
     CMD_ADC_CAL_MODE , \
     CMD_ADC_CAL_LOAD_CURR , \
@@ -59,7 +61,7 @@ class ztmCMD(Enum):
     CMD_DAC_CAL_SET_MID_SCALE, \
     CMD_DAC_CAL_STORE_MID_SCALE, \
     CMD_DAC_CAL_CHECK, \
-    CMD_DAC_CAL_STOP = range(0 , 31)
+    CMD_DAC_CAL_STOP = range(0 , 33)
 
 class ztmSTATUS(Enum):
     STATUS_ACK, \
@@ -71,7 +73,12 @@ class ztmSTATUS(Enum):
     STATUS_CLR, \
     STATUS_RDY, \
     STATUS_BUSY, \
-    STATUS_ERROR = range(0 , 10)
+    STATUS_ERROR, \
+    STATUS_SEEKING_CURR, \
+    STATUS_TUNNEL_SUCCESS, \
+    STATUS_IZ_SWEEP, \
+    STATUS_IV_SWEEP, \
+    STATUS_TIP_CRASHED = range(0 , 15)
 
 
 # the usbMsgFunctions could probably all be replaced by a single elaborate function that 
