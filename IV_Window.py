@@ -25,18 +25,33 @@ class IVWindow:
     def init_meas_widgets(self):
         # current
         self.frame1 = LabelFrame(self.root, text="Current (nA)", padx=10, pady=2, bg="gray")
-        self.label1 = Entry(self.frame1, bg="white", width=25)
+        self.label1 = Label(self.frame1, bg="white", width=25)
         
         # sample bias voltage
         self.frame2 = LabelFrame(self.root, text="Sample Bias Voltage (V)", padx=10, pady=2, bg="gray")
-        self.label2 = Entry(self.frame2, bg="white", width=25)
+        self.label2 = Label(self.frame2, bg="white", width=25)
         
+        # IV sweep voltage parameters
+        # min voltage
+        self.frame3 = LabelFrame(self.root, text="Minimum Voltage (V)", padx=10, pady=2, bg="#ADD8E6")
+        self.label3 = Entry(self.frame3, bg="white", width=25)
+        
+        # max voltage
+        self.frame4 = LabelFrame(self.root, text="Maximum Voltage (V)", padx=10, pady=2, bg="#ADD8E6")
+        self.label4 = Entry(self.frame4, bg="white", width=25)
+
+        # dummy
+        self.frame6 = LabelFrame(self.root, text="Maximum Voltage (V)", padx=10, pady=2, bg="#ADD8E6")
+        self.label8 = Entry(self.frame6, bg="white", width=25)
+
         # user notes text box
-        self.frame3 = LabelFrame(self.root, text="NOTES", padx=10, pady=5, bg="#A7C7E7")
-        self.label3 = Text(self.frame3, height=7, width=30)
-        self.label4 = Text(self.frame3, height=1, width=8)
-        self.label5 = Label(self.frame3, padx=10, text="Date:", height=1, width=5)
+        self.frame5 = LabelFrame(self.root, text="NOTES", padx=10, pady=5, bg="#A7C7E7")
+        self.label5 = Text(self.frame5, height=7, width=30)
+        self.label6 = Text(self.frame5, height=1, width=8)
+        self.label7 = Label(self.frame5, padx=10, text="Date:", height=1, width=5)
         
+
+
         # setup the drop option menu
         self.DropDownMenu()
         
@@ -49,18 +64,30 @@ class IVWindow:
     
     def publish_meas_widgets(self):
         # current
-        self.frame1.grid(row=11, column=0, padx=5, pady=5, sticky=E)
+        self.frame1.grid(row=11, column=0, padx=5, pady=5, sticky="e")
         self.label1.grid(row=0, column=0, padx=5, pady=5)
         
         # sample bias voltage
-        self.frame2.grid(row=11, column=1, padx=5, pady=5, sticky=E)
+        self.frame2.grid(row=11, column=1, padx=5, pady=5, sticky="e")
         self.label2.grid(row=0, column=0, padx=5, pady=5)   
         
+        # min voltage
+        self.frame3.grid(row=12, column=0, padx=5, pady=5, sticky="e")
+        self.label3.grid(row=0, column=0, padx=5, pady=5)
+        
+        # max voltage
+        self.frame4.grid(row=12, column=1, padx=5, pady=5, sticky="e")
+        self.label4.grid(row=0, column=0, padx=5, pady=5)
+
+        # dummy
+        self.frame6.grid(row=13, column=0, padx=5, pady=5, sticky="e")
+        self.label8.grid(row=0, column=0, padx=5, pady=5)
+
         # Positioning the notes section
-        self.frame3.grid(row=11, column=7, rowspan=3, pady=5, sticky="n")
-        self.label3.grid(row=1, column=0, pady=5, columnspan=3, rowspan=3) 
-        self.label4.grid(row=0, column=2, pady=5, sticky="e")
-        self.label5.grid(row=0, column=2, pady=5, sticky="w")
+        self.frame5.grid(row=11, column=7, rowspan=3, pady=5, sticky="n")
+        self.label5.grid(row=1, column=0, pady=5, columnspan=3, rowspan=3) 
+        self.label6.grid(row=0, column=2, pady=5, sticky="e")
+        self.label7.grid(row=0, column=2, pady=5, sticky="w")
         
         # Positioning the file drop-down menu
         self.drop_menu.grid(row=0, column=0, padx=self.padx, pady=self.pady, sticky="w")

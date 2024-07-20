@@ -186,14 +186,14 @@ class MeasGUI:
 
         # fine adjust step size
         self.frame9 = LabelFrame(root, text="", padx=5, pady=5, bg="#ADD8E6")
-        self.label_sample_rate = Label(self.frame9, text="Step Size: ", bg="#ADD8E6", width=8, anchor="w")
-        self.sample_rate_var = StringVar()
-        self.sample_rate_var.set("-")
-        self.sample_rate_menu = OptionMenu(self.frame9, self.sample_rate_var, "Full", "Half", "Quarter", "Eighth") # command=self.sample_rate_selected) 
-        self.sample_rate_menu.config(width=6)
+        self.label_fine_adjust = Label(self.frame9, text="Step Size: ", bg="#ADD8E6", width=8, anchor="w")
+        self.fine_adjust_var = StringVar()
+        self.fine_adjust_var.set("-")
+        self.fine_adjust_menu = OptionMenu(self.frame9, self.fine_adjust_var, "Full", "Half", "Quarter", "Eighth", command=self.saveFineAdjust) 
+        self.fine_adjust_menu.config(width=6)
 
-        self.label_sample_rate.grid(column=1, row=1)
-        self.sample_rate_menu.grid(column=1, row=2) #, padx=self.padx)
+        self.label_fine_adjust.grid(column=1, row=1)
+        self.fine_adjust_menu.grid(column=1, row=2) #, padx=self.padx)
         self.frame9.grid(row=12, column=2, rowspan=2, columnspan=2, padx=5, pady=5, sticky="")
         self.label_fine_adjust_inc = Label(self.frame9, text="Approx. Dist", bg="#ADD8E6", width=9, anchor="w")
 
@@ -265,6 +265,7 @@ class MeasGUI:
         self.pady = 10
         
         # Initialize data attributes for continuous update
+        self.distance = 0
         self.adc_curr = 0
         self.vbias = 0
         self.vpzo = 0
@@ -431,8 +432,8 @@ class MeasGUI:
     '''
 
     def savePiezoIncrement(self, event):
-        vpiezoIncrement = self.label10.get()
-        print(f"Saved piezo inc value: {vpiezoIncrement}")
+        vpiezo_increment = self.label10.get()
+        print(f"Saved piezo inc value: {vpiezo_increment}")
 
     def saveCurrentSetpoint(self, event): 
         curr_setpoint = self.label3.get()
@@ -448,9 +449,12 @@ class MeasGUI:
 
     ### working on meow ###
     def saveSampleRate(self, _): 
-        sample_rate = ctk.StringVar()
-        sample_rate.set(self.sample_rate_menu.getvar)
+        sample_rate = (self.sample_rate_var.get())
         print(f"Saved sample rate value: {sample_rate}")
+
+    def saveFineAdjust(self, _):
+        fine_adjust_step_size = self.fine_adjust_var.get()
+        print(f"Saved fine adjust step size: {fine_adjust_step_size}")
 
     # to remove 
     def updateParams(self):
@@ -511,11 +515,14 @@ class MeasGUI:
         self.update_label()
 
     def update_label(self):
+        self.label1.configure(text=f"{self.distance:.3f} nm")
         self.label2.configure(text=f"{self.adc_curr:.3f} nA")
         #self.label2.delete(0, END)
         #self.label2.insert(0, f"{self.vbias:.3f}")
         #self.label3.delete(0, END)
         #self.label3.insert(0, f"{self.vpzo:.3f}")
+        self.distance = self.distance + 1
+        self.adc_curr = self.adc_curr + 1.5
         self.label2.after(1000, self.update_label)
                  
     # file drop-down menu
@@ -548,96 +555,6 @@ class GraphGUI:
         # Create a canvas to embed the figure in Tkinter
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.root)
         self.canvas.get_tk_widget().grid(row=0, column=3, columnspan=6, rowspan=10, padx=10, pady=5)
-
-# class for creating buttons
-# class ButtonGUI:
-#     def __init__(self, root, parent):
-#         self.root = root
-#         self.parent = parent
-        
-#         # define images
-#         self.add_btn_image1 = ctk.CTkImage(Image.open("Images/Retract_Tip_Btn.png"), size=(40,80))
-#         self.add_btn_image2 = ctk.CTkImage(Image.open("Images/Fine_Adjust_Btn_Up.png"), size=(40,40))
-#         self.add_btn_image3 = ctk.CTkImage(Image.open("Images/Fine_Adjust_Btn_Down.png"), size=(40,40))
-#         self.add_btn_image4 = ctk.CTkImage(Image.open("Images/Start_Btn.png"), size=(90,35))
-#         self.add_btn_image5 = ctk.CTkImage(Image.open("Images/Stop_Btn.png"), size=(90,35))
-#         self.add_btn_image6 = ctk.CTkImage(Image.open("Images/Acquire_IV.png"), size=(90,35))
-#         self.add_btn_image7 = ctk.CTkImage(Image.open("Images/Acquire_IZ.png"), size=(90,35))
-#         self.add_btn_image8 = ctk.CTkImage(Image.open("Images/Stop_LED.png"), size=(35,35))
-        
-#         # create buttons with proper sizes
-#         self.start_btn = ctk.CTkButton(master=root, image=self.add_btn_image4, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.start_reading)
-#         self.stop_btn = ctk.CTkButton(master=root, image=self.add_btn_image5, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.stop_reading)
-#         self.acquire_iv_btn = ctk.CTkButton(master=root, image=self.add_btn_image6, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.open_iv_window)
-#         self.acquire_iz_btn = ctk.CTkButton(master=root, image=self.add_btn_image7, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.open_iz_window)
-#         self.stop_led_btn = ctk.CTkButton(master=root, image=self.add_btn_image8, text="", width=30, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0)
-        
-#         self.retract_tip_frame = LabelFrame(root, text="Retract Tip", padx=10, pady=5, bg="#eeeeee")
-#         self.retract_tip_btn = ctk.CTkButton(master=self.retract_tip_frame, image=self.add_btn_image1, width=40, height=100, text="", compound="bottom", fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0)
-        
-#         self.fine_adjust_frame = LabelFrame(root, text="Fine Adjust", padx=10, pady=5, bg="#eeeeee")
-#         self.fine_adjust_btn_up = ctk.CTkButton(master=self.fine_adjust_frame, image=self.add_btn_image2, text = "", width=40, height=40, compound="bottom", fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0)
-#         self.fine_adjust_btn_down = ctk.CTkButton(master=self.fine_adjust_frame, image=self.add_btn_image3, text="", compound="bottom", width=40, height=40, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0)
-        
-#         # self.save_params_button = ctk.CTkButton(root, text="Save Parameters",corner_radius=0, command=self.updateParams)
-
-
-#         '''
-#         self.vbias_frame = LabelFrame(root, text="Vbias", padx=10, pady=2, bg="#7393B3")
-#         self.vbias_label = Entry(self.vbias_frame, bg="white", width=15)
-#         '''
-
-
-#         self.DisplayGUI()
-        
-#     def DisplayGUI(self):
-#         '''
-#         Method to display all button widgets
-#         '''
-#         self.retract_tip_frame.grid(row=11, column=0, rowspan=3, columnspan=2, padx=20, sticky="e")
-#         self.retract_tip_btn.grid(row=11, column=0)
-        
-#         self.fine_adjust_frame.grid(row=11, column=1, rowspan=3, columnspan=2, padx=5, sticky="e")
-#         self.fine_adjust_btn_up.grid(row=11, column=0)
-#         self.fine_adjust_btn_down.grid(row=12, column=0)
-        
-#         self.start_btn.grid(row=2, column=9, sticky="e")
-#         self.stop_btn.grid(row=3, column=9, sticky="ne")
-#         self.acquire_iv_btn.grid(row=4, column=9, sticky="ne")
-#         self.acquire_iz_btn.grid(row=5, column=9, sticky="ne")
-#         self.stop_led_btn.grid(row=2, column=10, sticky="e")
-
-#         # self.save_params_button.grid(row=14, column=4, columnspan=2)
-
-#     '''
-#         self.vbias_frame.grid(row=6, column=9, padx=5, pady=5, sticky="ne")
-#         self.vbias_label.grid(row=6, column=9, padx=5, pady=5)
-#     '''
-
-
-
-
-#     def open_iv_window(self):
-#         '''
-#         Method to open a new window when the "Acquire I-V" button is clicked
-#         '''
-#         new_window = ctk.CTkToplevel(self.root)
-#         IVWindow(new_window)
-
-#     def open_iz_window(self):
-#         '''
-#         Method to open a new window when the "Acquire I-Z" button is clicked
-#         '''
-#         new_window = ctk.CTkToplevel(self.root)
-#         IZWindow(new_window)
-    
-#     def start_reading(self):
-#         print("ButtonGUI: Start button pressed")
-#         self.parent.start_reading()
-    
-#     def stop_reading(self):
-#         print("ButtonGUI: Stop button pressed")
-#         self.parent.stop_reading()
 
 
 if __name__ == "__main__":
