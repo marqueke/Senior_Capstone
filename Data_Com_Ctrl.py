@@ -35,7 +35,7 @@ class DataCtrl:
         :param raw_data: The raw data received from the serial port.
         :return: Decoded data or None if the frame is incomplete.
         """
-        print(f"Raw data received (length {len(raw_data)}): {raw_data.hex()}")
+        #print(f"Raw data received (length {len(raw_data)}): {raw_data.hex()}")
         if len(raw_data) < 11:
             print("Incomplete data frame received.")
             return None
@@ -45,8 +45,14 @@ class DataCtrl:
         status = raw_data[2]
         payload = raw_data[3:11]
 
-        print(f"Decoded Header: MSG={msg}, CMD={cmd}, STATUS={status}, PAYLOAD={payload}")
+        #print(f"Decoded Header: MSG={msg}, CMD={cmd}, STATUS={status}, PAYLOAD={payload}")
 
+    def send_command(self, msg, cmd, status, payload):
+        data = struct.pack('BBB', msg, cmd, status) + payload
+        print(f"Sending command: {data.hex()}")
+        self.serial_ctrl.write_serial(data) 
+        
+'''
         ####################################################### THIS WILL BE THE "STATE MACHINE" #######################################################
         # read and write to MCU
         if msg == MSG_A:
@@ -74,10 +80,6 @@ class DataCtrl:
     def handle_msg_a(self, cmd, status, payload):
         print("**********Handling MSG_A**********")
         
-        '''
-        if payload == 0:
-            return self.handle_msg_e(cmd, status, payload)
-        '''
         # write data to GUI
         # set Vbias
         # set desired ADC current
@@ -117,10 +119,6 @@ class DataCtrl:
     def handle_msg_b(self, cmd, status, payload):
         print("**********Handling MSG_B**********")
         
-        '''
-        if payload == 0:
-            return self.handle_msg_e(cmd, status, payload)
-        '''
         
         # Need to send msg to MCU that we have entered I-Z mode
         # Need to send start/stop Vpzo seep
@@ -142,10 +140,6 @@ class DataCtrl:
     def handle_msg_c(self, cmd, status, payload):
         print("**********Handling MSG_C**********")
         
-        '''
-        if payload == 0:
-            return self.handle_msg_e(cmd, status, payload)
-        '''
         if status == ztmSTATUS.STATUS_CLR.value:
             if cmd == ztmCMD.CMD_REQ_DATA.value:
                 print(f"MSG C: Disabled data.")
@@ -190,11 +184,6 @@ class DataCtrl:
     def handle_msg_d(self, cmd, status, payload):
         print("**********Handling MSG_D**********")
         
-        '''
-        if payload == 0:
-            return self.handle_msg_e(cmd, status, payload)
-        '''
-        
         # Implement specific handling for MSG_D
         # Need to send sampling rate to MCU across homepage, I-Z, I-V mode
         if cmd == ztmCMD.CMD_CLR.value and status == ztmSTATUS.STATUS_CLR.value:
@@ -214,10 +203,6 @@ class DataCtrl:
     def handle_msg_e(self, cmd, status, payload):
         print("**********Handling MSG_E**********")
     
-        '''
-        if payload == 0:
-            return self.handle_msg_e(cmd, status, payload)
-        '''
         
         if cmd == ztmCMD.CMD_VBIAS_SET_SINE.value and status == ztmSTATUS.STATUS_CLR.value:
             vbias_sine_amp = (payload[0] << 8) | payload[1]
@@ -232,12 +217,7 @@ class DataCtrl:
     ##### MESSAGE F #####
     def handle_msg_f(self, cmd, status, payload):
         print("**********Handling MSG_F**********")
-    
-        '''
-        if payload == 0:
-            return self.handle_msg_e(cmd, status, payload)
-        '''
-        
+
         if cmd == ztmCMD.CMD_CLR.value and status == ztmSTATUS.STATUS_FFT_DATA.value:
             fft_curr_amp = (payload[0] << 24) | (payload[1] << 16) | (payload[2] << 8) | payload[3]
             fft_freq = (payload[4] << 24) | (payload[5] << 16) | (payload[6] << 8) | payload[7]
@@ -246,82 +226,5 @@ class DataCtrl:
             return fft_curr_amp, fft_freq
         else:
             print("Unhandled CMD or STATUS for MSG_F")
-    
-    ####################################################### COMMANDS #######################################################
-    
-    def send_msgA(self, cmd, status, current_setpoint=0, vbias=0, sample_rate=0):
-        """
-        Sends a command to the MCU with the appropriate payload.
+'''       
 
-        Args:
-            cmd (ztmCMD): Command to send.
-            current_setpoint (int): Current setpoint value in nA (4 bytes).
-            vbias (int): Bias voltage value in V (2 bytes).
-            sample_rate (int): Sample rate value in kHz (1 byte).
-        """
-        if cmd == ztmCMD.CMD_CURR_SETPT.value:
-            payload = struct.pack('>I', current_setpoint) + b'\x00\x00\x00\x00'
-        elif cmd == ztmCMD.CMD_VBIAS_SET.value:
-            payload = b'\x00\x00\x00\x00' + struct.pack('>H', vbias) + b'\x00\x00'
-        elif cmd == ztmCMD.CMD_SET_SAMPLE_RATE.value:
-            payload = b'\x00\x00\x00\x00\x00\x00' + struct.pack('>B', sample_rate) + b'\x00'
-        else:
-            payload = b'\x00' * 8
-
-        data = struct.pack('BBB', MSG_A, cmd.value, ztmSTATUS.STATUS_CLR.value) + payload
-        self.serial_ctrl.write_data(data)
-
-    def send_status(self, status):
-        """
-        Sends a status message to the MCU.
-
-        Args:
-            status (ztmSTATUS): Status to send.
-        """
-        data = struct.pack('BBB', MSG_E, 0, status.value) + b'\x00' * 8
-        self.serial_ctrl.write_bytes(data)
-        
-    def handle_status_rdy(self):
-        self.send_status(ztmSTATUS.STATUS_ACK.value)
-
-    def set_current_setpoint(self, current_setpoint):
-        self.send_msgA(ztmCMD.CMD_CURR_SETPT.value, current_setpoint=current_setpoint)
-
-    def set_vbias(self, vbias):
-        self.send_msgA(ztmCMD.CMD_VBIAS_SET.value, vbias=vbias)
-
-    '''
-    Sets the sample rate of the setup
-    '''
-    def set_sample_rate(self, sample_rate):
-        self.send_msgA(ztmCMD.CMD_SET_SAMPLE_RATE.value, sample_rate=sample_rate)
-
-    '''
-    Function to confirm the startup routine of the microscope, setting the stepper motor 
-    to its home position and sending the rerquired parameters to the MCU
-    '''
-    def process_startup_routine(self):
-        self.handle_status_rdy()
-        self.set_current_setpoint()  
-        self.set_vbias()  
-        self.set_sample_rate()  
-    
-    '''
-    Function to finely adjust the tip up based on the step size
-    '''
-    def set_adjust_up(self, distance):
-        pass
-    
-    '''
-    Function to finely adjust the tip down based on the step size
-    '''
-    def set_adjust_down(self, distance):
-        pass
-        
-
-    def send_command(self, msg, cmd, status, payload):
-        data = struct.pack('BBB', msg, cmd, status) + payload
-        print(f"Sending command: {data.hex()}")
-        self.serial_ctrl.write_serial(data) 
-
-        

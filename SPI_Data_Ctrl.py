@@ -1,5 +1,7 @@
 import serial
 import threading
+import time
+from ztmSerialCommLibrary import ztmCMD, ztmSTATUS, usbMsgFunctions, MSG_A, MSG_B, MSG_C, MSG_D, MSG_E, MSG_F
 
 class SerialCtrl:
     def __init__(self, port, baudrate, callback):
@@ -50,7 +52,38 @@ class SerialCtrl:
         else:
             print("Serial port is not open. Call start() first.")
             return None
-        
+    
+    # function to read msg of 11 bytes
+    def read_bytes(self):
+        count = 0
+        max_attempts = 10
+        response = None
+
+        while count < max_attempts:
+            if self.serial_port and self.serial_port.is_open:
+                try:
+                    # Attempt to read 11 bytes with a timeout
+                    response = self.serial_port.read(11)
+                    if response and len(response) == 11:
+                        print(f"\nMCU Response: {response.hex()}")
+                        return response
+                    else:
+                        print("No response received from MCU, retrying...")
+                        return None
+                except serial.SerialTimeoutException:
+                    print("Read timed out, retrying...")
+                    return None
+            else:
+                print("Serial port is not open.")
+                return None
+            count += 1
+            time.sleep(1)
+
+        if not response:
+            print("Failed to receive response from MCU after multiple attempts.")
+            return None
+                
+                
     # WRITE FUNCTION TO SEND DATA BACK TO MCU
     def write_serial(self, data):
         if self.serial_port:

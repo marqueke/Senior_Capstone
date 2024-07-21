@@ -1,1 +1,1 @@
-self.data_ctrl.set_serial_ctrl(self.serial_ctrl)
+raw data

@@ -41,7 +41,9 @@ class IVWindow:
         if self.serial_ctrl:
             print("Serial controller is initialized, starting now...")
             self.serial_ctrl.start()
-            self.send_parameters()
+            
+            port = self.serial_ctrl.serial_port
+            self.send_parameters(port)
         else:
             print("Serial controller is not initialized.")
     
@@ -70,40 +72,31 @@ class IVWindow:
             value = default_value
         return value  
 
-    def send_parameters(self):
-        testMsg = [MSG_A, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0x00, 0x00, 0x00, 0x00] 
+    def send_parameters(self, port):
+        # get vbias min/max and num setpoints from user input
+        vbias_min = self.get_float_value(self.label3, 0.0, "Voltage Bias Minimum")
+        vbias_max = self.get_float_value(self.label4, 0.0, "Voltage Bias Maximum")
+        num_setpoints = self.get_float_value(self.label8, 10.0, "Number of Setpoints")
         
-        # values of interest
-        testCurrent = 2.547895322   # Example float value to pack into bytes
-        vB = 4.5                    # example vbias V from gui
-        vP = 6.7                    # example vpiezo V from gui
-
-        # Pack the floats into bytes objects
-        testCurrBytes = struct.pack('f', testCurrent)
-        vbiasBytes = struct.pack('H', Convert.get_Vbias_int(vB))
-        vpzoBytes = struct.pack('H', Convert.get_Vpiezo_int(vP))
-
-        # load them into the dummy message
-        testMsg[3:7]  = list(testCurrBytes)
-        testMsg[7:9]  = list(vbiasBytes)
-        testMsg[9:11] = list(vpzoBytes)
-
-        # Pretend we received the message - we need to decode the data for use/display
-            # current
-        current_nA = round(struct.unpack('f', bytes(testMsg[3:7]))[0], 3) #unpack bytes & convert
-        self.current = current_nA
-        cStr = str(current_nA)  # format as a string
-        print("Received values\n\tCurrent: " + cStr + " nA\n")
-            
-        vb_V = round(Convert.get_Vbias_float(struct.unpack('H',bytes(testMsg[7:9]))[0]), 3) #unpack bytes & convert
-        self.vbias = vb_V
-        vbStr = str(vb_V)   # format as a string
-        print("\tVbias: " + vbStr + " V\n")
+        # convert vbias and setpoints to int
+        vbias_min_int = Convert.get_Vbias_int(vbias_min)
+        vbias_max_int = Convert.get_Vbias_int(vbias_max)
+        num_setpoints_int = int(num_setpoints)
         
-            # vpiezo
-        vp_V = round(Convert.get_Vpiezo_float(struct.unpack('H',bytes(testMsg[9:11]))[0]), 3) #unpack bytes & convert
-        vpStr = str(vp_V)   # format as a string
-        print("\tVpiezo: " + vpStr + " V\n")
+        # calculate delta
+        delta = (vbias_max_int - vbias_min_int) / num_setpoints_int
+        
+        # set to minimum vbias
+        tempVbias = vbias_min_int
+        i = 0
+        
+        # BACK AND FORTH
+        while num_setpoints >= i:
+            pass
+            #self.parent.ztm_serial.sendMsgA(port, ztmCMD.CMD_SET_VBIAS.value, ztmSTATUS.STATUS_MEASUREMENTS.value, 0, tempVbias, 0)
+        
+        # send msg to MCU
+        
         
         self.label2.configure(text=f"{self.vbias:.3f} V")
         self.label1.configure(text=f"{self.current:.3f} nA")
@@ -111,13 +104,6 @@ class IVWindow:
         #self.label2.configure(text=f"{self.vbias:.3f} V")
         
         '''
-        vbias_min = self.get_float_value(self.label3, 0.0, "Voltage Bias Minimum")
-        vbias_max = self.get_float_value(self.label4, 0.0, "Voltage Bias Maximum")
-
-        # convert vbias and vpzo to int
-        vbias_min_int = Convert.get_Vbias_int(vbias_min)
-        vbias_max_int = Convert.get_Vbias_int(vbias_max)
-        
         print(f"Vbias min int: {vbias_min_int}, Vbias max int: {vbias_max_int}")
         
         # convert values to bytes
@@ -170,7 +156,7 @@ class IVWindow:
         self.label4 = Entry(self.frame4, bg="white", width=30)
 
         # number of setpoints
-        self.frame6 = LabelFrame(self.root, text="Number of setpoints", padx=10, pady=2, bg="#ADD8E6")
+        self.frame6 = LabelFrame(self.root, text="Number of Setpoints", padx=10, pady=2, bg="#ADD8E6")
         self.label8 = Entry(self.frame6, bg="white", width=30)
 
         # user notes text box

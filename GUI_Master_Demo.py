@@ -2,7 +2,7 @@ from tkinter import *
 from tkinter import messagebox, filedialog
 from PIL import Image, ImageGrab
 import customtkinter as ctk
-import serial, re, os, struct
+import serial, re, os, struct, time
 import serial.tools.list_ports
 
 import matplotlib.pyplot as plt
@@ -32,7 +32,8 @@ class RootGUI:
         self.data_ctrl = DataCtrl(9600, self.handle_data)
         self.serial_ctrl = SerialCtrl('COM9', 9600, self.data_ctrl.decode_data)
         self.data_ctrl.set_serial_ctrl(self.serial_ctrl)
-														
+        self.ztm_serial = usbMsgFunctions(self)
+					
         
         # Initialize other components
         self.meas_gui = MeasGUI(self.root, self)
@@ -51,6 +52,10 @@ class RootGUI:
         if self.serial_ctrl:
             print("Serial controller is initialized, starting now...")
             self.serial_ctrl.start()
+            
+            port = self.serial_ctrl.serial_port
+            #print(port)
+            self.meas_gui.send_parameters(port)
         else:
             print("Serial controller is not initialized.")
     
@@ -160,7 +165,7 @@ class MeasGUI:
     def __init__(self, root, parent):
         self.root = root
         self.parent = parent					
-        
+            
         # sample rate adjust
         self.frame8 = LabelFrame(root, text="", padx=5, pady=5, bg="#ADD8E6")
         self.label_sample_rate = Label(self.frame8, text="Sample Rate: ", bg="#ADD8E6", width=11, anchor="w")
@@ -362,7 +367,9 @@ class MeasGUI:
         self.start_btn.configure(state="disabled")
         self.stop_btn.configure(state="normal")
         self.parent.start_reading()
-        self.send_parameters()
+
+        #port = self.serial_ctrl.port
+        #self.send_parameters(port)
 							  
     
     def stop_reading(self):
@@ -415,6 +422,7 @@ class MeasGUI:
     def get_float_value(self, label, default_value, value_name):
         try:
             value = float(label.get())
+            print(value)
         except ValueError:
             print(f"Invalid input for {value_name}. Using default value of {default_value}.")
             value = default_value
@@ -424,44 +432,56 @@ class MeasGUI:
     Function to send user-inputted parameters to MCU
     sample bias, vpiezo, step size, current setpoint, sample rate
     '''        
-    def send_parameters(self):
+    def send_parameters(self, port):
 
         adc_curr = self.get_float_value(self.label3, 0.0, "ADC Current")
         vbias = self.get_float_value(self.label6, 0.0, "Voltage Bias")
         vpzo = self.get_float_value(self.label10, 0.0, "Vpiezo")
         # step size
         # sample rate
+        
+        # NEW FUNCTION 
+        #### Send user input parameters to the MCU
+        self.parent.ztm_serial.sendMsgA(port, ztmCMD.CMD_PIEZO_ADJ.value, ztmSTATUS.STATUS_DONE.value, 0, 0, vpzo)
 
-        # convert vbias and vpzo to int
-        vbias_int = Convert.get_Vbias_int(vbias)
-        vpzo_int = Convert.get_Vpiezo_int(vpzo)
-        
-        print(f"ADC Current float: {adc_curr}, Vbias int: {vbias_int}, Vpzo int: {vpzo_int}")
-        
-        # convert values to bytes
-        adc_curr_bytes = struct.pack('>f', adc_curr)
-        vbias_bytes = struct.pack('>H', vbias_int)
-        vpzo_bytes = struct.pack('>H', vpzo_int)
-        
-        
-        # Construct the payload with vpzo in the correct position
-        payload = adc_curr_bytes  + vbias_bytes + vpzo_bytes
-        print(f"Payload: {payload.hex()}")
-        
-        self.parent.data_ctrl.send_command(MSG_A, ztmCMD.CMD_PIEZO_ADJ.value, ztmSTATUS.STATUS_DONE.value, payload)
-        
-        response = self.parent.serial_ctrl.read_serial_blocking()
-        if response:
-            print(f"MCU Response: {response.hex()}")
+        # Initialize counter and response buffer 
+        ### Read ACK from the MCU
+        ack_response = self.parent.serial_ctrl.read_bytes()
+        ### Unpack data and display on the GUI
+        if ack_response:
+            self.parent.ztm_serial.unpackRxMsg(ack_response)
         else:
-            print("No response received from MCU")
+            print("Failed to receive response from MCU.")
+              
+        ### Request data from MCU
+        self.parent.ztm_serial.sendMsgC(port, ztmCMD.CMD_REQ_DATA.value, ztmSTATUS.STATUS_CLR.value)
         
-        '''
-        ##### WRITE TO DISPLAY DATA AFTER RECEIVING A RESPONSE #####
-        current_nA = round(struct.unpack('f', bytes(testMsg[3:7]))[0], 3) #unpack bytes & convert
-        cStr = str(current_nA)  # format as a string
-        print("Received values\n\tCurrent: " + cStr + " nA\n")
-        '''
+        ### Read data from MCU
+        data_response = self.parent.serial_ctrl.read_bytes()
+        
+        ### Unpack data
+        if data_response:
+            self.parent.ztm_serial.unpackRxMsg(data_response)
+            
+            # Extracting and displaying the payload
+            current_nA = round(struct.unpack('>f', ack_response[3:7])[0], 3)
+            vb_V = round(Convert.get_Vbias_float(struct.unpack('>H', ack_response[7:9])[0]), 3)
+            vp_V = round(Convert.get_Vpiezo_float(struct.unpack('>H', ack_response[9:11])[0]), 3)
+
+            '''
+            # Display the values on the GUI
+            self.label1.config(text=f"Current: {current_nA} nA")
+            self.label2.config(text=f"Vbias: {vb_V} V")
+            self.label10.config(text=f"Vpiezo: {vp_V} V")
+            '''
+            
+            print("Received values\n\tCurrent: " + str(current_nA) + " nA")
+            print("\tVbias: " + str(vb_V) + " V")
+            print("\tVpiezo: " + str(vp_V) + " V\n")
+        else:
+            print("Failed to receive response from MCU.")
+        
+        ### Display data on GUI
 
     def savePiezoIncrement(self, event):
         vpiezo_increment = self.label10.get()
