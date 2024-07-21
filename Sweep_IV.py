@@ -23,12 +23,12 @@ class SweepIV_Window:
         self.label2 = Entry(self.frame2, bg="white", width=25)
         
         # save button
-        self.add_btn_image1 = ctk.CTkImage(Image.open("Images/Save_Btn.png"), size=(60,20))
-        self.add_btn_image2 = ctk.CTkImage(Image.open("Images/Exit_Btn.png"), size=(60,20))
+        self.add_btn_image1 = ctk.CTkImage(Image.open("Images/Save_Btn.png"), size=(50,14))
+        self.add_btn_image2 = ctk.CTkImage(Image.open("Images/Exit_Btn.png"), size=(50,14))
         
         # exit button
-        self.save_btn = ctk.CTkButton(self.root, image=self.add_btn_image1, text="", width=60, height=20, fg_color="#d3d3d3", bg_color="#d3d3d3", corner_radius=0)
-        self.exit_btn = ctk.CTkButton(self.root, image=self.add_btn_image2, text="", width=60, height=20, fg_color="#d3d3d3", bg_color="#d3d3d3", corner_radius=0)
+        self.save_btn = ctk.CTkButton(self.root, image=self.add_btn_image1, text="", width=50, height=14, fg_color="#d3d3d3", bg_color="#d3d3d3", corner_radius=0)
+        self.exit_btn = ctk.CTkButton(self.root, image=self.add_btn_image2, text="", width=50, height=14, fg_color="#d3d3d3", bg_color="#d3d3d3", corner_radius=0)
         
         self.publish_iv_sweep_widgets()
         

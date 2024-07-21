@@ -9,8 +9,9 @@ MSG_B = 0x0B
 MSG_C = 0x0C
 MSG_D = 0x0D
 MSG_E = 0x0E
+MSG_F = 0x0F
 
-msgBytes = 10
+msgBytes = 11
 
 usbDelay  = 0.05
 
@@ -30,38 +31,20 @@ statByte    = 2    # STATUS -> 1 byte
 
 class ztmCMD(Enum): 
     CMD_CLR, \
-    CMD_VBIAS_SET, \
-    CMD_CURR_SETPT, \
-    CMD_SCOPE_START, \
-    CMD_SCOPE_HALT, \
-    CMD_TIP_RETRACT, \
-    CMD_TIP_UP, \
-    CMD_TIP_DWN, \
-    CMD_SET_SAMPLE_RATE, \
-    CMD_IZ_MODE, \
-    CMD_IV_MODE , \
-    CMD_IZ_PARAM_STORE, \
-    CMD_IZ_SWP_START, \
-    CMD_IZ_SWP_STOP , \
-    CMD_IV_PARAM_STORE, \
-    CMD_IV_SWP_START, \
-    CMD_IV_SWP_STOP, \
-    CMD_RETURN_HOME, \
-    CMD_STEPPER_RESET_POSITION, \
-    CMD_ABORT , \
-    CMD_ADC_CAL_MODE , \
-    CMD_ADC_CAL_LOAD_CURR , \
-    CMD_ADC_CAL_MEAS_GND , \
-    CMD_ADC_CAL_MEAS_TEST_CURR, \
-    CMD_ADC_CAL_STOP, \
-    CMD_DAC_CAL_MODE_VBIAS, \
-    CMD_DAC_CAL_MODE_VPZO, \
-    CMD_DAC_CAL_SET_0V, \
-    CMD_DAC_CAL_STORE_0V, \
-    CMD_DAC_CAL_SET_MID_SCALE, \
-    CMD_DAC_CAL_STORE_MID_SCALE, \
-    CMD_DAC_CAL_CHECK, \
-    CMD_DAC_CAL_STOP = range(0 , 33)
+    CMD_SET_VBIAS, \
+    CMD_SET_ADC_SAMPLE_RATE, \
+    CMD_PERIODIC_DATA_ENABLE, \
+    CMD_PERIODIC_DATA_DISABLE, \
+    CMD_REQ_DATA, \
+    CMD_REQ_STEP_COUNT, \
+    CMD_STEPPER_ADJ, \
+    CMD_PIEZO_ADJ, \
+    CMD_VBIAS_SET_SINE, \
+    CMD_VBIAS_STOP_SINE, \
+    CMD_REQ_FFT_DATA, \
+    CMD_RETURN_TIP_HOME, \
+    CMD_STEPPER_RESET_HOME_POSITION, \
+    CMD_ABORT = range(0 , 15)
 
 class ztmSTATUS(Enum):
     STATUS_ACK, \
@@ -74,11 +57,10 @@ class ztmSTATUS(Enum):
     STATUS_RDY, \
     STATUS_BUSY, \
     STATUS_ERROR, \
-    STATUS_SEEKING_CURR, \
-    STATUS_TUNNEL_SUCCESS, \
-    STATUS_IZ_SWEEP, \
-    STATUS_IV_SWEEP, \
-    STATUS_TIP_CRASHED = range(0 , 15)
+    STATUS_STEP_COUNT, \
+    STATUS_MEASUREMENTS, \
+    STATUS_FFT_DATA, \
+    STATUS_TIP_CRASHED = range(0 , 14)
 
 
 # the usbMsgFunctions could probably all be replaced by a single elaborate function that 
