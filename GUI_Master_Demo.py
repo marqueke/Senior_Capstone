@@ -146,6 +146,7 @@ class ComGUI:
                 self.drop_com["state"] = "disable"
                 InfoMsg = f"Successful UART connection using {self.clicked_com.get()}."
                 messagebox.showinfo("Connected", InfoMsg)
+                self.parent.serial_ctrl.start()
             except serial.SerialException as e:
                 InfoMsg = f"Failed to connect to {port}: {e}"
                 messagebox.showerror("Connection Error", InfoMsg)
@@ -197,7 +198,6 @@ class MeasGUI:
         self.label5.grid(column=2, row=2, padx=5, pady=5)
 
         # vpiezo adjust step size
-
         self.frame10 = LabelFrame(root, text="", padx=5, pady=5, bg="#d0cee2")
         self.label_vpeizo_delta = Label(self.frame10, text="Vpiezo ΔV (V):", bg="#d0cee2", width=11, anchor="w")
         self.label_vpeizo_delta.grid(column=1, row=1)
@@ -213,8 +213,6 @@ class MeasGUI:
         self.label_vpeizo_total.grid(column=1, row=3, columnspan=2)
         self.label12 = Label(self.frame10, bg="white", width=10)
         self.label12.grid(column=1, row=4, columnspan=2)
-
-
 
         # distance
         self.frame1 = LabelFrame(root, text="Distance (nm)", padx=10, pady=2, bg="gray", width=20)
@@ -233,11 +231,7 @@ class MeasGUI:
         self.frame4 = LabelFrame(root, text="Current Offset (nA)", padx=10, pady=2, bg="#ADD8E6")
         self.label4 = Entry(self.frame4, bg="white", width=24)
         self.label4.bind("<Return>", self.saveCurrentOffset)
-        
-        # fine adjustment increments
-        # self.frame5 = LabelFrame(root, text="Fine Adjust ΔZ", padx=10, pady=2, bg="#ADD8E6")
-        # self.label5 = Entry(self.frame5, bg="white", width=10)
-                
+         
         # sample bias
         self.frame6 = LabelFrame(root, text="Sample Bias (V)", padx=10, pady=2, bg="#ADD8E6")
         self.label6 = Entry(self.frame6, bg="white", width=24)
@@ -248,9 +242,6 @@ class MeasGUI:
         self.label7 = Text(self.frame7, height=7, width=30)
         self.label8 = Text(self.frame7, height=1, width=8)
         self.label9 = Label(self.frame7, padx=10, text="Date:", height=1, width=5)
-        
-        # save parameters button
-        # self.save_params_button = ctk.CTkButton(root, text="Save Parameters",corner_radius=0, command=self.updateParams)
 
         # setup the drop option menu
         self.DropDownMenu()
@@ -298,12 +289,8 @@ class MeasGUI:
         self.vpiezo_adjust_btn_down = ctk.CTkButton(master=self.vpiezo_btn_frame, image=self.add_btn_image1, text="", width=40, height=40, compound="bottom", fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0)
         
         self.fine_adjust_frame = LabelFrame(root, text="Fine Adjust", padx=10, pady=5, bg="#eeeeee")
-        self.fine_adjust_btn_up = ctk.CTkButton(master=self.fine_adjust_frame, image=self.add_btn_image2, text = "", width=40, height=40, compound="bottom", fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0)
-        self.fine_adjust_btn_down = ctk.CTkButton(master=self.fine_adjust_frame, image=self.add_btn_image3, text="", width=40, height=40, compound="bottom", fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0)
-        
-        # save parameters button
-        # self.save_params_button = ctk.CTkButton(root, text="Save Parameters",corner_radius=0, command=self.updateParams)
-
+        self.fine_adjust_btn_up = ctk.CTkButton(master=self.fine_adjust_frame, image=self.add_btn_image2, text = "", width=40, height=40, compound="bottom", fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.handle_fine_adjust_up)
+        self.fine_adjust_btn_down = ctk.CTkButton(master=self.fine_adjust_frame, image=self.add_btn_image3, text="", width=40, height=40, compound="bottom", fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.handle_fine_adjust_down)
 
         '''
         self.vbias_frame = LabelFrame(root, text="Vbias", padx=10, pady=2, bg="#7393B3")
@@ -396,10 +383,6 @@ class MeasGUI:
         # positioning current offset text box
         self.frame4.grid(row=12, column=5, padx=5, pady=5, sticky="w")
         self.label4.grid(row=1, column=1, padx=5, pady=5) 
-        
-        # positioning fine adjust control text box
-        # self.frame5.grid(row=13, column=4, padx=5, pady=5, sticky="nw")
-        # self.label5.grid(row=2, column=0, padx=5, pady=5)  
 
         # positioning sample bias text box
         self.frame6.grid(row=13, column=5, padx=5, pady=5, sticky="nw")
@@ -414,9 +397,6 @@ class MeasGUI:
         # positioning the file drop-down menu
         self.drop_menu.grid(row=0, column=0, padx=5, pady=5, sticky="w")
 
-        # positioning for save parameters button
-        # self.save_params_button.grid(row=14, column=4, columnspan=2)  
-    
     '''
     Function to error check user inputs
     '''
@@ -438,8 +418,16 @@ class MeasGUI:
         adc_curr = self.get_float_value(self.label3, 0.0, "ADC Current")
         vbias = self.get_float_value(self.label6, 0.0, "Voltage Bias")
         vpzo = self.get_float_value(self.label10, 0.0, "Vpiezo")
-        # step size
-        # sample rate
+        # number of steps, hardcoded = 1, for fine adjust arrows
+        num_of_steps = 1
+        # fine adjust direction
+        fine_adjust_dir = 0 #self.fine_adjust_direction
+        # # sample rate
+        # sample_rate = self.sample_rate # integer in kHz
+        
+        # # NEW FUNCTION
+        #### send user fine adjust command and params to mcu
+        self.parent.ztm_serial.sendMsgD(port, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_STEP_COUNT.value, self.fine_adjust_step_size, fine_adjust_dir, num_of_steps)
         
         # NEW FUNCTION 
         #### Send user input parameters to the MCU
@@ -484,37 +472,161 @@ class MeasGUI:
         
         ### Display data on GUI
 
+    
+
+    # save piezo incremental step input by user to send to mcu
     def savePiezoIncrement(self, event):
         vpiezo_increment = self.label10.get()
         print(f"Saved piezo inc value: {vpiezo_increment}")
 
+    # save current setpoint input by user to send to mcu
     def saveCurrentSetpoint(self, event): 
         curr_setpoint = self.label3.get()
         print(f"Saved current setpoint value: {curr_setpoint}")
 
+    # save current offset input by user to send to mcu
     def saveCurrentOffset(self, event): 
         curr_offset = self.label4.get()
         print(f"Saved current offset value: {curr_offset}")
 
+    # save sample bias voltage input by user to send to mcu
     def saveSampleBias(self, event): 
         sample_bias = self.label6.get()
         print(f"Saved sample bias value: {sample_bias}")
 
-    ### working on meow ###
-    def saveSampleRate(self, _): 
-									 
-        sample_rate = (self.sample_rate_var.get())
-        print(f"Saved sample rate value: {sample_rate}")
+    # saves sample rate input as a integer 'sample_rate' to be sent to mcu
+    def saveSampleRate(self, _):
+        if self.sample_rate_var.get() == "25 kHz":
+            self.sample_rate = 25000
+        elif self.sample_rate_var.get() == "12.5 kHz":
+            self.sample_rate = 12500
+        elif self.sample_rate_var.get() == "37.5 kHz":
+            self.sample_rate = 37500
+        elif self.sample_rate_var.get() == "10 kHz":
+            self.sample_rate = 10000
+        elif self.sample_rate_var.get() == "5 kHz":
+            self.sample_rate = 5000
+        print(f"Saved sample rate value: {self.sample_rate}")
+        
+        port = self.parent.serial_ctrl.serial_port
 
+        '''
+        sendMsgB(port, msgCmd, msgStatus, uint16_rateHz):
+            - port          = COM port variable assigned using pySerial functions
+            - msgCmd        = ztmCMD value - see documentation for valid commands
+            - msgStatus     = ztmStatus value - usually STATUS_CLR
+            - uint16_rateHz = data rate to assign, units of Hz, max limit 65535
+            - Function transmits Msg B, does not return anything. '''
+        self.parent.ztm_serial.sendMsgB(port, ztmCMD.CMD_SET_ADC_SAMPLE_RATE.value, ztmSTATUS.STATUS_CLR.value, self.sample_rate)
+        print(f"Sending cmd adjust sample rate to mcu for: {self.sample_rate}")
+
+        ### Read ACK from the MCU
+        ack_response = self.parent.serial_ctrl.read_bytes()
+        ### Unpack data and display on the GUI
+        if ack_response:
+            self.parent.ztm_serial.unpackRxMsg(ack_response)
+        else:
+            print("Failed to receive response from MCU.")
+
+    # save fine adjust stepper motor step size as an integer 'fine_adjust_step_size' to be sent to mcu
     def saveFineAdjust(self, _):
-        fine_adjust_step_size = self.fine_adjust_var.get()
-        print(f"Saved fine adjust step size: {fine_adjust_step_size}")
+        if self.fine_adjust_var.get() == "Full":
+            self.fine_adjust_step_size = 0
+            approx_step_distance = 0.008    # need to update
+        elif self.fine_adjust_var.get() == "Half":
+            self.fine_adjust_step_size = 1
+            approx_step_distance = 0.004    # need to update
+        elif self.fine_adjust_var.get() == "Quarter":
+            self.fine_adjust_step_size = 2
+            approx_step_distance = 0.002    # need to update
+        elif self.fine_adjust_var.get() == "Eighth":
+            self.fine_adjust_step_size = 3
+            approx_step_distance = 0.001    # need to update
+        
+        # print confirmation to terminal
+        print(f"Saved fine adjust step size: {self.fine_adjust_var.get()} : {self.fine_adjust_step_size}")
+
+        # display approx distance per step size to user
+        self.label5.configure(text=f"{approx_step_distance:.3f} nm")
+
+    # handles button click for fine adjust up arrow
+    def handle_fine_adjust_up(self):
+        # fine adjust direction : direction = 0 for up, 1 for down
+        fine_adjust_dir = 0 
+        
+        # number of steps, hardcoded = 1, for fine adjust arrows
+        num_of_steps = 1
+
+        port = self.parent.serial_ctrl.serial_port
+        print(f"port: {port}")
+
+        #### send user fine adjust command and params to mcu
+        # need to figure out port access
+        '''sendMsgD(port, msgCmd, msgStatus, size, dir, count):
+            - port          = COM port variable assigned using pySerial functions
+            - msgCmd        = ztmCMD value - see documentation for valid commands
+            - msgStatus     = ztmStatus value - usually STATUS_CLR
+            - size          = step size - see global constants, ex. FULL_STEP
+            - dir           = direction assignment, raise or lower the top plate of microscope
+                              ex. DIR_UP (value should be 1 or 0)
+            - count         = number of steps at the designated step size
+            - Function transmits Msg D, does not return anything. '''
+        self.parent.ztm_serial.sendMsgD(port, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_CLR.value, self.fine_adjust_step_size, fine_adjust_dir, num_of_steps)
+        print(f"Sending cmd fine_adjust_up to mcu: {self.fine_adjust_step_size}")
+
+        ### Read ACK from the MCU
+        done_response = self.parent.serial_ctrl.read_bytes()
+        ### Unpack data and display on the GUI
+        # looking for STATUS_DONE
+        if done_response:
+            print(f"Response recieved: {done_response}")
+            status_received = self.parent.ztm_serial.unpackRxMsg(done_response)
+            if status_received != ztmSTATUS.STATUS_DONE.value:
+                print(f"ERROR: wrong status recieved, status value: {status_received}")
+        else:
+            print("Failed to receive response from MCU.")
+        
+    # handles button click for fine adjust down arrow
+    def handle_fine_adjust_down(self):
+        # fine adjust direction : direction = 0 for up, 1 for down
+        fine_adjust_dir = 1 
+        
+        # number of steps, hardcoded = 1, for fine adjust arrows
+        num_of_steps = 1
+
+        port = self.parent.serial_ctrl.serial_port
+
+        #### send user fine adjust command and params to mcu
+        # need to figure out port access
+        '''sendMsgD(port, msgCmd, msgStatus, size, dir, count):
+            - port          = COM port variable assigned using pySerial functions
+            - msgCmd        = ztmCMD value - see documentation for valid commands
+            - msgStatus     = ztmStatus value - usually STATUS_CLR
+            - size          = step size - see global constants, ex. FULL_STEP
+            - dir           = direction assignment, raise or lower the top plate of microscope
+                              ex. DIR_UP (value should be 1 or 0)
+            - count         = number of steps at the designated step size
+            - Function transmits Msg D, does not return anything. '''
+        self.parent.ztm_serial.sendMsgD(port, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_CLR.value, self.fine_adjust_step_size, fine_adjust_dir, num_of_steps)
+        print(f"Sending cmd fine_adjust_down to mcu: {self.fine_adjust_step_size}")
+
+        ### Read ACK from the MCU 
+        done_response = self.parent.serial_ctrl.read_bytes()
+        ### Unpack data and display on the GUI
+        # looking for STATUS_DONE
+        if done_response:
+            print(f"Response recieved: {done_response}")
+            status_received = self.parent.ztm_serial.unpackRxMsg(done_response)
+            if status_received != ztmSTATUS.STATUS_DONE.value:
+                print(f"ERROR: wrong status recieved, status value: {status_received}")
+        else:
+            print("Failed to receive response from MCU.")
 
     # to remove 
     def updateParams(self):
         curr_setpoint = self.label3.get()
         curr_offset = self.label4.get()
-        fine_adjust_inc = self.label5.get()
+        #fine_adjust_inc = self.label5.get()
         Sample_bias = self.label6.get()
 
         if self.validate_setpoint(curr_setpoint):
@@ -527,10 +639,10 @@ class MeasGUI:
         else:
             messagebox.showerror("Error", "Please enter a valid current offset")
         
-        if self.validate_fine_adjust_inc(fine_adjust_inc):
-            print(f"Entered fine adjust inc: {fine_adjust_inc}")
-        else:
-            messagebox.showerror("Error", "Please enter a valid fine adjust inc")
+        # if self.validate_fine_adjust_inc(fine_adjust_inc):
+        #     print(f"Entered fine adjust inc: {fine_adjust_inc}")
+        # else:
+        #     messagebox.showerror("Error", "Please enter a valid fine adjust inc")
         
         if self.validate_sample_bias(Sample_bias):
             print(f"Entered sample bias: {Sample_bias}")
