@@ -1,8 +1,8 @@
 from tkinter import *
-from tkinter import messagebox
-from PIL import Image
+from tkinter import messagebox, filedialog
+from PIL import Image, ImageGrab
 import customtkinter as ctk
-import serial
+import serial, re, os, struct, time
 import serial.tools.list_ports
 import re
 
@@ -13,6 +13,8 @@ from IV_Window import IVWindow  # import the IV Window Class
 from IZ_Window import IZWindow  # import the IV Window Class
 from SPI_Data_Ctrl import SerialCtrl
 from Data_Com_Ctrl import DataCtrl
+from value_conversion import Convert
+from ztmSerialCommLibrary import ztmCMD, ztmSTATUS, usbMsgFunctions, MSG_A, MSG_B, MSG_C, MSG_D, MSG_E, MSG_F
 #from value_conversion import Convert
 
 
@@ -29,9 +31,12 @@ class RootGUI:
         # initialize data and serial control
         self.data_ctrl = DataCtrl(9600, self.handle_data)
         self.serial_ctrl = SerialCtrl('COM9', 9600, self.data_ctrl.decode_data)
+        self.data_ctrl.set_serial_ctrl(self.serial_ctrl)
+        self.ztm_serial = usbMsgFunctions(self)
+					
         
         # Initialize other components
-        self.meas_gui = MeasGUI(self.root)
+        self.meas_gui = MeasGUI(self.root, self)
         self.graph_gui = GraphGUI(self.root)
         #self.button_gui = ButtonGUI(self.root, self)
         self.com_gui = ComGUI(self.root, self)
@@ -47,6 +52,10 @@ class RootGUI:
         if self.serial_ctrl:
             print("Serial controller is initialized, starting now...")
             self.serial_ctrl.start()
+            
+            port = self.serial_ctrl.serial_port
+            #print(port)
+            self.meas_gui.send_parameters(port)
         else:
             print("Serial controller is not initialized.")
     
@@ -154,9 +163,10 @@ class ComGUI:
   
 # class for measurements/text box widgets in homepage
 class MeasGUI:
-    def __init__(self, root):
+    def __init__(self, root, parent):
         self.root = root
-        
+        self.parent = parent					
+            
         # sample rate adjust
         self.frame8 = LabelFrame(root, text="", padx=5, pady=5, bg="#ADD8E6")
         self.label_sample_rate = Label(self.frame8, text="Sample Rate: ", bg="#ADD8E6", width=11, anchor="w")
@@ -187,6 +197,7 @@ class MeasGUI:
         self.label5.grid(column=2, row=2, padx=5, pady=5)
 
         # vpiezo adjust step size
+
         self.frame10 = LabelFrame(root, text="", padx=5, pady=5, bg="#d0cee2")
         self.label_vpeizo_delta = Label(self.frame10, text="Vpiezo ΔV (V):", bg="#d0cee2", width=11, anchor="w")
         self.label_vpeizo_delta.grid(column=1, row=1)
@@ -222,6 +233,10 @@ class MeasGUI:
         self.frame4 = LabelFrame(root, text="Current Offset (nA)", padx=10, pady=2, bg="#ADD8E6")
         self.label4 = Entry(self.frame4, bg="white", width=24)
         self.label4.bind("<Return>", self.saveCurrentOffset)
+        
+        # fine adjustment increments
+        # self.frame5 = LabelFrame(root, text="Fine Adjust ΔZ", padx=10, pady=2, bg="#ADD8E6")
+        # self.label5 = Entry(self.frame5, bg="white", width=10)
                 
         # sample bias
         self.frame6 = LabelFrame(root, text="Sample Bias (V)", padx=10, pady=2, bg="#ADD8E6")
@@ -233,6 +248,9 @@ class MeasGUI:
         self.label7 = Text(self.frame7, height=7, width=30)
         self.label8 = Text(self.frame7, height=1, width=8)
         self.label9 = Label(self.frame7, padx=10, text="Date:", height=1, width=5)
+        
+        # save parameters button
+        # self.save_params_button = ctk.CTkButton(root, text="Save Parameters",corner_radius=0, command=self.updateParams)
 
         # setup the drop option menu
         self.DropDownMenu()
@@ -265,12 +283,12 @@ class MeasGUI:
         self.add_btn_image10 = ctk.CTkImage(Image.open("Images/Save_Home_Btn.png"), size=(90,35))
         self.add_btn_image11 = ctk.CTkImage(Image.open("Images/Return_Home_Btn.png"), size=(35,35))
         
-        # create buttons with proper sizes
+        # create buttons with proper sizes															   
         self.start_btn = ctk.CTkButton(master=root, image=self.add_btn_image4, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.start_reading)
         self.stop_btn = ctk.CTkButton(master=root, image=self.add_btn_image5, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.stop_reading)
         self.acquire_iv_btn = ctk.CTkButton(master=root, image=self.add_btn_image6, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.open_iv_window)
         self.acquire_iz_btn = ctk.CTkButton(master=root, image=self.add_btn_image7, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.open_iz_window)
-        self.stop_led_btn = ctk.CTkButton(master=root, image=self.add_btn_image8, text="", width=30, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0)
+        self.stop_led_btn = ctk.CTkButton(master=root, image=self.add_btn_image8, text="", width=30, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, hover=NONE)
         
         self.save_home_pos = ctk.CTkButton(master=root, image=self.add_btn_image10, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0)
         self.return_to_home_pos = ctk.CTkButton(master=root, image=self.add_btn_image11, text="", width=30, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0)
@@ -331,9 +349,6 @@ class MeasGUI:
         self.vbias_label.grid(row=6, column=9, padx=5, pady=5)
     '''
 
-
-
-
     def open_iv_window(self):
         '''
         Method to open a new window when the "Acquire I-V" button is clicked
@@ -350,12 +365,19 @@ class MeasGUI:
     
     def start_reading(self):
         print("ButtonGUI: Start button pressed")
-        self.start_reading()
+        self.start_btn.configure(state="disabled")
+        self.stop_btn.configure(state="normal")
+        self.parent.start_reading()
+
+        #port = self.serial_ctrl.port
+        #self.send_parameters(port)
+							  
     
     def stop_reading(self):
         print("ButtonGUI: Stop button pressed")
-        self.stop_reading()
-
+        self.start_btn.configure(state="normal")
+        self.stop_btn.configure(state="disabled")
+        self.parent.stop_reading()
 
 
     def publish(self):
@@ -396,17 +418,71 @@ class MeasGUI:
         # self.save_params_button.grid(row=14, column=4, columnspan=2)  
     
     '''
-    def update_distance(self, adc_curr, vbias, vpzo):
-        print(f"MeasGUI: Updating labels with ADC_CURR={adc_curr}, VBIAS={vbias}, VPZO={vpzo}")
-        self.label1.delete(0, END)
-        self.label1.insert(0, f"{adc_curr:.3f}")
-        
-        self.label2.delete(0, END)
-        self.label2.insert(0, f"{vbias:.3f}")
-        
-        self.label3.delete(0, END)
-        self.label3.insert(0, f"{vpzo:.3f}")
+    Function to error check user inputs
     '''
+    def get_float_value(self, label, default_value, value_name):
+        try:
+            value = float(label.get())
+            print(value)
+        except ValueError:
+            print(f"Invalid input for {value_name}. Using default value of {default_value}.")
+            value = default_value
+        return value  
+    
+    '''
+    Function to send user-inputted parameters to MCU
+    sample bias, vpiezo, step size, current setpoint, sample rate
+    '''        
+    def send_parameters(self, port):
+
+        adc_curr = self.get_float_value(self.label3, 0.0, "ADC Current")
+        vbias = self.get_float_value(self.label6, 0.0, "Voltage Bias")
+        vpzo = self.get_float_value(self.label10, 0.0, "Vpiezo")
+        # step size
+        # sample rate
+        
+        # NEW FUNCTION 
+        #### Send user input parameters to the MCU
+        self.parent.ztm_serial.sendMsgA(port, ztmCMD.CMD_PIEZO_ADJ.value, ztmSTATUS.STATUS_DONE.value, 0, 0, vpzo)
+
+        # Initialize counter and response buffer 
+        ### Read ACK from the MCU
+        ack_response = self.parent.serial_ctrl.read_bytes()
+        ### Unpack data and display on the GUI
+        if ack_response:
+            self.parent.ztm_serial.unpackRxMsg(ack_response)
+        else:
+            print("Failed to receive response from MCU.")
+              
+        ### Request data from MCU
+        self.parent.ztm_serial.sendMsgC(port, ztmCMD.CMD_REQ_DATA.value, ztmSTATUS.STATUS_CLR.value)
+        
+        ### Read data from MCU
+        data_response = self.parent.serial_ctrl.read_bytes()
+        
+        ### Unpack data
+        if data_response:
+            self.parent.ztm_serial.unpackRxMsg(data_response)
+            
+            # Extracting and displaying the payload
+            current_nA = round(struct.unpack('>f', ack_response[3:7])[0], 3)
+            vb_V = round(Convert.get_Vbias_float(struct.unpack('>H', ack_response[7:9])[0]), 3)
+            vp_V = round(Convert.get_Vpiezo_float(struct.unpack('>H', ack_response[9:11])[0]), 3)
+
+            '''
+            # Display the values on the GUI
+            self.label1.config(text=f"Current: {current_nA} nA")
+            self.label2.config(text=f"Vbias: {vb_V} V")
+            self.label10.config(text=f"Vpiezo: {vp_V} V")
+            '''
+            
+            print("Received values\n\tCurrent: " + str(current_nA) + " nA")
+            print("\tVbias: " + str(vb_V) + " V")
+            print("\tVpiezo: " + str(vp_V) + " V\n")
+        else:
+            print("Failed to receive response from MCU.")
+        
+        ### Display data on GUI
 
     def savePiezoIncrement(self, event):
         vpiezo_increment = self.label10.get()
@@ -426,6 +502,7 @@ class MeasGUI:
 
     ### working on meow ###
     def saveSampleRate(self, _): 
+									 
         sample_rate = (self.sample_rate_var.get())
         print(f"Saved sample rate value: {sample_rate}")
 
@@ -482,7 +559,6 @@ class MeasGUI:
         pattern4 = [0-9]
         return re.match(pattern4,bias)
 
-
     # should be displaying distance and current that is sent from mcu
     def update_distance(self, adc_curr, vbias, vpzo):
         print(f"MeasGUI: Updating distance with data: ADC_CURR={adc_curr}, VBIAS={vbias}, VPZO={vpzo}")
@@ -514,9 +590,39 @@ class MeasGUI:
                    "Export (.txt)",
                    "Exit"]
         self.menu_options.set(options[0])
-        self.drop_menu = OptionMenu(self.root, self.menu_options, *options)
+        self.drop_menu = OptionMenu(self.root, self.menu_options, *options, command=self.menu_selection)
         self.drop_menu.config(width=10)
 
+    def menu_selection(self, selection):
+        if selection == "Exit":
+            self.root.quit()
+        elif selection == "Save":
+            self.save_graph()
+            pass
+        elif selection == "Save As":
+            self.save_graph_as()
+        elif selection == "Export (.txt)":
+            # export data into a .txt file
+            pass
+    
+    def save_graph(self):
+        '''
+        Saves the current graph image with a default file name.
+        '''
+        downloads_folder = os.path.join(os.path.expanduser("~"), "Downloads")
+        default_filename = os.path.join(downloads_folder, "graph.png")
+        self.parent.graph_gui.fig.savefig(default_filename)
+        messagebox.showinfo("Save Graph", f"Graph saved in Downloads as {default_filename}")
+
+    def save_graph_as(self):
+        '''
+        Saves the current graph image with a user-specified file name.
+        '''
+        file_path = filedialog.asksaveasfilename(defaultextension=".png", filetypes=[("PNG files", "*.png"), ("All files", "*.*")])
+        if file_path:
+            self.parent.graph_gui.fig.savefig(file_path)
+            messagebox.showinfo("Save Graph As", f"Graph saved as {file_path}")
+            
 # class for graph in homepage
 class GraphGUI:
     def __init__(self, root):

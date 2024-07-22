@@ -1,27 +1,110 @@
 # iz_window.py
 
 from tkinter import *
-from tkinter import messagebox
+from tkinter import messagebox, filedialog
 from PIL import Image
 import customtkinter as ctk
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.animation as animation
+import matplotlib.pyplot as plt
+import os, struct
 
 from Sweep_IZ import SweepIZ_Window  # import the IZ Sweep Window Class
+from SPI_Data_Ctrl import SerialCtrl
+from Data_Com_Ctrl import DataCtrl
+from value_conversion import Convert
+from ztmSerialCommLibrary import ztmCMD, ztmSTATUS, usbMsgFunctions, MSG_A, MSG_B, MSG_C, MSG_D, MSG_E, MSG_F
 
 class IZWindow:
     def __init__(self, root):
         self.root = root
         self.root.title("Acquire I-Z")
         self.root.config(bg="#d0cee2")
-        self.root.geometry("800x640")
+        self.root.geometry("750x675")   # (length x width)
+
+        # initialize data and serial control
+        self.data_ctrl = DataCtrl(9600, self.handle_data)
+        self.serial_ctrl = SerialCtrl('COM9', 9600, self.data_ctrl.decode_data)
         
         # Initialize the widgets
         self.init_meas_widgets()
         self.init_graph_widgets()
         self.init_data_btns()
+    
+    def start_reading(self):
+        print("Starting to read data...")
+        if self.serial_ctrl:
+            print("Serial controller is initialized, starting now...")
+            self.serial_ctrl.start()
+            self.send_parameters()
+        else:
+            print("Serial controller is not initialized.")
+    
+    def stop_reading(self):
+        print("Stopped reading data...")
+        self.serial_ctrl.stop()
+    
+    def handle_data(self, raw_data):
+        print(f"Handling raw data: {raw_data.hex()}")
+        decoded_data = self.data_ctrl.decode_data(raw_data)
+        if decoded_data:
+            print("Data is being decoded...")
+        else:
+            print("Data decoding failed or data is incomplete")
+    
+    '''
+    Function to error check user inputs
+    '''
+    def get_float_value(self, label, default_value, value_name):
+        try:
+            value = float(label.get())
+        except ValueError:
+            print(f"Invalid input for {value_name}. Using default value of {default_value}.")
+            value = default_value
+        return value  
+
+    def send_parameters(self):
+
+        vpzo_min = self.get_float_value(self.label4, 0.0, "Voltage Piezo Minimum")
+        vpzo_max = self.get_float_value(self.label5, 0.0, "Voltage Piezo Maximum")
+
+        # convert vpzo to int
+        vpzo_min_int = Convert.get_Vpiezo_int(vpzo_min)
+        vpzo_max_int = Convert.get_Vpiezo_int(vpzo_max)
         
+        print(f"Vpzo min int: {vpzo_min_int}, Vpzo max int: {vpzo_max_int}")
+        
+        # convert values to bytes
+        vpzo_min_bytes = struct.pack('>H', vpzo_min_int)
+        vpzo_max_bytes = struct.pack('>H', vpzo_max_int)
+        
+        
+        # Construct the payload with vpzo in the correct position
+        payload_min = vpzo_min_bytes
+        payload_max = vpzo_max_bytes
+        
+        print(f"Payload Vpzo Minimum: {payload_min.hex()}")
+        print(f"Payload Vpzo Maximum: {payload_max.hex()}")
+        
+        '''
+        # SAVING BC UNSURE ABOUT VPZO
+        self.parent.data_ctrl.send_command(MSG_A, ztmCMD.CMD_PIEZO_ADJ.value, ztmSTATUS.STATUS_DONE.value, payload)
+        
+        response = self.parent.serial_ctrl.read_serial_blocking()
+        if response:
+            print(f"MCU Response: {response.hex()}")
+        else:
+            print("No response received from MCU")
+        '''
+
+        '''
+        ##### WRITE TO DISPLAY DATA AFTER RECEIVING A RESPONSE #####
+        vp_V = round(ztmConvert.get_Vpiezo_float_V(struct.unpack('H',bytes(testMsg[9:11]))[0]), 3) #unpack bytes & convert
+        vpStr = str(vp_V)   # format as a string
+        print("\tVpiezo: " + vpStr + " V\n")
+        '''
+
     def init_meas_widgets(self):
         # piezo extension
         self.frame1 = LabelFrame(self.root, text="ΔZ/Piezo Extension (nm)", padx=10, pady=2, bg="gray")
@@ -38,11 +121,15 @@ class IZWindow:
         # IV sweep voltage parameters
         # min voltage
         self.frame4 = LabelFrame(self.root, text="Minimum Voltage (V)", padx=10, pady=2, bg="#ADD8E6")
-        self.label4 = Entry(self.frame4, bg="white", width=25)
+        self.label4 = Entry(self.frame4, bg="white", width=30)
         
         # max voltage
         self.frame5 = LabelFrame(self.root, text="Maximum Voltage (V)", padx=10, pady=2, bg="#ADD8E6")
-        self.label5 = Entry(self.frame5, bg="white", width=25)
+        self.label5 = Entry(self.frame5, bg="white", width=30)
+    
+        # number of setpoints
+        self.frame7 = LabelFrame(self.root, text="Number of Setpoints", padx=10, pady=2, bg="#ADD8E6")
+        self.label9 = Entry(self.frame7, bg="white", width=30)
 
         # user notes text box
         self.frame6 = LabelFrame(self.root, text="NOTES", padx=10, pady=5, bg="#A7C7E7")
@@ -62,25 +149,29 @@ class IZWindow:
     
     def publish_meas_widgets(self):
         # piezo extension
-        self.frame1.grid(row=11, column=0, padx=5, pady=5, sticky=SE)
+        self.frame1.grid(row=12, column=0, padx=5, pady=5, sticky=SE)
         self.label1.grid(row=0, column=0, padx=5, pady=5, sticky="s")
         
         # piezo voltage
-        self.frame2.grid(row=11, column=1, padx=5, pady=5, sticky=SE)
+        self.frame2.grid(row=12, column=1, padx=5, pady=5, sticky=SE)
         self.label2.grid(row=0, column=0, padx=5, pady=5)   
         
         # current
-        self.frame3.grid(row=12, column=0, padx=5, pady=5, sticky=NE)
+        self.frame3.grid(row=13, column=0, padx=5, pady=5, sticky=NE)
         self.label3.grid(row=0, column=0, padx=5, pady=5, sticky="n") 
 
         # min voltage
-        self.frame4.grid(row=13, column=0, padx=5, pady=5, sticky="e")
+        self.frame4.grid(row=11, column=0, padx=5, pady=5, sticky="n")
         self.label4.grid(row=0, column=0, padx=5, pady=5)
         
         # max voltage
-        self.frame5.grid(row=13, column=1, padx=5, pady=5, sticky="e")
+        self.frame5.grid(row=11, column=1, padx=5, pady=5, sticky="n")
         self.label5.grid(row=0, column=0, padx=5, pady=5)
 
+        # number of setpoints
+        self.frame7.grid(row=13, column=1, padx=5, pady=5, sticky="n")
+        self.label9.grid(row=0, column=0, padx=5, pady=5)
+        
         # Positioning the notes section
         self.frame6.grid(row=11, column=7, rowspan=3, pady=5, sticky="n")
         self.label6.grid(row=1, column=0, pady=5, columnspan=3, rowspan=3) 
@@ -97,8 +188,8 @@ class IZWindow:
         self.add_btn_image4 = ctk.CTkImage(Image.open("Images/Sweep_IZ_Btn.png"), size=(90,35))
         self.add_btn_image5 = ctk.CTkImage(Image.open("Images/Stop_LED.png"), size=(35,35))
         
-        self.start_btn = ctk.CTkButton(self.root, image=self.add_btn_image1, text="", width=90, height=35, fg_color="#d0cee2", bg_color="#d0cee2", corner_radius=0)
-        self.stop_btn = ctk.CTkButton(self.root, image=self.add_btn_image2, text="", width=90, height=35, fg_color="#d0cee2", bg_color="#d0cee2", corner_radius=0)
+        self.start_btn = ctk.CTkButton(self.root, image=self.add_btn_image1, text="", width=90, height=35, fg_color="#d0cee2", bg_color="#d0cee2", corner_radius=0, command=self.start_reading)
+        self.stop_btn = ctk.CTkButton(self.root, image=self.add_btn_image2, text="", width=90, height=35, fg_color="#d0cee2", bg_color="#d0cee2", corner_radius=0, command=self.stop_reading)
         self.home_btn = ctk.CTkButton(self.root, image=self.add_btn_image3, text="", width=90, height=35, fg_color="#d0cee2", bg_color="#d0cee2", corner_radius=0)
         self.sweep_btn = ctk.CTkButton(self.root, image=self.add_btn_image4, text="", width=90, height=35, fg_color="#d0cee2", bg_color="#d0cee2", corner_radius=0, command=self.open_iz_sweep_window)
         self.stop_led_btn = ctk.CTkButton(self.root, image=self.add_btn_image5, text="", width=35, height=35, fg_color="#d0cee2", bg_color="#d0cee2", corner_radius=0)
@@ -109,8 +200,8 @@ class IZWindow:
         self.start_btn.grid(row=1, column=10, padx=5, pady=15, sticky="s")
         self.stop_btn.grid(row=2, column=10, padx=5, sticky="n")
         self.stop_led_btn.grid(row=1, column=11, padx=5, pady=15, sticky="sw")
-        self.home_btn.grid(row=12, column=11, pady=40, sticky="ne")
-        self.sweep_btn.grid(row=12, column=11, sticky="se")
+        self.sweep_btn.grid(row=14, column=10, sticky="n")
+        self.home_btn.grid(row=15, column=10, sticky="n")
     
     def open_iz_sweep_window(self):
         '''
@@ -118,6 +209,9 @@ class IZWindow:
         '''
         new_window = ctk.CTkToplevel(self.root)
         SweepIZ_Window(new_window)
+    
+    def return_home(self):
+        self.root.destroy()
         
     # file drop-down menu
     def DropDownMenu(self):
@@ -131,9 +225,38 @@ class IZWindow:
                    "Export (.txt)",
                    "Exit"]
         self.menu_options.set(options[0]) 
-        self.drop_menu = OptionMenu(self.root, self.menu_options, *options)
+        self.drop_menu = OptionMenu(self.root, self.menu_options, *options, command=self.menu_selection)
         self.drop_menu.config(width=10)
+
+    def menu_selection(self, selection):
+        if selection == "Exit":
+            self.root.destroy()
+        elif selection == "Save":
+            self.save_graph()
+        elif selection == "Save As":
+            self.save_graph_as()
+        elif selection == "Export (.txt)":
+            self.export_data()
     
+    def save_graph(self):
+        downloads_folder = os.path.join(os.path.expanduser("~"), "Downloads")
+        default_filename = os.path.join(downloads_folder, "graph.png")
+        self.fig.savefig(default_filename)
+        messagebox.showinfo("Save Graph", f"Graph saved in Downloads as {default_filename}")
+        
+    def save_graph_as(self):
+        file_path = filedialog.asksaveasfilename(defaultextension=".png", filetypes=[("PNG files", "*.png"), ("All files", "*.*")])
+        if file_path:
+            self.fig.savefig(file_path)
+            messagebox.showinfo("Save Graph As", f"Graph saved as {file_path}")
+    
+    def export_data(self):
+        file_path = filedialog.asksaveasfilename(defaultextension=".txt", filetypes=[("Text files", "*.txt"), ("All files", "*.*")])
+        if file_path:
+            with open(file_path, 'w') as file:
+                file.write("Sample data to export")
+            messagebox.showinfo("Export Data", f"Data exported as {file_path}")
+                
     def init_graph_widgets(self):
         self.fig, self.ax = plt.subplots()
         self.ax.set_xlabel('Delta Z (nm)')
@@ -162,8 +285,8 @@ class IZWindow:
             self.ax.clear()
             self.ax.plot(xdata, ydata, c='#64B9FF')
             
-            self.ax.set_title('Sample Data Live Graph')
-            self.ax.set_xlabel('X Sample Label')
-            self.ax.set_ylabel('Y Sample Label')
+            self.ax.set_title('Tunneling Current')
+            self.ax.set_xlabel('Piezo Voltage (V)')
+            self.ax.set_ylabel('Current (A)')
         except FileNotFoundError:
             pass
