@@ -163,7 +163,7 @@ class usbMsgFunctions:
             port.write(serial.to_bytes([byte]))
         # send payload
         for i in range(0, payloadBytes):
-            port.write(serial.to_bytes(padByte))
+            port.write(serial.to_bytes(0))
     
         # clear buffer    
         port.flush()  

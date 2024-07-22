@@ -54,6 +54,7 @@ class SerialCtrl:
             return None
 
 
+    '''
     def ztmGetMsg(self):
 
         response = b''  # Initialize an empty byte string to store the response
@@ -85,7 +86,8 @@ class SerialCtrl:
                 return response    
         else:
             print(f"Failed to receive complete message.\n")    
-            
+    '''
+        
     # function to read msg of 11 bytes
     def read_bytes(self):
         count = 0

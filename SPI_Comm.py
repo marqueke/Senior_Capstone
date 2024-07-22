@@ -1,3 +1,4 @@
+# DO NOT REFERENCE THIS FILE. IT IS A DEAD FILE
 from enum import Enum
 import struct
 from value_conversion import Convert
