@@ -1,8 +1,8 @@
 import struct
 from value_conversion import Convert
-from ztmSerialCommLibrary import ztmCMD, ztmSTATUS, usbMsgFunctions, MSG_A, MSG_B, MSG_C, MSG_D, MSG_E, MSG_F
+#from ztmSerialCommLibrary import ztmCMD, ztmSTATUS, usbMsgFunctions, MSG_A, MSG_B, MSG_C, MSG_D, MSG_E, MSG_F
 
-from SPI_Data_Ctrl import SerialCtrl
+from SPI_Comm import SerialCtrl
 '''
 MSG A used to set voltage outputs and transmit standard measurements
 MSG B used for data and sampling rates
