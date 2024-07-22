@@ -15,7 +15,6 @@ from SPI_Data_Ctrl import SerialCtrl
 from Data_Com_Ctrl import DataCtrl
 #from value_conversion import Convert
 
-# NOTE: ADD drop down list for sample rates
 
 class RootGUI:
     def __init__(self):
@@ -69,6 +68,7 @@ class RootGUI:
         else:
             print("Data decoding failed or data is incomplete")
 
+
 # Class to setup and create the communication manager with MCU
 class ComGUI:
     def __init__(self, root, parent):
@@ -85,13 +85,6 @@ class ComGUI:
         self.btn_refresh = Button(self.frame, text="Refresh", width=10, command=self.com_refresh)
         self.btn_connect = Button(self.frame, text="Connect", width=10, state="disabled", command=self.serial_connect)
         
-        # Initialize sample rate menu
-        # self.label_sample_rate = Label(self.frame, text="Sample Rate: ", bg="white", width=15, anchor="w")
-        # self.sample_rate_var = StringVar()
-        # self.sample_rate_var.set("-")
-        # self.sample_rate_menu = OptionMenu(self.frame, self.sample_rate_var, "25 kHz", "12.5 kHz", "37.5 kHz", "10 kHz", "5 kHz", command=self.sample_rate_selected)
-        # self.sample_rate_menu.config(width=10)
-        
         # Optional Graphic parameters
         self.padx = 7
         self.pady = 5
@@ -103,8 +96,6 @@ class ComGUI:
         self.frame.grid(row=1, column=0, rowspan=3, columnspan=3, padx=5, pady=5)
         self.label_com.grid(column=1, row=2)
         self.drop_com.grid(column=2, row=2, padx=self.padx)
-        # self.label_sample_rate.grid(column=1, row=3)
-        # self.sample_rate_menu.grid(column=2, row=3, padx=self.padx)
         self.btn_refresh.grid(column=3, row=2, padx=self.padx)
         self.btn_connect.grid(column=3, row=3, padx=self.padx)
 
@@ -115,12 +106,6 @@ class ComGUI:
         self.clicked_com.set("-" if self.serial_ports else "No COM port found")
         self.drop_com = OptionMenu(self.frame, self.clicked_com, *self.serial_ports, command=self.connect_ctrl)
         self.drop_com.config(width=10)
-
-    # def sample_rate_selected(self, _):
-    #     if self.sample_rate_var.get() != "-" and self.clicked_com.get() != "-":
-    #         self.btn_connect["state"] = "active"
-    #     else:
-    #         self.btn_connect["state"] = "disabled"
             
     def connect_ctrl(self, widget):
         if self.clicked_com.get() == "-" and self.sample_rate_var.get == "-":
@@ -202,7 +187,6 @@ class MeasGUI:
         self.label5.grid(column=2, row=2, padx=5, pady=5)
 
         # vpiezo adjust step size
-
         self.frame10 = LabelFrame(root, text="", padx=5, pady=5, bg="#d0cee2")
         self.label_vpeizo_delta = Label(self.frame10, text="Vpiezo ΔV (V):", bg="#d0cee2", width=11, anchor="w")
         self.label_vpeizo_delta.grid(column=1, row=1)
@@ -238,10 +222,6 @@ class MeasGUI:
         self.frame4 = LabelFrame(root, text="Current Offset (nA)", padx=10, pady=2, bg="#ADD8E6")
         self.label4 = Entry(self.frame4, bg="white", width=24)
         self.label4.bind("<Return>", self.saveCurrentOffset)
-        
-        # fine adjustment increments
-        # self.frame5 = LabelFrame(root, text="Fine Adjust ΔZ", padx=10, pady=2, bg="#ADD8E6")
-        # self.label5 = Entry(self.frame5, bg="white", width=10)
                 
         # sample bias
         self.frame6 = LabelFrame(root, text="Sample Bias (V)", padx=10, pady=2, bg="#ADD8E6")
@@ -253,9 +233,6 @@ class MeasGUI:
         self.label7 = Text(self.frame7, height=7, width=30)
         self.label8 = Text(self.frame7, height=1, width=8)
         self.label9 = Label(self.frame7, padx=10, text="Date:", height=1, width=5)
-        
-        # save parameters button
-        # self.save_params_button = ctk.CTkButton(root, text="Save Parameters",corner_radius=0, command=self.updateParams)
 
         # setup the drop option menu
         self.DropDownMenu()
