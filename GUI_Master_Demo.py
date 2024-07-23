@@ -17,6 +17,17 @@ from SPI_Data_Ctrl import SerialCtrl
 
 # NOTE: ADD drop down list for sample rates
 
+# global variable
+curr_setpoint = None
+
+vbias_save = None
+vbias_done_flag = 0
+
+sample_rate_save = None
+sample_rate_done_flag = 0
+
+response = 0
+
 class RootGUI:
     def __init__(self):
         self.root = ctk.CTk()
@@ -40,7 +51,7 @@ class RootGUI:
         self.com_gui = ComGUI(self.root, self)
         
     def quit_application(self):
-        print("Quitting application")
+        print("\nQUITTING APPLICATION")
         if self.serial_ctrl:
             self.serial_ctrl.stop()
         self.root.quit()
@@ -165,7 +176,7 @@ class MeasGUI:
         self.root = root
         self.parent = parent
 
-        # Initialize data attributes for continuous update
+        # initialize data attributes for continuous update
         self.distance   = 0.0
         self.adc_curr   = 0.0
         
@@ -177,11 +188,6 @@ class MeasGUI:
         # stepper motor adjust
         self.step_up    = 0
         self.step_down  = 0
-        
-        # flags for start seeking
-        self.vpzo_done_flag     = 0
-        self.vbias_done_flag    = 0
-        self.sample_rate_done_flag = 0
         
         self.initialize_widgets()
         
@@ -309,18 +315,23 @@ class MeasGUI:
         # put on the grid all the elements
         self.publish()
 
-    '''
-    # send sample bias voltage to MCU
-    def send_vbias(self): 
-        #port = self.parent.serial_ctrl.serial_port
-        port = self.parent.serial_ctrl.serial_port
-        print(f"Port connected: {port}")
-        
-        sample_bias_float = self.get_float_value(self.label6, 1.0, "Voltage Bias")
-        print(f"Saved sample bias value (float): {sample_bias_float}")
-        
-        #self.parent.ztm_serial.sendMsgA(self.port, ztmCMD.CMD_SET_VBIAS.value, ztmSTATUS.STATUS_DONE.value, 0, sample_bias_float,0)
-    '''
+    def disable_widgets(self):
+        '''
+        Function to disable entry widgets when we start seeking
+        Disabling:
+            - vpzo delta
+            - vpzo up
+            - vpzo down
+            - current setpoint
+            - current offset
+            - sample rate
+            - stepper motor step size
+            - stepper motor up
+            - stepper motor down
+            - vbias
+        '''
+        self.vpiezo_adjust_btn_down["state"] = "disabled"
+        self.vpiezo_adjust_btn_up["state"] = "disabled"
       
     def open_iv_window(self):
         '''
@@ -421,6 +432,48 @@ class MeasGUI:
         # reset home position
         self.return_to_home_frame.grid(row=9, column=9)
         self.return_to_home_pos.grid(row=0, column=0)
+
+    '''
+    Function to send a message to the MCU and retry if we do
+    not receive expected response
+    '''
+    def send_msg_retry(self, port, msg_type, cmd, status, *params, max_attempts=10, sleep_time=0.5):
+        global response
+        attempt = 0
+        
+        while attempt < max_attempts:
+            if msg_type == MSG_A:
+                self.parent.ztm_serial.sendMsgA(port, cmd, status, *params)
+            elif msg_type == MSG_B:
+                self.parent.ztm_serial.sendMsgB(port, cmd, status, *params)
+            elif msg_type == MSG_C:
+                self.parent.ztm_serial.sendMsgC(port, cmd, status, *params)
+            elif msg_type == MSG_D:
+                self.parent.ztm_serial.sendMsgD(port, cmd, status, *params)
+            elif msg_type == MSG_E:
+                self.parent.ztm_serial.sendMsgE(port, cmd, status, *params)
+            else:
+                raise ValueError(f"Unsupported message type: {msg_type}")
+            
+            response = self.parent.serial_ctrl.read_bytes()
+            
+            ### Unpack data and display on the GUI
+            if response:
+                if response[2] != ztmSTATUS.STATUS_DONE.value:
+                    print(f"ERROR. Wrong status recieved: {response}")
+
+                    attempt += 1
+                else:
+                    self.parent.ztm_serial.unpackRxMsg(response)
+                    print(f"SUCCESS. Response received: {response}")
+                    
+                    return True
+            else:
+                print("ERROR. Failed to receive response from MCU.")
+
+                attempt += 1
+            time.sleep(sleep_time)
+        return False
     
     '''
     Function to error check user inputs and update widget
@@ -436,18 +489,28 @@ class MeasGUI:
     
     '''
     Function to send user-inputted parameters to MCU
-    sample bias, vpiezo, step size, current setpoint, sample rate
+    sample bias, sample rate, current setpoint*
     '''        
     def start_seeking(self):
+        print("\n----------START SEEKING TUNNELING CURRENT----------")
+        
+        # access global variables
+        global curr_setpoint
+            
+        global vbias_save
+        global vbias_done_flag
+        
+        global sample_rate_save
+        global sample_rate_done_flag
+        
+        global response
+        
+        # check for port
         port = self.parent.serial_ctrl.serial_port
         if port is None:
             print("Port is not connected.")
-            return
-        else:
-            print(f"{port}")
-            
-        #vpzo = 1.25
-        #self.parent.ztm_serial.sendMsgA(self.port, ztmCMD.CMD_PIEZO_ADJ.value, ztmSTATUS.STATUS_CLR.value, 0, 0, vpzo)
+        
+        # Note: Disable entry widgets when seeking
         
         ########## WHEN USER PRESSES START BTN ##########
         # 1. Check if user values are set, if not set them to a default value (vpzo = 1, vbias = 1, ***current = 0.5)
@@ -455,104 +518,79 @@ class MeasGUI:
         # 3. a) Verify we have DONE msgs received from MCU (vpzo and vbias)
         # 3. b) If DONE msgs not rcvd, MCU will send RESEND status and GUI will resend until we have DONE from MCU
         
-        value1 = self.get_float_value(self.label3, 0.5, "Current Setpoint")
-        self.label3.insert(0, f"{value1:.3f}")      # not working
+        # error check current setpoint
+        try:
+            curr_setpoint = float(curr_setpoint)
+        except (TypeError, ValueError):
+            curr_setpoint = 0.5     # set to default value
+            print("Current setpoint set to default value.")
+        print(f"Current setpoint: {curr_setpoint}")
         
-        if self.vbias_done_flag == 0:
-            #value2 = self.get_float_value(self.label6, 1.0, "Voltage Bias")
-            #self.label6.insert(0, f"{value2:.3f}")      # not working
-            vbias = float(1.0)
-            print(f"Vbias set to default value: {vbias:.3f} V")
-            # send msg, verify DONE
+        # error check sample bias
+        if not vbias_done_flag:
+            # get vbias value
+            try:
+                vbias_save = float(vbias_save)      # check if there is a sample bias user input
+            except (TypeError, ValueError):
+                vbias_save = 1.0                    # set to default value
+                print("Sample bias set to default value. Sending sample bias message to MCU.")
+            
+            # send samplel bias msg and retrieve done
+            success = self.send_msg_retry(port, MSG_A, ztmCMD.CMD_SET_VBIAS.value, ztmSTATUS.STATUS_CLR.value, 0, vbias_save, 0)
+            
+            if success:
+                vbias_done_flag = 1
+            else:
+                vbias_done_flag = 0
+        print(f"Sample bias: {vbias_save}")
         
-        '''
-        # DON'T CARE. DISABLE VPZO WHEN START SEEKING
-        if self.vpzo_done_flag == 0:
-            #value3 = self.get_float_value(self.label10, 1.0, "Vpiezo")
-            #self.label10.insert(0, f"{value3:.3f}")     # not working
-            vpzo = float(1.0)
-            print(f"Vpzo set to default value: {vpzo:.3f} V")
-        '''
+        # error check sample rate
+        if not sample_rate_done_flag:
+            # get sample rate
+            if sample_rate_save == None:
+                sample_rate_save = 25000    # set to default vaue
+                print("Sample rate set to default value. Sending sample rate message to MCU.")
+                
+            # send sample rate msg and receive done
+            success = self.send_msg_retry(port, MSG_B, ztmCMD.CMD_SET_ADC_SAMPLE_RATE.value, ztmSTATUS.STATUS_CLR.value, sample_rate_save)
+            
+            if success:
+                sample_rate_done_flag = 1
+            else:
+                sample_rate_done_flag = 0
+        print(f"Sample rate: {sample_rate_save}")
         
-        if self.sample_rate_done_flag == 0:
-            #sample_rate_value = self.sample_rate_var.get()
-            #if sample_rate_value == "-":
-            #    sample_rate = 25000                     # default value
-            #    print(f"Sample rate set to default value: {sample_rate} Hz")
-            sample_rate = 25000
-            print(f"Sample bias set to default value: {sample_rate} Hz")
-            # send msg, verify DONE
         
         # 4. Once we have all DONE msgs, request data msg from GUI to MCU
         # 5. GUI waits to receive data
-        # 6. a) GUI receives data from MCU (current and distance)
+        # 6. a) GUI receives data from MCU (ADC current- possibly vbias, vpzo, and distance)
         # 6. b) Keep going until read current reaches current setpoint (if curr_data < curr_setpoint = keep reading)
-        # Note: put in function for vpiezo and delta v
-        
-        '''
-        
-        
-        # NEW FUNCTION 
-        #### Send user input parameters to the MCU - testing with vpzo
-        self.parent.ztm_serial.sendMsgA(port, ztmCMD.CMD_PIEZO_ADJ.value, ztmSTATUS.STATUS_DONE.value, 0, 0, vpzo)
-
-        # Initialize counter and response buffer 
-        ### Read ACK from the MCU
-        ack_response = self.parent.serial_ctrl.read_bytes()
-        #ack_response = self.parent.serial_ctrl.ztmGetMsg()
-        
-        ### Unpack data and display on the GUI
-        if ack_response:
-            self.parent.ztm_serial.unpackRxMsg(ack_response)
-            
-            # Extracting and displaying the payload
-            curr_val = round(struct.unpack('>f', ack_response[3:7])[0], 3)
-            vbias_val = round(Convert.get_Vbias_float(struct.unpack('>H', ack_response[7:9])[0]), 3)
-            vpzo_val = round(Convert.get_Vpiezo_float(struct.unpack('>H', ack_response[9:11])[0]), 3)
-            
-            #self.update_label()
-            
-            print("Received values\n\tCurrent: " + str(curr_val) + " nA")
-            print("\tVbias: " + str(vbias_val) + " V")
-            print("\tVpiezo: " + str(vpzo_val) + " V\n")
-        else:
-            print("Failed to receive response from MCU.")
-        
-        time.sleep(2)
-        
-        
-        ### Request data from MCU
-        self.parent.ztm_serial.sendMsgC(port, ztmCMD.CMD_REQ_DATA.value, ztmSTATUS.STATUS_CLR.value)
-        
-        ### Read data from MCU
-        data_response = self.parent.serial_ctrl.read_bytes()
-        
-        
-        ### Unpack data
-        if data_response:
-            self.parent.ztm_serial.unpackRxMsg(data_response)
-            
-            # Extracting and displaying the payload
-            curr_val = round(struct.unpack('>f', data_response[3:7])[0], 3)
-            vbias_val = round(Convert.get_Vbias_float(struct.unpack('>H', data_response[7:9])[0]), 3)
-            vpzo_val = round(Convert.get_Vpiezo_float(struct.unpack('>H', data_response[9:11])[0]), 3)
-            
-            #self.update_label()
-            
-            print("Received values\n\tCurrent: " + str(curr_val) + " nA")
-            print("\tVbias: " + str(vbias_val) + " V")
-            print("\tVpiezo: " + str(vpzo_val) + " V\n")
-        else:
-            print("Failed to receive response from MCU.")
-        
-        ### Display data on GUI
-        #self.label1.config(text=f"{current_nA:.3f}")
-        #self.label2.config(text=f"Current: {current_nA}")
-        #self.label10.config(text=f"Vpiezo: {vp_V} V")
-        '''
+        # Note: put in function for vpiezo/delta v error check and TIP APPROACH
+        if vbias_done_flag and sample_rate_done_flag:
+            success = self.send_msg_retry(port, MSG_C, ztmCMD.CMD_REQ_DATA.value, ztmSTATUS.STATUS_CLR.value)
+            if success:
+                print("SUCCESS. We are receiving data!")
+                curr_val = round(struct.unpack('>f', response[3:7])[0], 3)
+                print("Received values\n\tCurrent: " + str(curr_val) + " nA")
+                '''
+                for curr_data < curr_setpoint:
+                    # request data
+                    # receive data
+                    # curr_val = round(struct.unpack('>f', done[3:7])[0], 3)
+                
+                    # print("Received values\n\tCurrent: " + str(curr_val) + " nA")
+                '''
+            else:
+                print("ERROR. We are not receiving data!")
+ 
     
     def savePiezoValue(self, event): 
-        vpzo_value = self.label10.get()
+        vpzo_value = float(self.label10.get())
+        
+        if vpzo_value < float(0.003):
+            print("Vpiezo is too small. Set to 3 mV.")
+            vpzo_value = float(0.003)
+            
         print(f"Saved vpiezo value: {vpzo_value}")
         self.label12.configure(text=f"{self.total_voltage:.3f} ")
         
@@ -568,10 +606,15 @@ class MeasGUI:
     Function to send total vpiezo to MCU
     '''
     def sendPiezoAdjust(self):
+        print("\n----------SENDING PIEZO ADJUST----------")
         port = self.parent.serial_ctrl.serial_port
         #print(f"Port connected: {port}")
         
         delta_v_float = self.get_float_value(self.label10, 1.0, "Piezo Voltage")
+        
+        if delta_v_float < float(0.003):
+            delta_v_float = float(0.003)
+        
         print(f"Saved delta V (float): {delta_v_float}")
         
         if 0 <= self.total_voltage <= 10:
@@ -582,6 +625,7 @@ class MeasGUI:
                     self.total_voltage = 10.000
                     InfoMsg = f"Total voltage exceeds 10 V. Maximum allowed is 10 V."
                     messagebox.showerror("INVALID", InfoMsg)
+                    # send msg to MCU
                 self.vpzo_up = 0
             elif self.vpzo_down:
                 if self.total_voltage - delta_v_float >= 0:
@@ -590,14 +634,24 @@ class MeasGUI:
                     self.total_voltage = 0.000
                     InfoMsg = f"Total voltage below 0 V. Minimum allowed is 0 V."
                     messagebox.showerror("INVALID", InfoMsg)
+                    # send msg to MCU
                 self.vpzo_down = 0
         else:
             InfoMsg = f"Invalid range. Stay within 0 - 10 V."
             messagebox.showerror("INVALID", InfoMsg)
+            # send msg to MCU
         
         print(f"Total Voltage: {self.total_voltage}")
         self.label12.configure(text=f"{self.total_voltage:.3f} ")
         
+        success = self.send_msg_retry(port, MSG_A, ztmCMD.CMD_PIEZO_ADJ.value, ztmSTATUS.STATUS_CLR.value, 0, 0, self.total_voltage)
+        
+        if success:
+            print("\nSUCCESS. Received done message.")
+        else:
+            print("\nERROR. Failed to send piezo voltage.")
+
+        '''
         #### Send user input parameters to the MCU
         self.parent.ztm_serial.sendMsgA(port, ztmCMD.CMD_PIEZO_ADJ.value, ztmSTATUS.STATUS_DONE.value, 0.0, 0.0, self.total_voltage)
 
@@ -610,7 +664,7 @@ class MeasGUI:
             if done[2] != ztmSTATUS.STATUS_DONE.value:
                 print(f"ERROR: wrong status recieved, status value: {done}")
                 
-                self.vpzo_done_flag = 0
+                # resend msg to MCU
             else:
                 self.parent.ztm_serial.unpackRxMsg(done)
                 
@@ -624,16 +678,23 @@ class MeasGUI:
                 print("Received values\n\tCurrent: " + str(curr_val) + " nA")
                 print("\tVbias: " + str(vbias_val) + " V")
                 print("\tVpiezo: " + str(vpzo_val) + " V\n")
-                
-                self.vpzo_done_flag = 1
         else:
             print("Failed to receive response from MCU.")
-            self.vpzo_done_flag = 0
+        '''
+          
         
-    
-    def saveCurrentSetpoint(self, event): 
-        curr_setpoint = self.label3.get()
-        print(f"Saved current setpoint value: {curr_setpoint}")
+        
+    '''
+    Function to save the user inputted value of current setpoint to
+    use for start seeking function
+    '''
+    def saveCurrentSetpoint(self, _): 
+        global curr_setpoint 
+        curr_setpoint = float(self.label3.get())
+        print(f"\nSaved current setpoint value: {curr_setpoint}")
+        #self.start_seeking()
+        
+        return curr_setpoint
     
     
     '''
@@ -641,68 +702,54 @@ class MeasGUI:
     '''
     def saveCurrentOffset(self, event): 
         curr_offset = self.label4.get()
-        print(f"Saved current offset value: {curr_offset}")
+        print(f"\nSaved current offset value: {curr_offset}")
 
     '''
     Function to send vbias msg to the MCU and waits for a DONE response
+    Check if DONE or ACK is expected
     '''
     def saveSampleBias(self, event): 
+        print("\n----------SENDING SAMPLE BIAS----------")
         port = self.parent.serial_ctrl.serial_port
-        #print(f"Port connected: {port}")
+        global vbias_save
+        global vbias_done_flag
         
-        sample_bias_float = self.get_float_value(self.label6, 1.0, "Voltage Bias")
-        print(f"Saved sample bias value (float): {sample_bias_float}")
+        vbias_save = self.get_float_value(self.label6, 1.0, "Voltage Bias")
+        print(f"Saved sample bias value (float): {vbias_save}")
         
-        #### Send user input parameters to the MCU - testing with vbias
-        self.parent.ztm_serial.sendMsgA(port, ztmCMD.CMD_SET_VBIAS.value, ztmSTATUS.STATUS_DONE.value, 0.5, sample_bias_float, 1.0)
-
-        ### Read DONE from the MCU
-        vbias_done_response = self.parent.serial_ctrl.read_bytes()
-        #ack_response = self.parent.serial_ctrl.ztmGetMsg()
+        success = self.send_msg_retry(port, MSG_A, ztmCMD.CMD_SET_VBIAS.value, ztmSTATUS.STATUS_CLR.value, 0, vbias_save, 0)
         
-        ### Unpack data and display on the GUI
-        if vbias_done_response:
-            if vbias_done_response[2] != ztmSTATUS.STATUS_DONE.value:
-                print(f"ERROR: wrong status recieved, status value: {vbias_done_response}")
-                
-                self.vbias_done_flag = 0
-            else:
-                self.parent.ztm_serial.unpackRxMsg(vbias_done_response)
-            
-                # Extracting and displaying the payload
-                curr_val = round(struct.unpack('>f', vbias_done_response[3:7])[0], 3)
-                vbias_val = round(Convert.get_Vbias_float(struct.unpack('>H', vbias_done_response[7:9])[0]), 3)
-                vpzo_val = round(Convert.get_Vpiezo_float(struct.unpack('>H', vbias_done_response[9:11])[0]), 3)
-                
-                #self.update_label()
-                
-                print("Received values\n\tCurrent: " + str(curr_val) + " nA")
-                print("\tVbias: " + str(vbias_val) + " V")
-                print("\tVpiezo: " + str(vpzo_val) + " V\n")
-                
-                self.vbias_done_flag = 1
+        #vbias_done_flag = 1
+        
+        if success:
+            print("Received done message.")
+            vbias_done_flag = 1
         else:
-            print("Failed to receive response from MCU.")
-            self.vbias_done_flag = 0
-
+            print("Failed to send vbias.")
+            vbias_done_flag = 0
+        
 
     '''
     Saves sample rate as an integer and sends that to the MCU
     '''
     def saveSampleRate(self, _):
+        global sample_rate_done_flag
+        global sample_rate_save
+        
+        print("\n----------SENDING SAMPLE RATE----------")
         port = self.parent.serial_ctrl.serial_port
         
         if self.sample_rate_var.get() == "25 kHz":
-            self.sample_rate = 25000
+            sample_rate_save = 25000
         elif self.sample_rate_var.get() == "12.5 kHz":
-            self.sample_rate = 12500
+            sample_rate_save = 12500
         elif self.sample_rate_var.get() == "37.5 kHz":
-            self.sample_rate = 37500
+            sample_rate_save = 37500
         elif self.sample_rate_var.get() == "10 kHz":
-            self.sample_rate = 10000
+            sample_rate_save = 10000
         elif self.sample_rate_var.get() == "5 kHz":
-            self.sample_rate = 5000
-        print(f"Saved sample rate value: {self.sample_rate}")
+            sample_rate_save = 5000
+        print(f"Saved sample rate value: {sample_rate_save}")
 
         '''
         sendMsgB(port, msgCmd, msgStatus, uint16_rateHz):
@@ -711,24 +758,20 @@ class MeasGUI:
             - msgStatus     = ztmStatus value - usually STATUS_CLR
             - uint16_rateHz = data rate to assign, units of Hz, max limit 65535
             - Function transmits Msg B, does not return anything. '''
-        self.parent.ztm_serial.sendMsgB(port, ztmCMD.CMD_SET_ADC_SAMPLE_RATE.value, ztmSTATUS.STATUS_CLR.value, self.sample_rate)
-        print(f"Sending cmd adjust sample rate to mcu for: {self.sample_rate}")
 
-        ### Read DONE from the MCU
-        done_response = self.parent.serial_ctrl.read_bytes()
-														   
-        ### Unpack data and display on the GUI
-        if done_response:
-            if done_response[2] != ztmSTATUS.STATUS_DONE.value:
-                print(f"ERROR: wrong status recieved, status value: {done_response}")
-                
-                self.sample_rate_done_flag = 0
-            else:
-                self.parent.ztm_serial.unpackRxMsg(done_response)
-                self.sample_rate_done_flag = 1
+        print(f"Sending cmd adjust sample rate to mcu for: {sample_rate_save}")
+		
+        #sample_rate_done_flag = 1      # debug start_seeking()
+        success = self.send_msg_retry(port, MSG_B, ztmCMD.CMD_SET_ADC_SAMPLE_RATE.value, ztmSTATUS.STATUS_CLR.value, sample_rate_save)
+        
+    
+        if success:
+            print("Received done message.")
+            sample_rate_done_flag = 1
         else:
-            print("Failed to receive response from MCU.")
-            self.sample_rate_done_flag = 0
+            print("Failed to send sample rate.")
+            sample_rate_done_flag = 0
+        
         
     '''
     Saves adjust stepper motor step size as an integer 'fine_adjust_step_size' 
@@ -782,6 +825,8 @@ class MeasGUI:
             fine_adjust_dir = 1
             self.step_down  = 0
             dir_name = "down direction"
+            
+        print(f"\n----------SENDING STEPPER MOTOR {dir_name}----------")
             		  								 
         # number of steps, hardcoded = 1, for fine adjust arrows
         num_of_steps = 1
@@ -809,6 +854,7 @@ class MeasGUI:
                 print(f"ERROR: wrong status recieved, status value: {done_response}")
             else:
                 msg_received = self.parent.ztm_serial.unpackRxMsg(done_response)
+                print("DONE STATUS RECEIVED.")
                 print(f"Response recieved: {msg_received}")
         else:
             print("Failed to receive response from MCU.")
@@ -818,6 +864,7 @@ class MeasGUI:
     Function to save the new home position and send it to the MCU
     '''
     def save_home(self):
+        ("\n----------SENDING NEW HOME POSITION----------")
         port = self.parent.serial_ctrl.serial_port
         
         # set new home position
@@ -833,6 +880,7 @@ class MeasGUI:
                 print(f"ERROR: wrong status recieved, status value: {save_home_done}")
             else:
                 self.parent.ztm_serial.unpackRxMsg(save_home_done)
+                print("DONE STATUS RECEIVED.")
         else:
             print("Failed to receive response from MCU.")
     
@@ -840,6 +888,7 @@ class MeasGUI:
     Function to return to the home position and send it to the MCU
     '''
     def return_home(self):
+        ("\n----------SENDING TO RETURN HOME----------")
         port = self.parent.serial_ctrl.serial_port
         
         self.parent.ztm_serial.sendMsgC(port, ztmCMD.CMD_RETURN_TIP_HOME.value, ztmSTATUS.STATUS_CLR.value)
@@ -854,11 +903,10 @@ class MeasGUI:
                 print(f"ERROR: wrong status recieved, status value: {return_home_done}")
             else:
                 self.parent.ztm_serial.unpackRxMsg(return_home_done)
+                print("DONE STATUS RECEIVED.")
         else:
             print("Failed to receive response from MCU.")
     
-    '''
-    need to accuractely define the input validations
     '''
     def validate_setpoint(self, setpoint):
         pattern1 = [0-9]
@@ -877,6 +925,7 @@ class MeasGUI:
     def validate_sample_bias(bias):
         pattern4 = [0-9]
         return re.match(pattern4,bias)
+    '''
 
     # should be displaying distance and current that is sent from mcu
     def update_distance(self, adc_curr, vbias, vpzo):

@@ -50,3 +50,39 @@ if __name__ == "__main__":
     serial_writer.write_serial(data_bytes2)
     
     serial_writer.close_serial()
+    
+    
+'''
+attempt = 0
+
+vbias_save = self.get_float_value(self.label6, 1.0, "Voltage Bias")
+print(f"Saved sample bias value (float): {vbias_save}")
+
+while attempt < 10:
+#### Send user input parameters to the MCU - testing with vbias
+self.parent.ztm_serial.sendMsgA(port, ztmCMD.CMD_SET_VBIAS.value, ztmSTATUS.STATUS_DONE.value, 0.5, vbias_save, 1.0)
+
+### Read DONE from the MCU
+vbias_done_response = self.parent.serial_ctrl.read_bytes()
+
+#vbias_done_flag = 1        # debug
+
+### Unpack data and display on the GUI
+if vbias_done_response:
+    if vbias_done_response[2] != ztmSTATUS.STATUS_DONE.value:
+        print(f"ERROR: wrong status recieved, status value: {vbias_done_response}")
+        
+        self.vbias_done_flag = 0
+        attempt += 1
+    else:
+        self.parent.ztm_serial.unpackRxMsg(vbias_done_response)
+        self.vbias_done_flag = 1
+        
+        break
+else:
+    print("Failed to receive response from MCU.")
+    
+    self.vbias_done_flag = 0
+    attempt += 1
+time.sleep(1)
+'''

@@ -218,7 +218,7 @@ class usbMsgFunctions:
         # clear buffer    
         port.flush()    
     ###############################################
-    # UNPACK MSG DATA
+    # UNPACK MSG DATA - Reading MCU
     def unpackRxMsg(self, rxMsg):
         ################################
         # DEBUG - PRINT CMD AND STATUS #
@@ -262,7 +262,7 @@ class usbMsgFunctions:
                 return stepsRx 
             
         elif (rxMsg[0] == MSG_E):
-            # microcontroller should not send msg B       
+            # microcontroller should not send msg E       
             return False 
         
         elif (rxMsg[0] == MSG_F):
