@@ -21,7 +21,7 @@ class IVWindow:
         self.root = root
         self.root.title("Acquire I-V")
         self.root.config(bg="#b1ddf0")
-        self.root.geometry("755x675")   # (length x width)
+        self.root.geometry("750x675")   # (length x width)
         
         # initialize data and serial control
         self.data_ctrl = DataCtrl(9600, self.handle_data)
@@ -148,15 +148,15 @@ class IVWindow:
         
         # IV sweep voltage parameters
         # min voltage
-        self.frame3 = LabelFrame(self.root, text="Minimum Voltage (V)", padx=10, pady=2, bg="#ADD8E6")
+        self.frame3 = LabelFrame(self.root, text="Minimum Voltage (V)", padx=10, pady=2, bg="#A7C7E7")
         self.label3 = Entry(self.frame3, bg="white", width=30)
         
         # max voltage
-        self.frame4 = LabelFrame(self.root, text="Maximum Voltage (V)", padx=10, pady=2, bg="#ADD8E6")
+        self.frame4 = LabelFrame(self.root, text="Maximum Voltage (V)", padx=10, pady=2, bg="#A7C7E7")
         self.label4 = Entry(self.frame4, bg="white", width=30)
 
         # number of setpoints
-        self.frame6 = LabelFrame(self.root, text="Number of Setpoints", padx=10, pady=2, bg="#ADD8E6")
+        self.frame6 = LabelFrame(self.root, text="Number of Setpoints", padx=10, pady=2, bg="#A7C7E7")
         self.label8 = Entry(self.frame6, bg="white", width=30)
 
         # user notes text box

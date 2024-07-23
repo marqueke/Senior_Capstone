@@ -120,15 +120,15 @@ class IZWindow:
         
         # IV sweep voltage parameters
         # min voltage
-        self.frame4 = LabelFrame(self.root, text="Minimum Voltage (V)", padx=10, pady=2, bg="#ADD8E6")
+        self.frame4 = LabelFrame(self.root, text="Minimum Piezo Voltage (V)", padx=10, pady=2, bg="#A7C7E7")
         self.label4 = Entry(self.frame4, bg="white", width=30)
         
         # max voltage
-        self.frame5 = LabelFrame(self.root, text="Maximum Voltage (V)", padx=10, pady=2, bg="#ADD8E6")
+        self.frame5 = LabelFrame(self.root, text="Maximum Piezo Voltage (V)", padx=10, pady=2, bg="#A7C7E7")
         self.label5 = Entry(self.frame5, bg="white", width=30)
     
         # number of setpoints
-        self.frame7 = LabelFrame(self.root, text="Number of Setpoints", padx=10, pady=2, bg="#ADD8E6")
+        self.frame7 = LabelFrame(self.root, text="Number of Setpoints", padx=10, pady=2, bg="#A7C7E7")
         self.label9 = Entry(self.frame7, bg="white", width=30)
 
         # user notes text box
@@ -184,15 +184,13 @@ class IZWindow:
     def init_data_btns(self):
         self.add_btn_image1 = ctk.CTkImage(Image.open("Images/Start_Btn.png"), size=(90,35))
         self.add_btn_image2 = ctk.CTkImage(Image.open("Images/Stop_Btn.png"), size=(90,35))
-        self.add_btn_image3 = ctk.CTkImage(Image.open("Images/Homepage_Btn.png"), size=(90,35))
-        self.add_btn_image4 = ctk.CTkImage(Image.open("Images/Sweep_IZ_Btn.png"), size=(90,35))
-        self.add_btn_image5 = ctk.CTkImage(Image.open("Images/Stop_LED.png"), size=(35,35))
+        self.add_btn_image3 = ctk.CTkImage(Image.open("Images/Start_LED.png"), size=(35,35))
+        self.add_btn_image4 = ctk.CTkImage(Image.open("Images/Stop_LED.png"), size=(35,35))
         
         self.start_btn = ctk.CTkButton(self.root, image=self.add_btn_image1, text="", width=90, height=35, fg_color="#d0cee2", bg_color="#d0cee2", corner_radius=0, command=self.start_reading)
         self.stop_btn = ctk.CTkButton(self.root, image=self.add_btn_image2, text="", width=90, height=35, fg_color="#d0cee2", bg_color="#d0cee2", corner_radius=0, command=self.stop_reading)
-        self.home_btn = ctk.CTkButton(self.root, image=self.add_btn_image3, text="", width=90, height=35, fg_color="#d0cee2", bg_color="#d0cee2", corner_radius=0)
-        self.sweep_btn = ctk.CTkButton(self.root, image=self.add_btn_image4, text="", width=90, height=35, fg_color="#d0cee2", bg_color="#d0cee2", corner_radius=0, command=self.open_iz_sweep_window)
-        self.stop_led_btn = ctk.CTkButton(self.root, image=self.add_btn_image5, text="", width=35, height=35, fg_color="#d0cee2", bg_color="#d0cee2", corner_radius=0)
+        self.start_led_btn = ctk.CTkButton(self.root, image=self.add_btn_image3, text="", width=35, height=35, fg_color="#d0cee2", bg_color="#d0cee2", corner_radius=0)
+        self.stop_led_btn = ctk.CTkButton(self.root, image=self.add_btn_image4, text="", width=35, height=35, fg_color="#d0cee2", bg_color="#d0cee2", corner_radius=0)
         
         self.publish_data_btns()
         
@@ -200,15 +198,68 @@ class IZWindow:
         self.start_btn.grid(row=1, column=10, padx=5, pady=15, sticky="s")
         self.stop_btn.grid(row=2, column=10, padx=5, sticky="n")
         self.stop_led_btn.grid(row=1, column=11, padx=5, pady=15, sticky="sw")
-        self.sweep_btn.grid(row=14, column=10, sticky="n")
-        self.home_btn.grid(row=15, column=10, sticky="n")
-    
-    def open_iz_sweep_window(self):
-        '''
-        Method to open a new window when the "Piezo Sweep Parameters" button is clicked
-        '''
-        new_window = ctk.CTkToplevel(self.root)
-        SweepIZ_Window(new_window)
+        # need to switch RG LED on process state
+        #self.start_led_btn.grid(row=1, column=11, padx=5, pady=15, sticky="sw")
+
+    def saveMinVoltage(self, event):
+        self.min_voltage = self.label4.get()
+        print(f"Saved min voltage value: {self.min_voltage}")
+
+    def saveMaxVoltage(self, event):
+        self.max_voltage = self.label5.get()
+        print(f"Saved max voltage value: {self.max_voltage}")
+
+    def saveNumSetpoints(self, event):
+        self.num_setpoints = self.label9.get()
+        print(f"Saved number of setpoints value: {self.num_setpoints}")
+
+    def run_sweep_process(self):
+        volt_per_step = self.max_voltage - self.min_voltage
+        volt_per_step = volt_per_step / self.num_setpoints
+
+        #starting point for piezo sweep
+        self.vpiezo = self.min_voltage
+        self.parent.ztm_serial.sendMsgA(self.parent.serial_ctrl.serial_port, ztmCMD.CMD_PIEZO_ADJ.value, ztmSTATUS.STATUS_MEASUREMENTS.value, 0, 0, vpiezo)
+
+        for i in range(0, self.num_setpoints - 1):
+            self.parent.ztm_serial.sendMsgA(self.parent.serial_ctrl.serial_port, ztmCMD.CMD_PIEZO_ADJ.value, ztmSTATUS.STATUS_MEASUREMENTS.value, 0, 0, vpiezo)
+
+            # read done message receieved from mcu
+            ack_response = self.parent.serial_ctrl.read_bytes()
+            # looking for ACK message from MCU
+            if ack_response:
+                print(f"Response recieved: {ack_response}")
+                status_received = self.parent.ztm_serial.unpackRxMsg(ack_response)
+
+                # looking for STATUS.ACK
+                if status_received != ztmSTATUS.STATUS_ACK.value:
+                    print(f"ERROR: wrong status recieved, status value: {status_received}")   
+                    print("STOPPING SWEEP PROCESS")
+                    break
+                else:
+                    print(f"Response recieved: {status_received}")
+            else:
+                print("Failed to receive response from MCU.")
+
+            self.vpiezo += volt_per_step
+            self.num_setpoints += 1
+        
+    # currently working on this **********************************************************
+    # current, piezo voltage, piezo extension
+    def update_label(self):
+        self.label1.configure(text=f"{self.piezo_distance:.3f} nm") # piezo extension
+        self.label2.configure(text=f"{self.vpiezo:.3f} nA") # piezo voltage
+        self.label3.configure(text=f"{self.adc_curr:.3f} nA") # current
+
+        self.label2.after(1000, self.update_label)
+
+        
+    # def open_iz_sweep_window(self):
+    #     '''
+    #     Method to open a new window when the "Piezo Sweep Parameters" button is clicked
+    #     '''
+    #     new_window = ctk.CTkToplevel(self.root)
+    #     SweepIZ_Window(new_window)
     
     def return_home(self):
         self.root.destroy()

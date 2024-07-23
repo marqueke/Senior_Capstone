@@ -328,9 +328,6 @@ class MeasGUI:
         self.save_home_pos.grid(row=8, column=9)
         self.return_to_home_pos.grid(row=9, column=9)
 
-        # positioning for save parameters button
-        # self.save_params_button.grid(row=14, column=4, columnspan=2)
-
     '''
         self.vbias_frame.grid(row=6, column=9, padx=5, pady=5, sticky="ne")
         self.vbias_label.grid(row=6, column=9, padx=5, pady=5)
@@ -418,16 +415,6 @@ class MeasGUI:
         adc_curr = self.get_float_value(self.label3, 0.0, "ADC Current")
         vbias = self.get_float_value(self.label6, 0.0, "Voltage Bias")
         vpzo = self.get_float_value(self.label10, 0.0, "Vpiezo")
-        # number of steps, hardcoded = 1, for fine adjust arrows
-        num_of_steps = 1
-        # fine adjust direction
-        fine_adjust_dir = 0 #self.fine_adjust_direction
-        # # sample rate
-        # sample_rate = self.sample_rate # integer in kHz
-        
-        # # NEW FUNCTION
-        #### send user fine adjust command and params to mcu
-        self.parent.ztm_serial.sendMsgD(port, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_STEP_COUNT.value, self.fine_adjust_step_size, fine_adjust_dir, num_of_steps)
         
         # NEW FUNCTION 
         #### Send user input parameters to the MCU
@@ -472,8 +459,6 @@ class MeasGUI:
         
         ### Display data on GUI
 
-    
-
     # save piezo incremental step input by user to send to mcu
     def savePiezoIncrement(self, event):
         vpiezo_increment = self.label10.get()
@@ -508,25 +493,37 @@ class MeasGUI:
             self.sample_rate = 5000
         print(f"Saved sample rate value: {self.sample_rate}")
         
-        port = self.parent.serial_ctrl.serial_port
-
-        '''
-        sendMsgB(port, msgCmd, msgStatus, uint16_rateHz):
-            - port          = COM port variable assigned using pySerial functions
-            - msgCmd        = ztmCMD value - see documentation for valid commands
-            - msgStatus     = ztmStatus value - usually STATUS_CLR
-            - uint16_rateHz = data rate to assign, units of Hz, max limit 65535
-            - Function transmits Msg B, does not return anything. '''
-        self.parent.ztm_serial.sendMsgB(port, ztmCMD.CMD_SET_ADC_SAMPLE_RATE.value, ztmSTATUS.STATUS_CLR.value, self.sample_rate)
+        # send user input sample rate to mcu
+        self.parent.ztm_serial.sendMsgB(self.parent.serial_ctrl.serial_port, ztmCMD.CMD_SET_ADC_SAMPLE_RATE.value, ztmSTATUS.STATUS_CLR.value, self.sample_rate)
         print(f"Sending cmd adjust sample rate to mcu for: {self.sample_rate}")
 
-        ### Read ACK from the MCU
+        # read done message receieved from mcu
         ack_response = self.parent.serial_ctrl.read_bytes()
-        ### Unpack data and display on the GUI
+        # looking for ACK message from MCU
         if ack_response:
-            self.parent.ztm_serial.unpackRxMsg(ack_response)
+            print(f"Response recieved: {ack_response}")
+            status_received = self.parent.ztm_serial.unpackRxMsg(ack_response)
+
+            # looking for STATUS.ACK
+            if status_received != ztmSTATUS.STATUS_ACK.value:
+                print(f"ERROR: wrong status recieved, status value: {status_received}")   
+            else:
+                print(f"Response recieved: {status_received}")
+                # read done message receieved from mcu, after receiving ACK
+                done_response = self.parent.serial_ctrl.read_bytes()
+                # check for done status received
+                if done_response:
+                    print(f"Response recieved: {done_response}")
+                    status_received = self.parent.ztm_serial.unpackRxMsg(done_response)
+
+                    # looking for STATUS_DONE
+                    if status_received != ztmSTATUS.STATUS_DONE.value:
+                        print(f"ERROR: wrong status recieved, status value: {status_received}")
+                else:
+                    print("Failed to receive response from MCU.")     
         else:
             print("Failed to receive response from MCU.")
+        
 
     # save fine adjust stepper motor step size as an integer 'fine_adjust_step_size' to be sent to mcu
     def saveFineAdjust(self, _):
@@ -553,35 +550,25 @@ class MeasGUI:
     def handle_fine_adjust_up(self):
         # fine adjust direction : direction = 0 for up, 1 for down
         fine_adjust_dir = 0 
-        
         # number of steps, hardcoded = 1, for fine adjust arrows
         num_of_steps = 1
 
-        port = self.parent.serial_ctrl.serial_port
-        print(f"port: {port}")
-
-        #### send user fine adjust command and params to mcu
-        # need to figure out port access
-        '''sendMsgD(port, msgCmd, msgStatus, size, dir, count):
-            - port          = COM port variable assigned using pySerial functions
-            - msgCmd        = ztmCMD value - see documentation for valid commands
-            - msgStatus     = ztmStatus value - usually STATUS_CLR
-            - size          = step size - see global constants, ex. FULL_STEP
-            - dir           = direction assignment, raise or lower the top plate of microscope
-                              ex. DIR_UP (value should be 1 or 0)
-            - count         = number of steps at the designated step size
-            - Function transmits Msg D, does not return anything. '''
-        self.parent.ztm_serial.sendMsgD(port, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_CLR.value, self.fine_adjust_step_size, fine_adjust_dir, num_of_steps)
+        # send user fine adjust command and params to mcu
+        self.parent.ztm_serial.sendMsgD(self.parent.serial_ctrl.serial_port, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_CLR.value, self.fine_adjust_step_size, fine_adjust_dir, num_of_steps)
         print(f"Sending cmd fine_adjust_up to mcu: {self.fine_adjust_step_size}")
 
-        ### Read ACK from the MCU
+        # read done message receieved from mcu
         done_response = self.parent.serial_ctrl.read_bytes()
-        ### Unpack data and display on the GUI
-        # looking for STATUS_DONE
+        # check for done status received
         if done_response:
             print(f"Response recieved: {done_response}")
             status_received = self.parent.ztm_serial.unpackRxMsg(done_response)
-            if status_received != ztmSTATUS.STATUS_DONE.value:
+
+            # check for OVERCURRENT warning from MCU, should display warning to user
+            if status_received == ztmSTATUS.STATUS_OVERCURRENT.value:
+                print(f"WARNING! OVERCURRENT WARNING! : status value: {status_received}")
+            # looking for STATUS_DONE
+            elif status_received != ztmSTATUS.STATUS_DONE.value:
                 print(f"ERROR: wrong status recieved, status value: {status_received}")
         else:
             print("Failed to receive response from MCU.")
@@ -590,39 +577,30 @@ class MeasGUI:
     def handle_fine_adjust_down(self):
         # fine adjust direction : direction = 0 for up, 1 for down
         fine_adjust_dir = 1 
-        
         # number of steps, hardcoded = 1, for fine adjust arrows
         num_of_steps = 1
 
-        port = self.parent.serial_ctrl.serial_port
-
-        #### send user fine adjust command and params to mcu
-        # need to figure out port access
-        '''sendMsgD(port, msgCmd, msgStatus, size, dir, count):
-            - port          = COM port variable assigned using pySerial functions
-            - msgCmd        = ztmCMD value - see documentation for valid commands
-            - msgStatus     = ztmStatus value - usually STATUS_CLR
-            - size          = step size - see global constants, ex. FULL_STEP
-            - dir           = direction assignment, raise or lower the top plate of microscope
-                              ex. DIR_UP (value should be 1 or 0)
-            - count         = number of steps at the designated step size
-            - Function transmits Msg D, does not return anything. '''
-        self.parent.ztm_serial.sendMsgD(port, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_CLR.value, self.fine_adjust_step_size, fine_adjust_dir, num_of_steps)
+        # send user fine adjust command and params to mcu
+        self.parent.ztm_serial.sendMsgD(self.parent.serial_ctrl.serial_port, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_CLR.value, self.fine_adjust_step_size, fine_adjust_dir, num_of_steps)
         print(f"Sending cmd fine_adjust_down to mcu: {self.fine_adjust_step_size}")
 
-        ### Read ACK from the MCU 
+        # read done message receieved from mcu
         done_response = self.parent.serial_ctrl.read_bytes()
-        ### Unpack data and display on the GUI
-        # looking for STATUS_DONE
+        # check for done status received
         if done_response:
             print(f"Response recieved: {done_response}")
             status_received = self.parent.ztm_serial.unpackRxMsg(done_response)
-            if status_received != ztmSTATUS.STATUS_DONE.value:
+
+            # check for OVERCURRENT warning from MCU, should display warning to user
+            if status_received == ztmSTATUS.STATUS_OVERCURRENT.value:
+                print(f"WARNING! OVERCURRENT WARNING! : status value: {status_received}")
+            # looking for STATUS_DONE
+            elif status_received != ztmSTATUS.STATUS_DONE.value:
                 print(f"ERROR: wrong status recieved, status value: {status_received}")
         else:
             print("Failed to receive response from MCU.")
 
-    # to remove 
+    # to remove , maybe
     def updateParams(self):
         curr_setpoint = self.label3.get()
         curr_offset = self.label4.get()
