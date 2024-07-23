@@ -6,7 +6,6 @@ from value_conversion import Convert
 import serial
 import time
 
-#define serial functions
 ###########################################
 # GLOBAL VARIABLES
 MSG_A = 0X0A
@@ -128,7 +127,7 @@ class usbMsgFunctions:
 
     # MSG B
     
-    def sendMsgB(port, msgCmd, msgStatus, uint16_rateHz):
+    def sendMsgB(self, port, msgCmd, msgStatus, uint16_rateHz):
         ''' - port          = COM port variable assigned using pySerial functions
             - msgCmd        = ztmCMD value - see documentation for valid commands
             - msgStatus     = ztmStatus value - usually STATUS_CLR
@@ -145,7 +144,7 @@ class usbMsgFunctions:
             port.write(serial.to_bytes([byte]))
         
         for i in range(0, payloadByteLen):
-            port.write(serial.to_bytes([padByte]))
+            port.write(serial.to_bytes([0]))
         # clear buffer    
         port.flush()       
 
@@ -160,7 +159,7 @@ class usbMsgFunctions:
     
         #send header
         for byte in headerC:
-            port.write(serial.to_bytes([byte]))
+            port.write(serial.to_bytes([0])) # changed from padByte to 0 to pass an int
         # send payload
         for i in range(0, payloadBytes):
             port.write(serial.to_bytes(0))
@@ -169,7 +168,7 @@ class usbMsgFunctions:
         port.flush()  
 
     # MSG D
-    def sendMsgD(port, msgCmd, msgStatus, size, dir, count):
+    def sendMsgD(self, port, msgCmd, msgStatus, size, dir, count):
         ''' - port          = COM port variable assigned using pySerial functions
             - msgCmd        = ztmCMD value - see documentation for valid commands
             - msgStatus     = ztmStatus value - usually STATUS_CLR
@@ -197,7 +196,7 @@ class usbMsgFunctions:
         port.flush()     
 
     # MSG E
-    def sendMsgE(port, sineVbiasAmp, uint16_rateHz):
+    def sendMsgE(self, port, sineVbiasAmp, uint16_rateHz):
         ''' - port          = COM port variable assigned using pySerial functions
             - uint16_rateHz = vbias frequency, units of Hz, max valid freq = 5000 Hz
             - Function transmits Msg E, does not return anything. '''           
@@ -214,7 +213,7 @@ class usbMsgFunctions:
         for byte in rateHzBytes:
             port.write(serial.to_bytes([byte]))  
         for i in range(0, payloadByteLen):
-            port.write(serial.to_bytes(padByte))
+            port.write(serial.to_bytes(padByte)) # might need to change from padByte to 0 to pass an int
 
         # clear buffer    
         port.flush()    
