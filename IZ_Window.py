@@ -25,7 +25,7 @@ class IZWindow:
 
         # initialize data and serial control
         self.data_ctrl = DataCtrl(9600, self.handle_data)
-        self.serial_ctrl = SerialCtrl('COM9', 9600, self.data_ctrl.decode_data)
+        self.serial_ctrl = SerialCtrl(None, 9600, self.data_ctrl.decode_data)
         
         # Initialize the widgets
         self.init_meas_widgets()
@@ -37,7 +37,7 @@ class IZWindow:
         if self.serial_ctrl:
             print("Serial controller is initialized, starting now...")
             self.serial_ctrl.start()
-            self.send_parameters()
+            self.run_sweep_process()
         else:
             print("Serial controller is not initialized.")
     
@@ -64,46 +64,6 @@ class IZWindow:
             value = default_value
         return value  
 
-    def send_parameters(self):
-
-        vpzo_min = self.get_float_value(self.label4, 0.0, "Voltage Piezo Minimum")
-        vpzo_max = self.get_float_value(self.label5, 0.0, "Voltage Piezo Maximum")
-
-        # convert vpzo to int
-        vpzo_min_int = Convert.get_Vpiezo_int(vpzo_min)
-        vpzo_max_int = Convert.get_Vpiezo_int(vpzo_max)
-        
-        print(f"Vpzo min int: {vpzo_min_int}, Vpzo max int: {vpzo_max_int}")
-        
-        # convert values to bytes
-        vpzo_min_bytes = struct.pack('>H', vpzo_min_int)
-        vpzo_max_bytes = struct.pack('>H', vpzo_max_int)
-        
-        
-        # Construct the payload with vpzo in the correct position
-        payload_min = vpzo_min_bytes
-        payload_max = vpzo_max_bytes
-        
-        print(f"Payload Vpzo Minimum: {payload_min.hex()}")
-        print(f"Payload Vpzo Maximum: {payload_max.hex()}")
-        
-        '''
-        # SAVING BC UNSURE ABOUT VPZO
-        self.parent.data_ctrl.send_command(MSG_A, ztmCMD.CMD_PIEZO_ADJ.value, ztmSTATUS.STATUS_DONE.value, payload)
-        
-        response = self.parent.serial_ctrl.read_serial_blocking()
-        if response:
-            print(f"MCU Response: {response.hex()}")
-        else:
-            print("No response received from MCU")
-        '''
-
-        '''
-        ##### WRITE TO DISPLAY DATA AFTER RECEIVING A RESPONSE #####
-        vp_V = round(ztmConvert.get_Vpiezo_float_V(struct.unpack('H',bytes(testMsg[9:11]))[0]), 3) #unpack bytes & convert
-        vpStr = str(vp_V)   # format as a string
-        print("\tVpiezo: " + vpStr + " V\n")
-        '''
 
     def init_meas_widgets(self):
         # piezo extension
@@ -203,12 +163,66 @@ class IZWindow:
         self.sweep_btn.grid(row=14, column=10, sticky="n")
         self.home_btn.grid(row=15, column=10, sticky="n")
     
-    def open_iz_sweep_window(self):
-        '''
-        Method to open a new window when the "Piezo Sweep Parameters" button is clicked
-        '''
-        new_window = ctk.CTkToplevel(self.root)
-        SweepIZ_Window(new_window)
+
+    def saveMinVoltage(self, event):
+        self.min_voltage = self.label4.get()
+        print(f"Saved min voltage value: {self.min_voltage}")
+
+    def saveMaxVoltage(self, event):
+        self.max_voltage = self.label5.get()
+        print(f"Saved max voltage value: {self.max_voltage}")
+
+    def saveNumSetpoints(self, event):
+        self.num_setpoints = self.label9.get()
+        print(f"Saved number of setpoints value: {self.num_setpoints}")
+
+    def run_sweep_process(self):
+        volt_per_step = self.max_voltage - self.min_voltage
+        volt_per_step = volt_per_step / self.num_setpoints
+
+        #starting point for piezo sweep
+        self.vpiezo = self.min_voltage
+        self.parent.ztm_serial.sendMsgA(self.parent.serial_ctrl.serial_port, ztmCMD.CMD_PIEZO_ADJ.value, ztmSTATUS.STATUS_MEASUREMENTS.value, 0, 0, self.vpiezo)
+
+        for i in range(0, self.num_setpoints - 1):
+            self.parent.ztm_serial.sendMsgA(self.parent.serial_ctrl.serial_port, ztmCMD.CMD_PIEZO_ADJ.value, ztmSTATUS.STATUS_MEASUREMENTS.value, 0, 0, self.vpiezo)
+
+            # read done message receieved from mcu
+            ack_response = self.parent.serial_ctrl.read_bytes()
+            # looking for ACK message from MCU
+            if ack_response:
+                print(f"Response recieved: {ack_response}")
+                status_received = self.parent.ztm_serial.unpackRxMsg(ack_response)
+
+                # looking for STATUS.ACK
+                if status_received != ztmSTATUS.STATUS_ACK.value:
+                    print(f"ERROR: wrong status recieved, status value: {status_received}")   
+                    print("STOPPING SWEEP PROCESS")
+                    break
+                else:
+                    print(f"Response recieved: {status_received}")
+            else:
+                print("Failed to receive response from MCU.")
+
+            self.vpiezo += volt_per_step
+            self.num_setpoints += 1
+        
+    # currently working on this **********************************************************
+    # current, piezo voltage, piezo extension
+    def update_label(self):
+        self.label1.configure(text=f"{self.piezo_distance:.3f} nm") # piezo extension
+        self.label2.configure(text=f"{self.vpiezo:.3f} nA") # piezo voltage
+        self.label3.configure(text=f"{self.adc_curr:.3f} nA") # current
+
+        self.label2.after(1000, self.update_label)
+
+        
+    # def open_iz_sweep_window(self):
+    #     '''
+    #     Method to open a new window when the "Piezo Sweep Parameters" button is clicked
+    #     '''
+    #     new_window = ctk.CTkToplevel(self.root)
+    #     SweepIZ_Window(new_window)
     
     def return_home(self):
         self.root.destroy()

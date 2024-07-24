@@ -1,4 +1,5 @@
 import serial
+import time
 
 class SerialWriter:
     def __init__(self, port, baudrate=9600, timeout=1):
@@ -11,6 +12,7 @@ class SerialWriter:
         try:
             self.serial = serial.Serial(self.port, self.baudrate, timeout=self.timeout)
             print(f"Serial port {self.port} opened successfully.")
+            print(f"{self.serial}")
         except serial.SerialException as e:
             print(f"Failed to open serial port {self.port}: {e}")
 
@@ -19,17 +21,31 @@ class SerialWriter:
             try:
                 self.serial.write(data)
                 print(f"Sent data: {data}")
+                time.sleep(1)  # Give some time for the device to respond
+                self.read_serial()
             except serial.SerialException as e:
                 print(f"Failed to write to serial port: {e}")
         else:
             print("Serial port is not open. Call open_serial() first.")
 
+    def read_serial(self):
+        if self.serial:
+            try:
+                if self.serial.in_waiting > 0:
+                    data = self.serial.read(self.serial.in_waiting)
+                    print(f"Received data: {data.hex()}")
+                else:
+                    print("No data available to read.")
+            except serial.SerialException as e:
+                print(f"Failed to read from serial port: {e}")
+        else:
+            print("Serial port is not open. Call open_serial() first.")
+
     def send_hex_data(self, hex_string):
         # Convert hex string to bytes
-        byte_data = hex_string
+        byte_data = bytes.fromhex(hex_string)
         # Send data over UART
-        self.serial.write(hex_string)
-        print(f"Sent data: {hex_string}")
+        self.write_serial(byte_data)
 
     def close_serial(self):
         if self.serial and self.serial.is_open:
@@ -43,10 +59,10 @@ if __name__ == "__main__":
     serial_writer = SerialWriter(port="COM9", baudrate=9600)
     serial_writer.open_serial()
 
-    data_bytes = [0x0E, 0x01, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
+    data_bytes = bytes([0x0E, 0x01, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
     serial_writer.write_serial(data_bytes)
 
-    data_bytes2 = [0x0E, 0x01, 0x06, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
+    data_bytes2 = bytes([0x0E, 0x01, 0x06, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
     serial_writer.write_serial(data_bytes2)
     
     serial_writer.close_serial()

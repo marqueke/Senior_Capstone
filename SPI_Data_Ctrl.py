@@ -54,7 +54,7 @@ class SerialCtrl:
             return None
 
 
-    '''
+    
     def ztmGetMsg(self):
 
         response = b''  # Initialize an empty byte string to store the response
@@ -75,19 +75,15 @@ class SerialCtrl:
                 break  
             # check if valid message
         if len(response) == 11:
-            if(response[0] != MSG_A or
-               response[0] != MSG_B or
-               response[0] != MSG_C or
-               response[0] != MSG_D or
-               response[0] != MSG_E or
-               response[0] != MSG_F):
+            if response[0] not in [MSG_A, MSG_B, MSG_C, MSG_D, MSG_E]:
                 print("Message received out of order.\n")
             else:
+                print(f"Successful response: {response.hex()}")
                 return response    
         else:
             print(f"Failed to receive complete message.\n")    
-    '''
-        
+    
+
     # function to read msg of 11 bytes
     def read_bytes(self):
         count = 0
@@ -155,9 +151,13 @@ class SerialCtrl:
                 self.thread = threading.Thread(target=self.read_serial)
                 self.thread.start()
                 print("Reading thread started.")
+                
+                return True
             except serial.SerialException as e:
                 print(f"Error opening serial port: {e}")
                 self.serial_port = None
+                
+                return False
 
     def stop(self):
         self.running = False
