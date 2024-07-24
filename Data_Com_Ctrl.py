@@ -51,6 +51,27 @@ class DataCtrl:
         data = struct.pack('BBB', msg, cmd, status) + payload
         print(f"Sending command: {data.hex()}")
         self.serial_ctrl.write_serial(data) 
+
+    ##### MESSAGE B #####
+    def handle_msg_b(self, cmd, status, payload):
+        print("**********Handling MSG_B**********")
+        
+        
+        # Need to send msg to MCU that we have entered I-Z mode
+        # Need to send start/stop Vpzo seep
+        # Need to display current, piezo voltage, delta z
+        # Abort CMD
+        if cmd == ztmCMD.CMD_CLR.value and status == ztmSTATUS.STATUS_CLR.value:
+            baud_rate = (payload[0] << 8) | payload[1]
+            empty_byte = (payload[2] << 40) | (payload[3] << 32) | (payload[4] << 24) | (payload[5] << 16) | (payload[6] << 8) | payload[7]               
+
+
+            print(f"BAUD RATE: {baud_rate: } Hz")
+            
+            return baud_rate
+        else:
+            print("Unhandled CMD or STATUS for MSG_B")
+            return None
         
 '''
         ####################################################### THIS WILL BE THE "STATE MACHINE" #######################################################
@@ -136,6 +157,7 @@ class DataCtrl:
             print("Unhandled CMD or STATUS for MSG_B")
             return None
 
+    
     ##### MESSAGE C #####
     def handle_msg_c(self, cmd, status, payload):
         print("**********Handling MSG_C**********")

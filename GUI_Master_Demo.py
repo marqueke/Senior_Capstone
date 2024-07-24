@@ -11,11 +11,11 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 from IV_Window import IVWindow  # import the IV Window Class
 from IZ_Window import IZWindow  # import the IV Window Class
-from SPI_Data_Ctrl import SerialCtrl
+#from SPI_Comm import SerialCtrl, ztmCMD, ztmSTATUS, usbMsgFunctions, MSG_A, MSG_B, MSG_C, MSG_D, MSG_E, MSG_F
 from Data_Com_Ctrl import DataCtrl
 from value_conversion import Convert
-from ztmSerialCommLibrary import ztmCMD, ztmSTATUS, usbMsgFunctions, MSG_A, MSG_B, MSG_C, MSG_D, MSG_E, MSG_F
-#from value_conversion import Convert
+from ztmSerialCommLibrary import usbMsgFunctions, ztmCMD, ztmSTATUS, MSG_A, MSG_B, MSG_C, MSG_D, MSG_E, MSG_F
+from SPI_Data_Ctrl import SerialCtrl
 
 
 class RootGUI:
@@ -30,15 +30,13 @@ class RootGUI:
         
         # initialize data and serial control
         self.data_ctrl = DataCtrl(9600, self.handle_data)
-        self.serial_ctrl = SerialCtrl('COM9', 9600, self.data_ctrl.decode_data)
+        self.serial_ctrl = SerialCtrl(None, 9600, self.data_ctrl.decode_data)
         self.data_ctrl.set_serial_ctrl(self.serial_ctrl)
         self.ztm_serial = usbMsgFunctions(self)
-					
         
         # Initialize other components
         self.meas_gui = MeasGUI(self.root, self)
         self.graph_gui = GraphGUI(self.root)
-        #self.button_gui = ButtonGUI(self.root, self)
         self.com_gui = ComGUI(self.root, self)
         
     def quit_application(self):
@@ -51,11 +49,8 @@ class RootGUI:
         print("Starting to read data...")
         if self.serial_ctrl:
             print("Serial controller is initialized, starting now...")
-            self.serial_ctrl.start()
-            
-            port = self.serial_ctrl.serial_port
-            #print(port)
-            self.meas_gui.send_parameters(port)
+            #self.serial_ctrl.start()
+            #self.meas_gui.start_seeking()
         else:
             print("Serial controller is not initialized.")
     
@@ -140,6 +135,8 @@ class ComGUI:
 
                 # If the port is available, proceed with the connection
                 self.parent.serial_ctrl.port = port
+                #self.parent.serial_ctrl.serial_port = serial.Serial(port)  # Open the serial port
+                #self.parent.meas_gui.update_port(self.parent.serial_ctrl.serial_port)  # Update the port in MeasGUI
                 print(f"Connecting to {port}...")
                 self.btn_connect["text"] = "Disconnect"
                 self.btn_refresh["state"] = "disable"
@@ -166,10 +163,17 @@ class ComGUI:
 class MeasGUI:
     def __init__(self, root, parent):
         self.root = root
-        self.parent = parent					
-            
+        self.parent = parent
+        
+        #print(f"{self.parent.serial_ctrl.serial_port}")
+        # Initialize the port					
+        #self.port = None
+        
+        self.initialize_widgets()
+        
+    def initialize_widgets(self):
         # sample rate adjust
-        self.frame8 = LabelFrame(root, text="", padx=5, pady=5, bg="#ADD8E6")
+        self.frame8 = LabelFrame(self.root, text="", padx=5, pady=5, bg="#ADD8E6")
         self.label_sample_rate = Label(self.frame8, text="Sample Rate: ", bg="#ADD8E6", width=11, anchor="w")
         self.sample_rate_var = StringVar()
         self.sample_rate_var.set("-")
@@ -181,7 +185,7 @@ class MeasGUI:
         self.frame8.grid(row=13, column=4, padx=5, pady=5, sticky="")
 
         # fine adjust step size
-        self.frame9 = LabelFrame(root, text="", padx=5, pady=5, bg="#ADD8E6")
+        self.frame9 = LabelFrame(self.root, text="", padx=5, pady=5, bg="#ADD8E6")
         self.label_fine_adjust = Label(self.frame9, text="Step Size: ", bg="#ADD8E6", width=8, anchor="w")
         self.fine_adjust_var = StringVar()
         self.fine_adjust_var.set("-")
@@ -198,47 +202,48 @@ class MeasGUI:
         self.label5.grid(column=2, row=2, padx=5, pady=5)
 
         # vpiezo adjust step size
-        self.frame10 = LabelFrame(root, text="", padx=5, pady=5, bg="#d0cee2")
+        self.frame10 = LabelFrame(self.root, text="", padx=5, pady=5, bg="#d0cee2")
         self.label_vpeizo_delta = Label(self.frame10, text="Vpiezo ΔV (V):", bg="#d0cee2", width=11, anchor="w")
         self.label_vpeizo_delta.grid(column=1, row=1)
         self.frame10.grid(row=7, column=2, rowspan=4, columnspan=2, padx=5, pady=5, sticky="")
         self.label_vpeizo_delta_distance = Label(self.frame10, text="Approx. Dist", bg="#d0cee2", width=9, anchor="w")
         self.label_vpeizo_delta_distance.grid(column=2, row=1)
         self.label10 = Entry(self.frame10, bg="white", width=10)
-        self.label10.bind("<Return>", self.savePiezoIncrement)
+        self.label10.bind("<Return>", self.savePiezoValue)
         self.label11 = Label(self.frame10, bg="white", width=10)
         self.label10.grid(column=1, row=2, padx=5)
         self.label11.grid(column=2, row=2, padx=5)
-        self.label_vpeizo_total = Label(self.frame10, text="Total Voltage", bg="#d0cee2", width=10, anchor="w")
+        self.label_vpeizo_total = Label(self.frame10, text="Total Voltage (Range: 0V - 10V)", bg="#d0cee2", width=10, anchor="w")
         self.label_vpeizo_total.grid(column=1, row=3, columnspan=2)
         self.label12 = Label(self.frame10, bg="white", width=10)
         self.label12.grid(column=1, row=4, columnspan=2)
 
         # distance
-        self.frame1 = LabelFrame(root, text="Distance (nm)", padx=10, pady=2, bg="gray", width=20)
+        self.frame1 = LabelFrame(self.root, text="Distance (nm)", padx=10, pady=2, bg="gray", width=20)
         self.label1 = Label(self.frame1, bg="white", width=20)
         
         # current
-        self.frame2 = LabelFrame(root, text="Current (nA)", padx=10, pady=2, bg="gray")
+        self.frame2 = LabelFrame(self.root, text="Current (nA)", padx=10, pady=2, bg="gray")
         self.label2 = Label(self.frame2, bg="white", width=20)
         
         # current setpoint
-        self.frame3 = LabelFrame(root, text="Current Setpoint (nA)", padx=10, pady=2, bg="#ADD8E6")
+        self.frame3 = LabelFrame(self.root, text="Current Setpoint (nA)", padx=10, pady=2, bg="#ADD8E6")
         self.label3 = Entry(self.frame3, bg="white", width=24)
         self.label3.bind("<Return>", self.saveCurrentSetpoint)
         
         # current offset
-        self.frame4 = LabelFrame(root, text="Current Offset (nA)", padx=10, pady=2, bg="#ADD8E6")
+        self.frame4 = LabelFrame(self.root, text="Current Offset (nA)", padx=10, pady=2, bg="#ADD8E6")
         self.label4 = Entry(self.frame4, bg="white", width=24)
         self.label4.bind("<Return>", self.saveCurrentOffset)
          
         # sample bias
-        self.frame6 = LabelFrame(root, text="Sample Bias (V)", padx=10, pady=2, bg="#ADD8E6")
+        self.frame6 = LabelFrame(self.root, text="Sample Bias (V)", padx=10, pady=2, bg="#ADD8E6")
         self.label6 = Entry(self.frame6, bg="white", width=24)
+        
         self.label6.bind("<Return>", self.saveSampleBias)
 
         # user notes text box
-        self.frame7 = LabelFrame(root, text="NOTES", padx=10, pady=5, bg="#ADD8E6")
+        self.frame7 = LabelFrame(self.root, text="NOTES", padx=10, pady=5, bg="#ADD8E6")
         self.label7 = Text(self.frame7, height=7, width=30)
         self.label8 = Text(self.frame7, height=1, width=8)
         self.label9 = Label(self.frame7, padx=10, text="Date:", height=1, width=5)
@@ -251,14 +256,12 @@ class MeasGUI:
         self.pady = 10
         
         # Initialize data attributes for continuous update
-        self.distance = 0
-        self.adc_curr = 0
-        self.vbias = 0
-        self.vpzo = 0
+        self.distance = 0.0
+        self.adc_curr = 0.0
+        self.vpzo_down = 0
+        self.vpzo_up = 0
+        self.total_voltage = 0.0
         self.update_label()
-        
-        # put on the grid all the elements
-        self.publish()
     
         # define images
         self.add_btn_image0 = ctk.CTkImage(Image.open("Images/Vpzo_Up_Btn.png"), size=(40,40))
@@ -275,94 +278,27 @@ class MeasGUI:
         self.add_btn_image11 = ctk.CTkImage(Image.open("Images/Return_Home_Btn.png"), size=(35,35))
         
         # create buttons with proper sizes															   
-        self.start_btn = ctk.CTkButton(master=root, image=self.add_btn_image4, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.start_reading)
-        self.stop_btn = ctk.CTkButton(master=root, image=self.add_btn_image5, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.stop_reading)
-        self.acquire_iv_btn = ctk.CTkButton(master=root, image=self.add_btn_image6, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.open_iv_window)
-        self.acquire_iz_btn = ctk.CTkButton(master=root, image=self.add_btn_image7, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.open_iz_window)
-        self.stop_led_btn = ctk.CTkButton(master=root, image=self.add_btn_image8, text="", width=30, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, hover=NONE)
+        self.start_btn = ctk.CTkButton(self.root, image=self.add_btn_image4, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.start_seeking)
+        self.stop_btn = ctk.CTkButton(self.root, image=self.add_btn_image5, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.stop_reading)
+        self.acquire_iv_btn = ctk.CTkButton(self.root, image=self.add_btn_image6, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.open_iv_window)
+        self.acquire_iz_btn = ctk.CTkButton(self.root, image=self.add_btn_image7, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.open_iz_window)
+        self.stop_led_btn = ctk.CTkButton(self.root, image=self.add_btn_image8, text="", width=30, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, hover=NONE)
         
-        self.save_home_pos = ctk.CTkButton(master=root, image=self.add_btn_image10, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0)
-        self.return_to_home_pos = ctk.CTkButton(master=root, image=self.add_btn_image11, text="", width=30, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0)
-
-        self.vpiezo_btn_frame = LabelFrame(root, text="Retract Tip", padx=10, pady=5, bg="#eeeeee")
-        self.vpiezo_adjust_btn_up = ctk.CTkButton(master=self.vpiezo_btn_frame, image=self.add_btn_image0, text = "", width=40, height=40, compound="bottom", fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0)
-        self.vpiezo_adjust_btn_down = ctk.CTkButton(master=self.vpiezo_btn_frame, image=self.add_btn_image1, text="", width=40, height=40, compound="bottom", fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0)
+        self.save_home_pos = ctk.CTkButton(self.root, image=self.add_btn_image10, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.save_home)
         
-        self.fine_adjust_frame = LabelFrame(root, text="Fine Adjust", padx=10, pady=5, bg="#eeeeee")
-        self.fine_adjust_btn_up = ctk.CTkButton(master=self.fine_adjust_frame, image=self.add_btn_image2, text = "", width=40, height=40, compound="bottom", fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.handle_fine_adjust_up)
-        self.fine_adjust_btn_down = ctk.CTkButton(master=self.fine_adjust_frame, image=self.add_btn_image3, text="", width=40, height=40, compound="bottom", fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.handle_fine_adjust_down)
-
-        '''
-        self.vbias_frame = LabelFrame(root, text="Vbias", padx=10, pady=2, bg="#7393B3")
-        self.vbias_label = Entry(self.vbias_frame, bg="white", width=15)
-        '''
-
-
-        self.DisplayGUI()
+        self.return_to_home_frame = LabelFrame(self.root, text="Return Home", labelanchor= "s", padx=10, pady=5, bg="#eeeeee")
+        self.return_to_home_pos = ctk.CTkButton(self.return_to_home_frame, image=self.add_btn_image11, text="", width=30, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.return_home)
         
-    # def sample_rate_selected(self, _):
-    #     if self.sample_rate_var.get() != "-" and self.clicked_com.get() != "-":
-    #         self.btn_connect["state"] = "active"
-    #     else:
-    #         self.btn_connect["state"] = "disabled"
-
-    def DisplayGUI(self):
-        '''
-        Method to display all button widgets
-        '''
-        self.vpiezo_btn_frame.grid(row=8, column=0, rowspan=3, columnspan=2, padx=5, sticky="e")
-        self.vpiezo_adjust_btn_up.grid(row=0, column=0)
-        self.vpiezo_adjust_btn_down.grid(row=1, column=0)
+        self.vpiezo_btn_frame = LabelFrame(self.root, text="Fine Adjust Tip", padx=10, pady=5, bg="#eeeeee")
+        self.vpiezo_adjust_btn_up = ctk.CTkButton(master=self.vpiezo_btn_frame, image=self.add_btn_image0, text = "", width=40, height=40, compound="bottom", fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.piezo_inc)
+        self.vpiezo_adjust_btn_down = ctk.CTkButton(master=self.vpiezo_btn_frame, image=self.add_btn_image1, text="", width=40, height=40, compound="bottom", fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.piezo_dec)
         
-        self.fine_adjust_frame.grid(row=11, column=0, rowspan=4, columnspan=2, padx=5, sticky="e")
-        self.fine_adjust_btn_up.grid(row=0, column=0)
-        self.fine_adjust_btn_down.grid(row=1, column=0)
-        
-        self.start_btn.grid(row=2, column=9, sticky="e")
-        self.stop_btn.grid(row=3, column=9, sticky="ne")
-        self.acquire_iv_btn.grid(row=4, column=9, sticky="ne")
-        self.acquire_iz_btn.grid(row=5, column=9, sticky="ne")
-        self.stop_led_btn.grid(row=2, column=10, sticky="e")
+        self.fine_adjust_frame = LabelFrame(self.root, text="Stepper Motor", padx=10, pady=5, bg="#eeeeee")
+        self.fine_adjust_btn_up = ctk.CTkButton(master=self.fine_adjust_frame, image=self.add_btn_image2, text = "", width=40, height=40, compound="bottom", fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.stepper_motor_up)
+        self.fine_adjust_btn_down = ctk.CTkButton(master=self.fine_adjust_frame, image=self.add_btn_image3, text="", width=40, height=40, compound="bottom", fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.stepper_motor_down)
 
-        # positioning for home and save home pos buttons
-        self.save_home_pos.grid(row=8, column=9)
-        self.return_to_home_pos.grid(row=9, column=9)
-
-    '''
-        self.vbias_frame.grid(row=6, column=9, padx=5, pady=5, sticky="ne")
-        self.vbias_label.grid(row=6, column=9, padx=5, pady=5)
-    '''
-
-    def open_iv_window(self):
-        '''
-        Method to open a new window when the "Acquire I-V" button is clicked
-        '''
-        new_window = ctk.CTkToplevel(self.root)
-        IVWindow(new_window)
-
-    def open_iz_window(self):
-        '''
-        Method to open a new window when the "Acquire I-Z" button is clicked
-        '''
-        new_window = ctk.CTkToplevel(self.root)
-        IZWindow(new_window)
-    
-    def start_reading(self):
-        print("ButtonGUI: Start button pressed")
-        self.start_btn.configure(state="disabled")
-        self.stop_btn.configure(state="normal")
-        self.parent.start_reading()
-
-        #port = self.serial_ctrl.port
-        #self.send_parameters(port)
-							  
-    
-    def stop_reading(self):
-        print("ButtonGUI: Stop button pressed")
-        self.start_btn.configure(state="normal")
-        self.stop_btn.configure(state="disabled")
-        self.parent.stop_reading()
-
+        # put on the grid all the elements
+        self.publish()
 
     def publish(self):
         # positioning distance text box
@@ -394,13 +330,94 @@ class MeasGUI:
         # positioning the file drop-down menu
         self.drop_menu.grid(row=0, column=0, padx=5, pady=5, sticky="w")
 
+        '''
+        Method to display all button widgets
+        '''
+        self.vpiezo_btn_frame.grid(row=8, column=0, rowspan=3, columnspan=2, padx=5, sticky="e")
+        self.vpiezo_adjust_btn_up.grid(row=0, column=0)
+        self.vpiezo_adjust_btn_down.grid(row=1, column=0)
+        
+        self.fine_adjust_frame.grid(row=11, column=0, rowspan=4, columnspan=2, padx=5, sticky="e")
+        self.fine_adjust_btn_up.grid(row=0, column=0)
+        self.fine_adjust_btn_down.grid(row=1, column=0)
+        
+        self.start_btn.grid(row=2, column=9, sticky="e")
+        self.stop_btn.grid(row=3, column=9, sticky="ne")
+        self.acquire_iv_btn.grid(row=4, column=9, sticky="ne")
+        self.acquire_iz_btn.grid(row=5, column=9, sticky="ne")
+        self.stop_led_btn.grid(row=2, column=10, sticky="e")
+
+        # positioning for home and save home pos buttons
+        self.save_home_pos.grid(row=8, column=9)
+        
+        self.return_to_home_frame.grid(row=9, column=9)
+        self.return_to_home_pos.grid(row=0, column=0)
+
+
+
+    '''
+    # send sample bias voltage to MCU
+    def send_vbias(self): 
+        #port = self.parent.serial_ctrl.serial_port
+        port = self.parent.serial_ctrl.serial_port
+        print(f"Port connected: {port}")
+        
+        sample_bias_float = self.get_float_value(self.label6, 1.0, "Voltage Bias")
+        print(f"Saved sample bias value (float): {sample_bias_float}")
+        
+        #self.parent.ztm_serial.sendMsgA(self.port, ztmCMD.CMD_SET_VBIAS.value, ztmSTATUS.STATUS_DONE.value, 0, sample_bias_float,0)
+    '''
+      
+    def open_iv_window(self):
+        '''
+        Method to open a new window when the "Acquire I-V" button is clicked
+        '''
+        new_window = ctk.CTkToplevel(self.root)
+        IVWindow(new_window)
+
+    def open_iz_window(self):
+        '''
+        Method to open a new window when the "Acquire I-Z" button is clicked
+        '''
+        new_window = ctk.CTkToplevel(self.root)
+        IZWindow(new_window, self.parent.serial_ctrl.serial_port)
+    
+    '''
+    def update_port(self, port):
+        
+        #Method to update port
+        
+        self.port = port
+        print(f"Port updated to: {self.port}")
+        return self.port
+    '''
+        
+    def start_reading(self):
+        print("ButtonGUI: Start button pressed")
+        self.start_btn.configure(state="disabled")
+        self.stop_btn.configure(state="normal")
+        #self.parent.start_reading()
+
+        #port = self.serial_ctrl.port
+        #self.start_seeking(port)
+							  
+    
+    def stop_reading(self):
+        print("ButtonGUI: Stop button pressed")
+        self.start_btn.configure(state="normal")
+        self.stop_btn.configure(state="disabled")
+        self.parent.stop_reading()
+
+
+
+
     '''
     Function to error check user inputs
     '''
     def get_float_value(self, label, default_value, value_name):
         try:
             value = float(label.get())
-            print(value)
+            #print(value)
         except ValueError:
             print(f"Invalid input for {value_name}. Using default value of {default_value}.")
             value = default_value
@@ -410,61 +427,169 @@ class MeasGUI:
     Function to send user-inputted parameters to MCU
     sample bias, vpiezo, step size, current setpoint, sample rate
     '''        
-    def send_parameters(self, port):
-
-        adc_curr = self.get_float_value(self.label3, 0.0, "ADC Current")
-        vbias = self.get_float_value(self.label6, 0.0, "Voltage Bias")
-        vpzo = self.get_float_value(self.label10, 0.0, "Vpiezo")
+    def start_seeking(self):
+        port = self.parent.serial_ctrl.serial_port
+        if port is None:
+            print("Port is not connected.")
+            return
+        else:
+            print(f"{port}")
+            
+        '''        
+        value2 = self.get_float_value(self.label6, 0.0, "Voltage Bias")
+        value3 = self.get_float_value(self.label10, 0.0, "Vpiezo")
+        
+        # Get the current setpoint value
+        print(f"Vbias in start_seeking: {value2}")
+        print(f"Vpzo in start_seeking: {value3}")
+        '''
+        vpzo = 1.25
+        #self.parent.ztm_serial.sendMsgA(self.port, ztmCMD.CMD_PIEZO_ADJ.value, ztmSTATUS.STATUS_CLR.value, 0, 0, vpzo)
+        ########## WHEN USER PRESSES START BTN ##########
+        # 1. Check if user values are set, if not set them to a default value (vpzo = 1, vbias = 1, ***current = 0.5)
+        # 2. Send messages for user inputs (if needed) to MCU
+        # 3. a) Verify we have DONE msgs received from MCU (vpzo and vbias)
+        # 3. b) If DONE msgs not rcvd, MCU will send RESEND status and GUI will resend until we have DONE from MCU
+        # 4. Once we have all DONE msgs, request data msg from GUI to MCU
+        # 5. GUI waits to receive data
+        # 6. a) GUI receives data from MCU (current and distance)
+        # 6. b) Keep going until read current reaches current setpoint (if curr_data < curr_setpoint = keep reading)
+        # Note: put in function for vpiezo and delta v
+        
+        '''
+        
         
         # NEW FUNCTION 
-        #### Send user input parameters to the MCU
+        #### Send user input parameters to the MCU - testing with vpzo
         self.parent.ztm_serial.sendMsgA(port, ztmCMD.CMD_PIEZO_ADJ.value, ztmSTATUS.STATUS_DONE.value, 0, 0, vpzo)
 
         # Initialize counter and response buffer 
         ### Read ACK from the MCU
         ack_response = self.parent.serial_ctrl.read_bytes()
+        #ack_response = self.parent.serial_ctrl.ztmGetMsg()
+        
         ### Unpack data and display on the GUI
         if ack_response:
             self.parent.ztm_serial.unpackRxMsg(ack_response)
+            
+            # Extracting and displaying the payload
+            curr_val = round(struct.unpack('>f', ack_response[3:7])[0], 3)
+            vbias_val = round(Convert.get_Vbias_float(struct.unpack('>H', ack_response[7:9])[0]), 3)
+            vpzo_val = round(Convert.get_Vpiezo_float(struct.unpack('>H', ack_response[9:11])[0]), 3)
+            
+            #self.update_label()
+            
+            print("Received values\n\tCurrent: " + str(curr_val) + " nA")
+            print("\tVbias: " + str(vbias_val) + " V")
+            print("\tVpiezo: " + str(vpzo_val) + " V\n")
         else:
             print("Failed to receive response from MCU.")
-              
+        
+        time.sleep(2)
+        
+        
         ### Request data from MCU
         self.parent.ztm_serial.sendMsgC(port, ztmCMD.CMD_REQ_DATA.value, ztmSTATUS.STATUS_CLR.value)
         
         ### Read data from MCU
         data_response = self.parent.serial_ctrl.read_bytes()
         
+        
         ### Unpack data
         if data_response:
             self.parent.ztm_serial.unpackRxMsg(data_response)
             
             # Extracting and displaying the payload
-            current_nA = round(struct.unpack('>f', ack_response[3:7])[0], 3)
-            vb_V = round(Convert.get_Vbias_float(struct.unpack('>H', ack_response[7:9])[0]), 3)
-            vp_V = round(Convert.get_Vpiezo_float(struct.unpack('>H', ack_response[9:11])[0]), 3)
-
-            '''
-            # Display the values on the GUI
-            self.label1.config(text=f"Current: {current_nA} nA")
-            self.label2.config(text=f"Vbias: {vb_V} V")
-            self.label10.config(text=f"Vpiezo: {vp_V} V")
-            '''
+            curr_val = round(struct.unpack('>f', data_response[3:7])[0], 3)
+            vbias_val = round(Convert.get_Vbias_float(struct.unpack('>H', data_response[7:9])[0]), 3)
+            vpzo_val = round(Convert.get_Vpiezo_float(struct.unpack('>H', data_response[9:11])[0]), 3)
             
-            print("Received values\n\tCurrent: " + str(current_nA) + " nA")
-            print("\tVbias: " + str(vb_V) + " V")
-            print("\tVpiezo: " + str(vp_V) + " V\n")
+            #self.update_label()
+            
+            print("Received values\n\tCurrent: " + str(curr_val) + " nA")
+            print("\tVbias: " + str(vbias_val) + " V")
+            print("\tVpiezo: " + str(vpzo_val) + " V\n")
         else:
             print("Failed to receive response from MCU.")
         
         ### Display data on GUI
+        #self.label1.config(text=f"{current_nA:.3f}")
+        #self.label2.config(text=f"Current: {current_nA}")
+        #self.label10.config(text=f"Vpiezo: {vp_V} V")
+        '''
+    
+    def savePiezoValue(self, event): 
+        vpzo_value = self.label10.get()
+        print(f"Saved vpiezo value: {vpzo_value}")
+        self.label12.configure(text=f"{self.total_voltage:.3f} ")
+        
+    def piezo_inc(self):
+        self.vpzo_up = 1
+        self.savePiezoAdjust()
+    
+    def piezo_dec(self):
+        self.vpzo_down = 1
+        self.savePiezoAdjust()
+        
+    '''
+    Function to send total vpiezo to MCU
+    '''
+    def savePiezoAdjust(self):
+        port = self.parent.serial_ctrl.serial_port
+        #print(f"Port connected: {port}")
+        
+        delta_v_float = self.get_float_value(self.label10, 1.0, "Piezo Voltage")
+        print(f"Saved delta V (float): {delta_v_float}")
+        
+        if 0 <= self.total_voltage <= 10:
+            if self.vpzo_up:
+                if self.total_voltage + delta_v_float <= 10:
+                    self.total_voltage += delta_v_float
+                else:
+                    self.total_voltage = 10.000
+                    InfoMsg = f"Total voltage exceeds 10 V. Maximum allowed is 10 V."
+                    messagebox.showerror("INVALID", InfoMsg)
+                self.vpzo_up = 0
+            elif self.vpzo_down:
+                if self.total_voltage - delta_v_float >= 0:
+                    self.total_voltage -= delta_v_float
+                else:
+                    self.total_voltage = 0.000
+                    InfoMsg = f"Total voltage below 0 V. Minimum allowed is 0 V."
+                    messagebox.showerror("INVALID", InfoMsg)
+                self.vpzo_down = 0
+        else:
+            InfoMsg = f"Invalid range. Stay within 0 - 10 V."
+            messagebox.showerror("INVALID", InfoMsg)
+        
+        print(f"Total Voltage: {self.total_voltage}")
+        self.label12.configure(text=f"{self.total_voltage:.3f} ")
+        
+        #### Send user input parameters to the MCU
+        self.parent.ztm_serial.sendMsgA(port, ztmCMD.CMD_PIEZO_ADJ.value, ztmSTATUS.STATUS_DONE.value, 0.0, 0.0, self.total_voltage)
 
-    # save piezo incremental step input by user to send to mcu
-    def savePiezoIncrement(self, event):
-        vpiezo_increment = self.label10.get()
-        print(f"Saved piezo inc value: {vpiezo_increment}")
-
-    # save current setpoint input by user to send to mcu
+        ### Read DONE from the MCU
+        vpzo_done_response = self.parent.serial_ctrl.read_bytes()
+        #ack_response = self.parent.serial_ctrl.ztmGetMsg()
+        
+        ### Unpack data and display on the GUI
+        if vpzo_done_response:
+            self.parent.ztm_serial.unpackRxMsg(vpzo_done_response)
+            
+            # Extracting and displaying the payload
+            curr_val = round(struct.unpack('>f', vpzo_done_response[3:7])[0], 3)
+            vbias_val = round(Convert.get_Vbias_float(struct.unpack('>H', vpzo_done_response[7:9])[0]), 3)
+            vpzo_val = round(Convert.get_Vpiezo_float(struct.unpack('>H', vpzo_done_response[9:11])[0]), 3)
+            
+            #self.update_label()
+            
+            print("Received values\n\tCurrent: " + str(curr_val) + " nA")
+            print("\tVbias: " + str(vbias_val) + " V")
+            print("\tVpiezo: " + str(vpzo_val) + " V\n")
+        else:
+            print("Failed to receive response from MCU.")
+        
+    
     def saveCurrentSetpoint(self, event): 
         curr_setpoint = self.label3.get()
         print(f"Saved current setpoint value: {curr_setpoint}")
@@ -474,10 +599,40 @@ class MeasGUI:
         curr_offset = self.label4.get()
         print(f"Saved current offset value: {curr_offset}")
 
-    # save sample bias voltage input by user to send to mcu
+    '''
+    Function to send vbias msg to the MCU and waits for a DONE response
+    '''
     def saveSampleBias(self, event): 
-        sample_bias = self.label6.get()
-        print(f"Saved sample bias value: {sample_bias}")
+        port = self.parent.serial_ctrl.serial_port
+        #print(f"Port connected: {port}")
+        
+        sample_bias_float = self.get_float_value(self.label6, 1.0, "Voltage Bias")
+        print(f"Saved sample bias value (float): {sample_bias_float}")
+        
+        #### Send user input parameters to the MCU - testing with vbias
+        self.parent.ztm_serial.sendMsgA(port, ztmCMD.CMD_SET_VBIAS.value, ztmSTATUS.STATUS_DONE.value, 0.5, sample_bias_float, 1.0)
+
+        ### Read DONE from the MCU
+        vbias_done_response = self.parent.serial_ctrl.read_bytes()
+        #ack_response = self.parent.serial_ctrl.ztmGetMsg()
+        
+        ### Unpack data and display on the GUI
+        if vbias_done_response:
+            self.parent.ztm_serial.unpackRxMsg(vbias_done_response)
+            
+            # Extracting and displaying the payload
+            curr_val = round(struct.unpack('>f', vbias_done_response[3:7])[0], 3)
+            vbias_val = round(Convert.get_Vbias_float(struct.unpack('>H', vbias_done_response[7:9])[0]), 3)
+            vpzo_val = round(Convert.get_Vpiezo_float(struct.unpack('>H', vbias_done_response[9:11])[0]), 3)
+            
+            #self.update_label()
+            
+            print("Received values\n\tCurrent: " + str(curr_val) + " nA")
+            print("\tVbias: " + str(vbias_val) + " V")
+            print("\tVpiezo: " + str(vpzo_val) + " V\n")
+        else:
+            print("Failed to receive response from MCU.")
+
 
     # saves sample rate input as a integer 'sample_rate' to be sent to mcu
     def saveSampleRate(self, _):
@@ -498,31 +653,48 @@ class MeasGUI:
         print(f"Sending cmd adjust sample rate to mcu for: {self.sample_rate}")
 
         # read done message receieved from mcu
-        ack_response = self.parent.serial_ctrl.read_bytes()
-        # looking for ACK message from MCU
-        if ack_response:
-            print(f"Response recieved: {ack_response}")
-            status_received = self.parent.ztm_serial.unpackRxMsg(ack_response)
+        done_response = self.parent.serial_ctrl.read_bytes()
+        # check for done status received
+        if done_response:
+            print(f"Response recieved: {done_response}")
+            status_received = self.parent.ztm_serial.unpackRxMsg(done_response)
 
-            # looking for STATUS.ACK
-            if status_received != ztmSTATUS.STATUS_ACK.value:
-                print(f"ERROR: wrong status recieved, status value: {status_received}")   
-            else:
-                print(f"Response recieved: {status_received}")
-                # read done message receieved from mcu, after receiving ACK
-                done_response = self.parent.serial_ctrl.read_bytes()
-                # check for done status received
-                if done_response:
-                    print(f"Response recieved: {done_response}")
-                    status_received = self.parent.ztm_serial.unpackRxMsg(done_response)
-
-                    # looking for STATUS_DONE
-                    if status_received != ztmSTATUS.STATUS_DONE.value:
-                        print(f"ERROR: wrong status recieved, status value: {status_received}")
-                else:
-                    print("Failed to receive response from MCU.")     
+            # looking for STATUS_DONE
+            if status_received != ztmSTATUS.STATUS_DONE.value:
+                print(f"ERROR: wrong status recieved, status value: {status_received}")
         else:
             print("Failed to receive response from MCU.")
+
+
+        '''
+        commented out checking for ACK and then DONE. now just looking for a done status received
+        '''
+        # # read done message receieved from mcu
+        # ack_response = self.parent.serial_ctrl.read_bytes()
+        # # looking for ACK message from MCU
+        # if ack_response:
+        #     print(f"Response recieved: {ack_response}")
+        #     status_received = self.parent.ztm_serial.unpackRxMsg(ack_response)
+
+        #     # looking for STATUS.ACK
+        #     if status_received != ztmSTATUS.STATUS_ACK.value:
+        #         print(f"ERROR: wrong status recieved, status value: {status_received}")   
+        #     else:
+        #         print(f"Response recieved: {status_received}")
+        #         # read done message receieved from mcu, after receiving ACK
+        #         done_response = self.parent.serial_ctrl.read_bytes()
+        #         # check for done status received
+        #         if done_response:
+        #             print(f"Response recieved: {done_response}")
+        #             status_received = self.parent.ztm_serial.unpackRxMsg(done_response)
+
+        #             # looking for STATUS_DONE
+        #             if status_received != ztmSTATUS.STATUS_DONE.value:
+        #                 print(f"ERROR: wrong status recieved, status value: {status_received}")
+        #         else:
+        #             print("Failed to receive response from MCU.")     
+        # else:
+        #     print("Failed to receive response from MCU.")
         
 
     # save fine adjust stepper motor step size as an integer 'fine_adjust_step_size' to be sent to mcu
@@ -546,16 +718,42 @@ class MeasGUI:
         # display approx distance per step size to user
         self.label5.configure(text=f"{approx_step_distance:.3f} nm")
 
-    # handles button click for fine adjust up arrow
-    def handle_fine_adjust_up(self):
+    '''
+    Handles the button click for the stepper motor up arrow 
+    '''
+    def stepper_motor_up(self):
+        self.step_up = 1
+        self.step_down = 0
+        self.sendStepperMotorAdjust()
+    
+    '''
+    Handles the button click for the stepper motor down arrow 
+    '''
+    def stepper_motor_down(self):
+        self.step_up = 0
+        self.step_down = 1
+        self.sendStepperMotorAdjust()
+
+    '''
+    Sends stepper motor adjust msg to the MCU
+    '''
+    def sendStepperMotorAdjust(self):        
         # fine adjust direction : direction = 0 for up, 1 for down
-        fine_adjust_dir = 0 
+        if self.step_up:
+            fine_adjust_dir = 0
+            self.step_up    = 0 
+            dir_name = "up direction"		
+        elif self.step_down:
+            fine_adjust_dir = 1
+            self.step_down  = 0
+            dir_name = "down direction"
+            		  								 
         # number of steps, hardcoded = 1, for fine adjust arrows
         num_of_steps = 1
 
         # send user fine adjust command and params to mcu
         self.parent.ztm_serial.sendMsgD(self.parent.serial_ctrl.serial_port, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_CLR.value, self.fine_adjust_step_size, fine_adjust_dir, num_of_steps)
-        print(f"Sending cmd fine_adjust_up to mcu: {self.fine_adjust_step_size}")
+        print(f"Sending {dir_name} cmd stepper motor adjust to mcu: {self.fine_adjust_var.get()} step")
 
         # read done message receieved from mcu
         done_response = self.parent.serial_ctrl.read_bytes()
@@ -572,62 +770,50 @@ class MeasGUI:
                 print(f"ERROR: wrong status recieved, status value: {status_received}")
         else:
             print("Failed to receive response from MCU.")
+
+    '''
+    Function to save the new home position and send it to the MCU
+    '''
+    def save_home(self):
+        port = self.parent.serial_ctrl.serial_port
         
-    # handles button click for fine adjust down arrow
-    def handle_fine_adjust_down(self):
-        # fine adjust direction : direction = 0 for up, 1 for down
-        fine_adjust_dir = 1 
-        # number of steps, hardcoded = 1, for fine adjust arrows
-        num_of_steps = 1
-
-        # send user fine adjust command and params to mcu
-        self.parent.ztm_serial.sendMsgD(self.parent.serial_ctrl.serial_port, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_CLR.value, self.fine_adjust_step_size, fine_adjust_dir, num_of_steps)
-        print(f"Sending cmd fine_adjust_down to mcu: {self.fine_adjust_step_size}")
-
-        # read done message receieved from mcu
-        done_response = self.parent.serial_ctrl.read_bytes()
-        # check for done status received
-        if done_response:
-            print(f"Response recieved: {done_response}")
-            status_received = self.parent.ztm_serial.unpackRxMsg(done_response)
-
-            # check for OVERCURRENT warning from MCU, should display warning to user
-            if status_received == ztmSTATUS.STATUS_OVERCURRENT.value:
-                print(f"WARNING! OVERCURRENT WARNING! : status value: {status_received}")
-            # looking for STATUS_DONE
-            elif status_received != ztmSTATUS.STATUS_DONE.value:
-                print(f"ERROR: wrong status recieved, status value: {status_received}")
+        # set new home position
+        self.parent.ztm_serial.sendMsgC(port, ztmCMD.CMD_STEPPER_RESET_HOME_POSITION.value, ztmSTATUS.STATUS_CLR.value)
+        print("Reset home position.")
+    
+        ### Read DONE from the MCU
+        save_home_done = self.parent.serial_ctrl.read_bytes()
+        
+        ### Unpack data and display on the GUI
+        if save_home_done:
+            if save_home_done[2] != ztmSTATUS.STATUS_DONE.value:
+                print(f"ERROR: wrong status recieved, status value: {save_home_done}")
+            else:
+                self.parent.ztm_serial.unpackRxMsg(save_home_done)
         else:
             print("Failed to receive response from MCU.")
-
-    # to remove , maybe
-    def updateParams(self):
-        curr_setpoint = self.label3.get()
-        curr_offset = self.label4.get()
-        #fine_adjust_inc = self.label5.get()
-        Sample_bias = self.label6.get()
-
-        if self.validate_setpoint(curr_setpoint):
-            print(f"Entered setpoint: {curr_setpoint}")
+    
+    '''
+    Function to return to the home position and send it to the MCU
+    '''
+    def return_home(self):
+        port = self.parent.serial_ctrl.serial_port
+        
+        self.parent.ztm_serial.sendMsgC(port, ztmCMD.CMD_RETURN_TIP_HOME.value, ztmSTATUS.STATUS_CLR.value)
+        print("Returning tip to home position.")
+        
+        ### Read DONE from the MCU
+        return_home_done = self.parent.serial_ctrl.read_bytes()
+        
+        ### Unpack data and display on the GUI
+        if return_home_done:
+            if return_home_done[2] != ztmSTATUS.STATUS_DONE.value:
+                print(f"ERROR: wrong status recieved, status value: {return_home_done}")
+            else:
+                self.parent.ztm_serial.unpackRxMsg(return_home_done)
         else:
-            messagebox.showerror("Error", "Please enter a valid current setpoint")
-        
-        if self.validate_offset(curr_offset):
-            print(f"Entered offset: {curr_offset}")
-        else:
-            messagebox.showerror("Error", "Please enter a valid current offset")
-        
-        # if self.validate_fine_adjust_inc(fine_adjust_inc):
-        #     print(f"Entered fine adjust inc: {fine_adjust_inc}")
-        # else:
-        #     messagebox.showerror("Error", "Please enter a valid fine adjust inc")
-        
-        if self.validate_sample_bias(Sample_bias):
-            print(f"Entered sample bias: {Sample_bias}")
-        else:
-            messagebox.showerror("Error", "Please enter a valid sample bias")
-        
-
+            print("Failed to receive response from MCU.")
+    
     '''
     need to accuractely define the input validations
     '''
@@ -655,18 +841,14 @@ class MeasGUI:
         self.adc_curr = adc_curr
         self.vbias = vbias
         self.vpzo = vpzo
-        self.update_label()
+        #self.update_label()
 
+    
     def update_label(self):
-        self.label1.configure(text=f"{self.distance:.3f} nm")
         self.label2.configure(text=f"{self.adc_curr:.3f} nA")
-        #self.label2.delete(0, END)
-        #self.label2.insert(0, f"{self.vbias:.3f}")
-        #self.label3.delete(0, END)
-        #self.label3.insert(0, f"{self.vpzo:.3f}")
-        self.distance = self.distance + 1
-        self.adc_curr = self.adc_curr + 1.5
-        self.label2.after(1000, self.update_label)
+        self.label1.configure(text=f"{self.distance:.3f} nm")
+        #self.label3.configure(text=f"{self.vpzo:.3f} V")
+    
                  
     # file drop-down menu
     def DropDownMenu(self):
