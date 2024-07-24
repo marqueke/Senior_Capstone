@@ -100,7 +100,7 @@ class SerialCtrl:
                     # Attempt to read 11 bytes with a timeout
                     response = self.serial_port.read(11)
                     if response and len(response) == 11:
-                        if response[0] not in [MSG_A, MSG_B, MSG_C, MSG_D, MSG_E, MSG_F]:
+                        if response[0] not in [MSG_A, MSG_B, MSG_C, MSG_D, MSG_E]:
                             print("Message received out of order.\n")
                             return None
                         else:

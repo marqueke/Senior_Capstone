@@ -6,7 +6,6 @@ from value_conversion import Convert
 import serial
 import time
 
-#define serial functions
 ###########################################
 # GLOBAL VARIABLES
 MSG_A = 0X0A
@@ -159,7 +158,7 @@ class usbMsgFunctions:
     
         #send header
         for byte in headerC:
-            port.write(serial.to_bytes([byte]))
+            port.write(serial.to_bytes([0])) # changed from padByte to 0 to pass an int
         # send payload
         for i in range(0, payloadBytes):
             port.write(serial.to_bytes(0)) # had to change from padByte to 0, to pass an int
@@ -218,7 +217,7 @@ class usbMsgFunctions:
         # clear buffer    
         port.flush()    
     ###############################################
-    # UNPACK MSG DATA
+    # UNPACK MSG DATA - Reading MCU
     def unpackRxMsg(self, rxMsg):
         ################################
         # DEBUG - PRINT CMD AND STATUS #
@@ -262,7 +261,7 @@ class usbMsgFunctions:
                 return stepsRx 
             
         elif (rxMsg[0] == MSG_E):
-            # microcontroller should not send msg B       
+            # microcontroller should not send msg E       
             return False 
         
         elif (rxMsg[0] == MSG_F):
