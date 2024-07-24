@@ -126,7 +126,7 @@ class usbMsgFunctions:
         port.flush() 
 
     # MSG B
-    
+    # Note: account for parsing different commands and rateHz vs. sample size
     def sendMsgB(self, port, msgCmd, msgStatus, uint16_rateHz):
         ''' - port          = COM port variable assigned using pySerial functions
             - msgCmd        = ztmCMD value - see documentation for valid commands

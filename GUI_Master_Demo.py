@@ -15,6 +15,8 @@ from value_conversion import Convert
 from ztmSerialCommLibrary import usbMsgFunctions, ztmCMD, ztmSTATUS, MSG_A, MSG_B, MSG_C, MSG_D, MSG_E, MSG_F
 from SPI_Data_Ctrl import SerialCtrl
 
+import random # for graph - delete later
+
 # global variables
 curr_setpoint = None
 curr_data = None
@@ -45,7 +47,7 @@ class RootGUI:
         
         # Initialize other components
         self.meas_gui = MeasGUI(self.root, self)
-        self.graph_gui = GraphGUI(self.root)
+        self.graph_gui = GraphGUI(self.root, self.meas_gui)
         self.com_gui = ComGUI(self.root, self)
         
     def quit_application(self):
@@ -240,10 +242,18 @@ class MeasGUI:
         self.sample_rate_var.set("-")
         self.sample_rate_menu = OptionMenu(self.frame8, self.sample_rate_var, "25 kHz", "12.5 kHz", "37.5 kHz", "10 kHz", "5 kHz", command=self.saveSampleRate) # command=self.sample_rate_selected) 
         self.sample_rate_menu.config(width=7)
-
+        
+        # sample size
+        self.sample_size = Entry(self.frame8, width=13)
+        self.sample_size_label = Label(self.frame8, text="Sample Size: ", bg="#ADD8E6", width=11, anchor="w")
+        self.sample_size.bind("<Return>", self.sendSampleSize)
+        
         self.label_sample_rate.grid(column=1, row=1)
         self.sample_rate_menu.grid(column=2, row=1) #, padx=self.padx)
         self.frame8.grid(row=13, column=4, padx=5, pady=5, sticky="")
+        
+        self.sample_size.grid(column=2, row=2, pady=5)
+        self.sample_size_label.grid(column=1, row=2)
 
         # fine adjust step size
         self.frame9 = LabelFrame(self.root, text="", padx=5, pady=5, bg="#ADD8E6")
@@ -403,6 +413,7 @@ class MeasGUI:
             self.stop_btn.configure(state="normal")
             
             self.parent.start_reading()
+            #self.update_label()
 							  
     
     def stop_reading(self):
@@ -566,6 +577,7 @@ class MeasGUI:
     '''
     Function to send user-inputted parameters to MCU
     sample bias, sample rate, current setpoint*
+    ### WILL BE CHANGING ###
     '''        
 
     def start_seeking(self):
@@ -588,7 +600,7 @@ class MeasGUI:
             port = self.parent.serial_ctrl.serial_port
             if port is None:
                 print("Port is not connected.")
-            
+                
             # Note: Disable entry widgets when seeking
             
             ########## WHEN USER PRESSES START BTN ##########
@@ -606,23 +618,39 @@ class MeasGUI:
             print(f"Current setpoint: {curr_setpoint}")
             
             # error check sample bias
-
-            # get vbias value
-            try:
-                vbias_save = float(vbias_save)      # check if there is a sample bias user input
-            except (TypeError, ValueError):
-                vbias_save = 1.0                    # set to default value
-                print("Sample bias set to default value. Sending sample bias message to MCU.")
+            if not vbias_done_flag:
+                # get vbias value
+                try:
+                    vbias_save = float(vbias_save)      # check if there is a sample bias user input
+                except (TypeError, ValueError):
+                    vbias_save = 1.0                    # set to default value
+                    print("Sample bias set to default value. Sending sample bias message to MCU.")
+                
+                # send samplel bias msg and retrieve done
+                success = self.send_msg_retry(port, MSG_A, ztmCMD.CMD_SET_VBIAS.value, ztmSTATUS.STATUS_CLR.value, 0, vbias_save, 0)
+                
+                if success:
+                    vbias_done_flag = 1
+                else:
+                    vbias_done_flag = 0
             print(f"Sample bias: {vbias_save}")
-            vbias_done_flag = 1
             
             # error check sample rate
-            # get sample rate
-            if sample_rate_save == None:
-                sample_rate_save = 25000    # set to default vaue
-                print("Sample rate set to default value. Sending sample rate message to MCU.")
+            if not sample_rate_done_flag:
+                # get sample rate
+                if sample_rate_save == None:
+                    sample_rate_save = 25000    # set to default vaue
+                    print("Sample rate set to default value. Sending sample rate message to MCU.")
+                    
+                # send sample rate msg and receive done
+                success = self.send_msg_retry(port, MSG_B, ztmCMD.CMD_SET_ADC_SAMPLE_RATE.value, ztmSTATUS.STATUS_CLR.value, sample_rate_save)
+                
+                if success:
+                    sample_rate_done_flag = 1
+                else:
+                    sample_rate_done_flag = 0
             print(f"Sample rate: {sample_rate_save}")
-            sample_rate_done_flag = 1
+            
             
             
             # 4. Once we have all DONE msgs, request data msg from GUI to MCU
@@ -631,21 +659,41 @@ class MeasGUI:
             # 6. b) Keep going until read current reaches current setpoint (if curr_data < curr_setpoint = keep reading)
             ######### NOTE: put in function for vpiezo/delta v error check and TIP APPROACH #########
             if vbias_done_flag and sample_rate_done_flag:
+                print("\n********** ADD SEAN'S TIP-APPROACH HERE **********")
+
+                # when completed, tip_approach_done_flag = 1
+                    # BUT add a condition to check if the done flag already = 1
+                # move on to periodic data routine
+                
+            
+            ########## 
+            if self.tip_approach_done_flag:
+                print("\n********** BEGIN ENABLING PERIODIC DATA **********")
+                
+            
+            '''
+            if vbias_done_flag and sample_rate_done_flag:
+  
                 # request data
                 success = self.send_msg_retry(port, MSG_C, ztmCMD.CMD_REQ_DATA.value, ztmSTATUS.STATUS_CLR.value)
                 if success:
-                    print("SUCCESS. We are receiving data!")
+                    pass
+                    
+                    ### CHANGING ###
+                    #print("SUCCESS. We are receiving data!")
                     #curr_val = round(struct.unpack('>f', response[3:7])[0], 3)
                     #print("Received values\n\tCurrent: " + str(curr_val) + " nA")
                     
-                    while curr_data <= curr_setpoint:
+                    #while curr_data <= curr_setpoint:
                         # request data
                         # receive data
                         # display in widgets
-                        self.send_msg_retry(port, MSG_C, ztmCMD.CMD_REQ_DATA.value, ztmSTATUS.STATUS_CLR.value)
+                    #    self.send_msg_retry(port, MSG_C, ztmCMD.CMD_REQ_DATA.value, ztmSTATUS.STATUS_CLR.value)
                         #self.label2.configure(text=f"{curr_data:.3f}")
                 else:
                     print("ERROR. We are not receiving data!")
+                '''
+                
  
     
     def savePiezoValue(self, event): 
@@ -775,14 +823,16 @@ class MeasGUI:
             
             success = self.send_msg_retry(port, MSG_A, ztmCMD.CMD_SET_VBIAS.value, ztmSTATUS.STATUS_CLR.value, 0, vbias_save, 0)
             
-            #vbias_done_flag = 1
+            #vbias_done_flag = 1    # used for debugging - delete later
             
+
             if success:
                 print("Received done message.")
                 vbias_done_flag = 1
             else:
                 print("Failed to send vbias.")
                 vbias_done_flag = 0
+      
         
 
     '''
@@ -821,6 +871,7 @@ class MeasGUI:
             print(f"Sending cmd adjust sample rate to mcu for: {sample_rate_save}")
             
             #sample_rate_done_flag = 1      # debug start_seeking()
+            
             success = self.send_msg_retry(port, MSG_B, ztmCMD.CMD_SET_ADC_SAMPLE_RATE.value, ztmSTATUS.STATUS_CLR.value, sample_rate_save)
             
         
@@ -830,6 +881,66 @@ class MeasGUI:
             else:
                 print("Failed to send sample rate.")
                 sample_rate_done_flag = 0
+                
+    '''
+    Send sample size as an integer and sends that to the MCU
+    '''
+    def sendSampleSize(self, _):
+        if self.check_connection():
+            self.root.focus()
+            return
+        else:
+            print("\n----------SENDING SAMPLE SIZE----------")
+            port = self.parent.serial_ctrl.serial_port
+            
+            try:
+                sample_size_save = int(self.sample_size.get())
+                if sample_size_save not in range(1, 1025):
+                    if sample_size_save < 1:
+                        sample_size_save = 1
+                        messagebox.showerror("Invalid Value", "Invalid input. Sample size defaulted to 1.")
+                    elif sample_size_save > 1024:
+                        sample_size_save = 1024
+                        messagebox.showerror("Invalid Value", "Invalid input. Sample size defaulted to 1024.")
+
+                    sample_size_str = str(sample_size_save)
+                    self.root.focus()
+                    self.sample_size.delete(0, END)
+                    self.sample_size.insert(0, sample_size_str)
+                
+                print(f"Saved sample size value: {sample_size_save}")
+
+                '''
+                sendMsgB(port, msgCmd, msgStatus, uint16_rateHz):
+                    - port          = COM port variable assigned using pySerial functions
+                    - msgCmd        = ztmCMD value - see documentation for valid commands
+                    - msgStatus     = ztmStatus value - usually STATUS_CLR
+                    - uint16_rateHz = data rate to assign, units of Hz, max limit 65535
+                    - Function transmits Msg B, does not return anything. '''
+
+                print(f"Sending cmd adjust sample size to mcu for: {sample_size_save}")
+                
+                # Note: msg will be defined at a later time
+                '''
+                success = self.send_msg_retry(port, MSG_B, ztmCMD.CMD_SET_ADC_SAMPLE_SIZE.value, ztmSTATUS.STATUS_CLR.value, sample_size_save)
+                
+            
+                if success:
+                    print("Received done message.")
+                    #sample_rate_done_flag = 1
+                else:
+                    print("Failed to send sample size.")
+                    #sample_rate_done_flag = 0
+                '''
+                
+                self.root.focus()
+            except ValueError:
+                self.root.focus()
+                self.sample_size.delete(0, END)
+                messagebox.showerror("Invalid Value", "Please enter a whole number from [1-1024].")
+                        
+        
+            
         
         
     '''
@@ -1028,11 +1139,22 @@ class MeasGUI:
 
     
     def update_label(self):
+        '''
         self.label2.configure(text=f"{self.adc_curr:.3f} nA")
         self.label1.configure(text=f"{self.distance:.3f} nm")
-        #la.configure(text=f"{self.vpzo:.3f} V")
+
+        self.adc_curr += 1
+        self.label2.after(1000, self.update_label)
+        '''
+        random_num = random.uniform(0, 5)
+        self.label2.configure(text=f"{random_num:.3f} nA")
+        self.label2.after(1000, self.update_label)
+        
     
-                 
+    def get_current_label2(self):
+        current_value = float(self.label2.cget("text").split()[0])  # assuming label2 text value is "value" nA
+        return current_value
+        
     # file drop-down menu
     def DropDownMenu(self):
         '''
@@ -1080,20 +1202,46 @@ class MeasGUI:
             
 # class for graph in homepage
 class GraphGUI:
-    def __init__(self, root):
+    def __init__(self, root, meas_gui):
         self.root = root
+        self.meas_gui = meas_gui
+        self.data = []
+        self.time = []
+        self.time_counter = 0   # counter to simulate the passage of time
+        
         self.create_graph()
+        self.update_graph()
         
     def create_graph(self):
         # Create a figure
         self.fig, self.ax = plt.subplots()
         self.ax.set_xlabel('Time (s)')
         self.ax.set_ylabel('Tunneling Current (nA)')
+        self.line, = self.ax.plot([], [], 'r-')
         
         # Create a canvas to embed the figure in Tkinter
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.root)
         self.canvas.get_tk_widget().grid(row=0, column=3, columnspan=6, rowspan=10, padx=10, pady=5)
 
+    def update_graph(self):
+        # fetch data from label 2
+        current_data = self.meas_gui.get_current_label2()
+        
+        # update data
+        self.data.append(current_data)
+        self.time.append(self.time_counter)
+        self.time_counter += 1
+        
+        # update plot data
+        self.line.set_data(self.time, self.data)
+        self.ax.relim()
+        self.ax.autoscale_view()
+        
+        # redraw canvas
+        self.canvas.draw()
+        
+        # schedule next update
+        self.root.after(1000, self.update_graph)
 
 if __name__ == "__main__":
     root_gui = RootGUI()
