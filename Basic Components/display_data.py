@@ -1,29 +1,36 @@
-import tkinter as tk
+# Imports tkinter
+from tkinter import *
 
-class ExampleApp:
-    def __init__(self, root):
-        self.root = root
-        self.create_widgets()
+# toplevel window
+root = Tk()
 
-    def create_widgets(self):
-        self.root.grid_rowconfigure(0, weight=1)
-        self.root.grid_columnconfigure(0, weight=1)
+# label widget
+label = Label(root, text="LABEL")
 
-        frame = tk.Frame(self.root, bg='gray')
-        frame.grid(row=0, column=0, sticky='nsew')
 
-        for i in range(3):
-            self.root.grid_rowconfigure(i, weight=1)
-            self.root.grid_columnconfigure(i, weight=1)
-            for j in range(3):
-                btn = tk.Button(frame, text=f"Button {i},{j}")
-                btn.grid(row=i, column=j, sticky='nsew')
+# Method to make Label(Widget) invisible
+def hide_label():
+    # This will remove the widget
+    label.pack_forget()
 
-        for i in range(3):
-            frame.grid_rowconfigure(i, weight=1)
-            frame.grid_columnconfigure(i, weight=1)
 
-if __name__ == "__main__":
-    root = tk.Tk()
-    app = ExampleApp(root)
-    root.mainloop()
+# Method to make Label(widget) visible
+def recover_label():
+    # This will recover the widget
+    label.pack()
+
+
+# hide_label() function hide the label temporarily
+B2 = Button(root, text="Click To Hide label", fg="red", command=hide_label)
+B2.pack()
+
+# recover_label() function recover the label
+B1 = Button(root, text="Click To Show label",
+            fg="green", command=recover_label)
+B1.pack()
+
+# pack Label widget
+label.pack()
+
+# Start the GUI
+root.mainloop()

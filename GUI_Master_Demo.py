@@ -5,7 +5,6 @@ import customtkinter as ctk
 import serial, re, os, struct, time
 import serial.tools.list_ports
 import tkinter as tk
-import tkinter.font as tkFont
 
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -29,6 +28,13 @@ vbias_done_flag = 0
 sample_rate_save = None
 sample_rate_done_flag = 0
 
+sample_size_save = None
+sample_size_done_flag = 0
+
+home_pos_total_steps = None
+curr_pos_total_steps = None
+
+tip_app_total_steps = None
 
 class RootGUI:
     def __init__(self):
@@ -331,7 +337,10 @@ class MeasGUI:
         self.add_btn_image5 = ctk.CTkImage(Image.open("Images/Stop_Btn.png"), size=(90,35))
         self.add_btn_image6 = ctk.CTkImage(Image.open("Images/Acquire_IV.png"), size=(90,35))
         self.add_btn_image7 = ctk.CTkImage(Image.open("Images/Acquire_IZ.png"), size=(90,35))
+        
+        #self.led_frame = LabelFrame(self.root, text="", labelanchor= "s", padx=10, pady=5, bg="#eeeeee")
         self.add_btn_image8 = ctk.CTkImage(Image.open("Images/Stop_LED.png"), size=(35,35))
+        
         # self.add_btn_image9 = ctk.CTkImage(Image.open("Images/Start_LED.png"), size=(35,35))
         self.add_btn_image10 = ctk.CTkImage(Image.open("Images/Save_Home_Btn.png"), size=(90,35))
         self.add_btn_image11 = ctk.CTkImage(Image.open("Images/Return_Home_Btn.png"), size=(35,35))
@@ -342,7 +351,6 @@ class MeasGUI:
         self.acquire_iv_btn = ctk.CTkButton(self.root, image=self.add_btn_image6, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.open_iv_window)
         self.acquire_iz_btn = ctk.CTkButton(self.root, image=self.add_btn_image7, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.open_iz_window)
         self.stop_led_btn = ctk.CTkButton(self.root, image=self.add_btn_image8, text="", width=30, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, hover=NONE)
-        
         self.save_home_pos = ctk.CTkButton(self.root, image=self.add_btn_image10, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.save_home)
         
         self.return_to_home_frame = LabelFrame(self.root, text="Return Home", labelanchor= "s", padx=10, pady=5, bg="#eeeeee")
@@ -391,22 +399,19 @@ class MeasGUI:
         IVWindow(new_window)
 
     def open_iz_window(self):
+        port = self.parent.serial_ctrl.serial_port
+        
         '''
         Method to open a new window when the "Acquire I-Z" button is clicked
         '''
         new_window = ctk.CTkToplevel(self.root)
-        IZWindow(new_window)
+        IZWindow(new_window, port)
     
     '''
-    def update_port(self, port):
-        
-        #Method to update port
-        
-        self.port = port
-        print(f"Port updated to: {self.port}")
-        return self.port
+    def startup_leds(self):
+        self.stop_led_btn.pack_forget()
     '''
-    
+       
     def start_reading(self):
         if self.check_connection():
             return
@@ -416,7 +421,6 @@ class MeasGUI:
             self.stop_btn.configure(state="normal")
             
             self.parent.start_reading()
-            #self.update_label()
 							  
     
     def stop_reading(self):
@@ -426,6 +430,7 @@ class MeasGUI:
             print("ButtonGUI: Stop button pressed")
             self.start_btn.configure(state="normal")
             self.stop_btn.configure(state="disabled")
+
             self.parent.stop_reading()
 
 
@@ -495,7 +500,7 @@ class MeasGUI:
     not receive expected response
     '''
     def send_msg_retry(self, port, msg_type, cmd, status, *params, max_attempts=10, sleep_time=0.5):
-        global curr_data
+        #global curr_data
         
         attempt = 0
         
@@ -528,7 +533,12 @@ class MeasGUI:
                     print(f"SUCCESS. Response received: {self.response}")
                     
                     return True
+                elif self.response[2] == ztmSTATUS.STATUS_STEP_COUNT.value and self.response[0] == MSG_D: #check on this message from MCU
+                    total_steps = int(struct.unpack('f', bytes(self.response[5:8]))[0], 3) #unpack bytes & convert
+                    print("Received values\nStepper Position Total (1/8) Steps: " + total_steps + "\n")
+                    return total_steps
                 elif self.response[2] == ztmSTATUS.STATUS_MEASUREMENTS.value:
+                    '''
                     curr_data = round(struct.unpack('f', bytes(self.response[3:7]))[0], 3) #unpack bytes & convert
                     cStr = str(curr_data)  # format as a string
                     print("Received values\n\tCurrent: " + cStr + " nA\n")
@@ -540,9 +550,7 @@ class MeasGUI:
                     vp_V = round(Convert.get_Vpiezo_float(struct.unpack('H',bytes(self.response[9:11]))[0]), 3) #unpack bytes & convert
                     vpStr = str(vp_V)   # format as a string
                     print("\tVpiezo: " + vpStr + " V\n")
-                    
-                    self.label2.configure(text=f"{curr_data:.3f}")
-
+                    '''
                     return True
                 elif self.response[2] == ztmSTATUS.STATUS_ACK.value:
                     print("Received ACK from MCU.")
@@ -578,31 +586,45 @@ class MeasGUI:
         return value  
     
     '''
-    Function to send user-inputted parameters to MCU
-    sample bias, sample rate, current setpoint*
+    Function to send user-inputted parameters to MCU, sample bias, sample rate, sample
+    size, current setpoint*
     ### WILL BE CHANGING ###
+    
+    This function consists of the tip approach algorithm and receiving periodic data
+    once the tip approach algorithm successfully finishes
     '''        
-
     def start_seeking(self):
+        # access global variables
+        global curr_setpoint
+        global curr_data
+        
+        global vbias_save
+        global vbias_done_flag
+        
+        global sample_rate_save
+        global sample_rate_done_flag
+    
+        global sample_size_save    
+        global sample_size_done_flag
+        
+        global tip_app_total_steps
+        global curr_pos_total_steps
+        
+        # local variable
+        self.count = 0
+        
+        # inside of this function updates curr_pos_total_steps
+        curr_pos_total_steps = self.send_msg_retry(self.parent.serial_ctrl.serial_port, MSG_C, ztmCMD.CMD_REQ_STEP_COUNT.value, ztmSTATUS.STATUS_CLR.value)
+        
         if self.check_connection():
             return
+        if tip_app_total_steps == curr_pos_total_steps:
+                self.enable_periodics()
         else:
             print("\n----------START SEEKING TUNNELING CURRENT----------")
             
-            # access global variables
-            global curr_setpoint
-            global curr_data
-            
-            global vbias_save
-            global vbias_done_flag
-            
-            global sample_rate_save
-            global sample_rate_done_flag
-            
             # check for port connection
             port = self.parent.serial_ctrl.serial_port
-            if port is None:
-                print("Port is not connected.")
                 
             # Note: Disable entry widgets when seeking
             
@@ -654,6 +676,27 @@ class MeasGUI:
                     sample_rate_done_flag = 0
             print(f"Sample rate: {sample_rate_save}")
             
+            '''
+            # error check sample size - CURRENTLY WORKING ON
+            if not sample_size_done_flag:
+                # get sample size value
+                try:
+                    sample_size_save = int(sample_size_save)      # check if there is a sample bias user input
+                except (TypeError, ValueError):
+                    sample_size_save = 100                    # set to default value
+                    print("Sample size set to default value. Sending sample size message to MCU.")
+                
+                # send sample size msg and retrieve done
+                success = self.send_msg_retry(port, MSG_B, ztmCMD.CMD_SET_SAMPLE_SIZE.value, ztmSTATUS.STATUS_CLR.value, sample_size_save)
+                
+                if success:
+                    sample_size_done_flag = 1
+                else:
+                    sample_size_done_flag = 0
+            print(f"Sample size: {sample_size_save}")
+            '''
+            
+            # sample_size_save = 10 # for debugging purposes, delete later
             
             
             # 4. Once we have all DONE msgs, request data msg from GUI to MCU
@@ -668,37 +711,50 @@ class MeasGUI:
                     # BUT add a condition to check if the done flag already = 1
                 # move on to periodic data routine
                 
-            
-            ########## 
-            if self.tip_approach_done_flag:
-                print("\n********** BEGIN ENABLING PERIODIC DATA **********")
+                tip_app_total_steps = self.send_msg_retry(self.parent.serial_ctrl.serial_port, MSG_C, ztmCMD.CMD_REQ_STEP_COUNT.value, ztmSTATUS.STATUS_CLR.value)
+                self.enable_periodics()
                 
+    def enable_periodics(self):
+        if self.check_connection():
+            return
+        else:
+        ########## 
+            print("\n********** BEGIN ENABLING PERIODIC DATA **********")
             
-            '''
-            if vbias_done_flag and sample_rate_done_flag:
-  
-                # request data
-                success = self.send_msg_retry(port, MSG_C, ztmCMD.CMD_REQ_DATA.value, ztmSTATUS.STATUS_CLR.value)
-                if success:
-                    pass
+            port = self.parent.serial_ctrl.serial_port
+            
+            enable_data_success = self.send_msg_retry(port, MSG_C, ztmCMD.CMD_PERIODIC_DATA_ENABLE.value, ztmSTATUS.STATUS_CLR.value)
+            
+            #self.parent.ztm_serial.sendMsgC(port, ztmCMD.CMD_PERIODIC_DATA_ENABLE.value, ztmSTATUS.STATUS_CLR.value)
+            
+            if enable_data_success:
+                while self.count < sample_size_save:
+                    # receive data from MCU
+                    self.response = self.parent.serial_ctrl.ztmGetMsg()
                     
-                    ### CHANGING ###
-                    #print("SUCCESS. We are receiving data!")
-                    #curr_val = round(struct.unpack('>f', response[3:7])[0], 3)
-                    #print("Received values\n\tCurrent: " + str(curr_val) + " nA")
+                    # verify the msg
+                    if self.response[2] == ztmSTATUS.STATUS_MEASUREMENTS.value:
+                        curr_data = round(struct.unpack('f', bytes(self.response[3:7]))[0], 3) #unpack bytes & convert
+                        cStr = str(curr_data)  # format as a string
+                        print("Received values\n\tCurrent: " + cStr + " nA\n")
                     
-                    #while curr_data <= curr_setpoint:
-                        # request data
-                        # receive data
-                        # display in widgets
-                    #    self.send_msg_retry(port, MSG_C, ztmCMD.CMD_REQ_DATA.value, ztmSTATUS.STATUS_CLR.value)
-                        #self.label2.configure(text=f"{curr_data:.3f}")
-                else:
-                    print("ERROR. We are not receiving data!")
-                '''
+                        # display
+                        self.label2.configure(text=f"{curr_data:.3f}")
+                    else:
+                        print("Error. Not receiving the response needed.")
+                        
+                    self.count += 1
+            else:
+                print("Enabling periodic data msg failed.")
                 
- 
     
+        disable_success = self.send_msg_retry(port, MSG_C, ztmCMD.CMD_PERIODIC_DATA_DISABLE.value, ztmSTATUS.STATUS_CLR.value)
+        if disable_success:
+            print("SUCCESS. Periodic data has been disabled.")
+        else:
+            print("ERROR. Periodic data has not been disabled.")
+        
+                
     def savePiezoValue(self, event): 
         if self.check_connection():
             self.root.focus()
@@ -757,6 +813,7 @@ class MeasGUI:
                         self.total_voltage = 10.000
                         InfoMsg = f"Total voltage exceeds 10 V. Maximum allowed is 10 V."
                         messagebox.showerror("INVALID", InfoMsg)
+                        return
                         # send msg to MCU
                     self.vpzo_up = 0
                 elif self.vpzo_down:
@@ -766,11 +823,13 @@ class MeasGUI:
                         self.total_voltage = 0.000
                         InfoMsg = f"Total voltage below 0 V. Minimum allowed is 0 V."
                         messagebox.showerror("INVALID", InfoMsg)
+                        return
                         # send msg to MCU
                     self.vpzo_down = 0
             else:
                 InfoMsg = f"Invalid range. Stay within 0 - 10 V."
                 messagebox.showerror("INVALID", InfoMsg)
+                return
                 # send msg to MCU
             
             print(f"Total Voltage: {self.total_voltage}")
@@ -785,39 +844,53 @@ class MeasGUI:
           
         
     '''
-    Function to save the user inputted value of current setpoint to
-    use for start seeking function
+    Function to save the user inputted value of current setpoint to use for 
+    the start seeking function
+    
+    QUESTION: Range for current setpoint?
     '''
     def saveCurrentSetpoint(self, _): 
+        global curr_setpoint 
+        
         if self.check_connection():
             self.root.focus()
             return
         else:
-            global curr_setpoint 
-            curr_setpoint = float(self.label3.get())
-            print(f"\nSaved current setpoint value: {curr_setpoint}")
+            try:
+                curr_setpoint = float(self.label3.get())
+                print(f"\nSaved current setpoint value: {curr_setpoint}")
             
-            self.root.focus()
-            #self.start_seeking()
-            
-            #return curr_setpoint
-    
-    
+                self.root.focus()
+            except ValueError:
+                self.root.focus()
+                self.label3.delete(0,END)
+                self.label3.insert(0,0.000)
+                messagebox.showerror("Invalid Value", "Error. Please enter a valid input.")
+
     '''
     Save current offset and use to offset the graph
+    
+    QUESTION: Range for current offset?
     '''
     def saveCurrentOffset(self, event): 
         if self.check_connection():
             self.root.focus()
             return
         else:
-            curr_offset = self.label4.get()
-            print(f"\nSaved current offset value: {curr_offset}")
-            self.root.focus()
+            try:
+                curr_offset = float(self.label4.get())
+                print(f"\nSaved current offset value: {curr_offset}")
+                self.root.focus()
+            except ValueError:
+                self.root.focus()
+                self.label4.delete(0,END)
+                self.label4.insert(0,0.000)
+                messagebox.showerror("Invalid Value", "Error. Please enter a valid input.")
 
     '''
     Function to send vbias msg to the MCU and waits for a DONE response
     Check if DONE or ACK is expected
+    - range of -10 V to 10 V
     '''
     def saveSampleBias(self, event): 
         if self.check_connection():
@@ -826,29 +899,37 @@ class MeasGUI:
         else:
             self.root.focus()
             
-            print("\n----------SENDING SAMPLE BIAS----------")
-            port = self.parent.serial_ctrl.serial_port
-            global vbias_save
-            global vbias_done_flag
+            try:
+                print("\n----------SENDING SAMPLE BIAS----------")
+                port = self.parent.serial_ctrl.serial_port
+                global vbias_save
+                global vbias_done_flag
+                
+                vbias_save = self.get_float_value(self.label6, 1.0, "Voltage Bias")
+                
+                # error checking within range
+                if vbias_save not in range(-10, 10):
+                    self.label6.delete(0, END)
+                    self.label6.insert(0, 0.000)
+                    
+                
+                success = self.send_msg_retry(port, MSG_A, ztmCMD.CMD_SET_VBIAS.value, ztmSTATUS.STATUS_CLR.value, 0, vbias_save, 0)
+                
+                print(f"Saved sample bias value (float): {vbias_save}")
+                
+                #vbias_done_flag = 1    # used for debugging - delete later
+                
+                if success:
+                    print("Received done message.")
+                    vbias_done_flag = 1
+                else:
+                    print("Failed to send vbias.")
+                    vbias_done_flag = 0
+                    
+            except ValueError:
+                pass
             
-            vbias_save = self.get_float_value(self.label6, 1.0, "Voltage Bias")
-            print(f"Saved sample bias value (float): {vbias_save}")
             
-            # testing - delete later
-            #test_array = [MSG_A, ztmCMD.CMD_SET_VBIAS.value, ztmSTATUS.STATUS_CLR.value, 0xb8, 0x10, 0x23, 0x40, 0x9a, 0xb9, 0x85, 0xab]
-            #print(f"{test_array}")
-            
-            success = self.send_msg_retry(port, MSG_A, ztmCMD.CMD_SET_VBIAS.value, ztmSTATUS.STATUS_CLR.value, 0, vbias_save, 0)
-            
-            #vbias_done_flag = 1    # used for debugging - delete later
-            
-            if success:
-                print("Received done message.")
-                vbias_done_flag = 1
-            else:
-                print("Failed to send vbias.")
-                vbias_done_flag = 0
-        
       
         
 
@@ -902,6 +983,9 @@ class MeasGUI:
     Send sample size as an integer and sends that to the MCU
     '''
     def sendSampleSize(self, _):
+        global sample_size_save
+        global sample_size_done_flag
+        
         if self.check_connection():
             self.root.focus()
             return
@@ -945,10 +1029,10 @@ class MeasGUI:
             
                 if success:
                     print("Received done message.")
-                    #sample_rate_done_flag = 1
+                    #sample_size_done_flag = 1
                 else:
                     print("Failed to send sample size.")
-                    #sample_rate_done_flag = 0
+                    #sample_size_done_flag = 0
                 '''
                 
             except ValueError:
@@ -1036,6 +1120,17 @@ class MeasGUI:
                                 ex. DIR_UP (value should be 1 or 0)
                 - count         = number of steps at the designated step size
                 - Function transmits Msg D, does not return anything. '''
+            
+            '''
+            success = self.send_msg_retry(port, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_CLR.value, self.fine_adjust_step_size, fine_adjust_dir, num_of_steps)
+            
+            if success:
+                print("Received stepper motor adjustment.")
+            else:
+                print("Failed to receive stepper motor adjustment.")
+            '''
+            
+            # NEED TO ADD SEND MSG RETRY
             self.parent.ztm_serial.sendMsgD(port, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_CLR.value, self.fine_adjust_step_size, fine_adjust_dir, num_of_steps)
             print(f"Sending {dir_name} cmd stepper motor adjust to mcu: {self.fine_adjust_var.get()} step")
 
@@ -1054,6 +1149,7 @@ class MeasGUI:
                     print(f"Response recieved: {msg_received}")
             else:
                 print("Failed to receive response from MCU.")
+            
                   
         
     '''
@@ -1063,23 +1159,13 @@ class MeasGUI:
         if self.check_connection():
             return
         else:
-            ("\n----------SENDING NEW HOME POSITION----------")
-            port = self.parent.serial_ctrl.serial_port
-            
-            # set new home position
-            self.parent.ztm_serial.sendMsgC(port, ztmCMD.CMD_STEPPER_RESET_HOME_POSITION.value, ztmSTATUS.STATUS_CLR.value)
-            print("Reset home position.")
-        
-            ### Read DONE from the MCU
-            save_home_done = self.parent.serial_ctrl.read_bytes()
-            
-            ### Unpack data and display on the GUI
-            if save_home_done:
-                if save_home_done[2] != ztmSTATUS.STATUS_DONE.value:
-                    print(f"ERROR: wrong status recieved, status value: {save_home_done}")
-                else:
-                    self.parent.ztm_serial.unpackRxMsg(save_home_done)
-                    print("DONE STATUS RECEIVED.")
+            ("\n----------SETTING NEW HOME POSITION----------")
+            save_home_pos = self.send_msg_retry(self.parent.serial_ctrl.serial_port, MSG_C, ztmCMD.CMD_REQ_STEP_COUNT.value, ztmSTATUS.STATUS_CLR.value)
+            if save_home_pos:
+                print("Received total step count position from MCU and saved new home position.")
+
+                # curr_pos_total_steps is set in send_msg_retry(), we then set global variable home_pos_total_steps to save this as new home position
+                home_pos_total_steps = curr_pos_total_steps
             else:
                 print("Failed to receive response from MCU.")
     
@@ -1090,22 +1176,48 @@ class MeasGUI:
         if self.check_connection():
             return
         else:
-            ("\n----------SENDING TO RETURN HOME----------")
-            port = self.parent.serial_ctrl.serial_port
+            # if a home position has not been set, error message and return from function
+            if home_pos_total_steps == None:
+                InfoMsg = f"No Home Position has been set."
+                messagebox.showerror("INVALID", InfoMsg)
+                return
+
+            ("\n----------RETURN TO HOME POSITION----------")
+            # request total step for stepper motor from MCU
+            save_home_pos = self.send_msg_retry(self.parent.serial_ctrl.serial_port, MSG_C, ztmCMD.CMD_REQ_STEP_COUNT.value, ztmSTATUS.STATUS_CLR.value)
             
-            self.parent.ztm_serial.sendMsgC(port, ztmCMD.CMD_RETURN_TIP_HOME.value, ztmSTATUS.STATUS_CLR.value)
-            print("Returning tip to home position.")
-            
-            ### Read DONE from the MCU
-            return_home_done = self.parent.serial_ctrl.read_bytes()
-            
-            ### Unpack data and display on the GUI
-            if return_home_done:
-                if return_home_done[2] != ztmSTATUS.STATUS_DONE.value:
-                    print(f"ERROR: wrong status recieved, status value: {return_home_done}")
-                else:
-                    self.parent.ztm_serial.unpackRxMsg(return_home_done)
-                    print("DONE STATUS RECEIVED.")
+            if save_home_pos:
+                print("Received current step count position from MCU.")
+                
+                # if home position is lower than the tip's current position
+                if home_pos_total_steps > curr_pos_total_steps:
+                    return_dir = 1 # down
+                    num_of_steps = home_pos_total_steps - curr_pos_total_steps
+                    print(f"Home position is lower than current position by {num_of_steps} (1/8) steps\n")
+
+                    # send command to stepper motor for number of steps between current position and home position
+                    success = self.send_msg_retry(self.parent.serial_ctrl.serial_port, MSG_D, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_CLR.value, 3, return_dir, num_of_steps)
+                    if success:
+                        print("Received done message.")
+                    else:
+                        print("Failed to receive response from MCU.")
+
+                # if home position is higher than the tip's current position
+                elif home_pos_total_steps < curr_pos_total_steps:
+                    return_dir = 0 # up
+                    num_of_steps = curr_pos_total_steps - home_pos_total_steps
+                    print(f"Home position is higher than current position by {num_of_steps} (1/8) steps")
+
+                    # send command to stepper motor for number of steps between current position and home position
+                    success = self.send_msg_retry(self.parent.serial_ctrl.serial_port, MSG_D, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_CLR.value, 3, return_dir, num_of_steps)
+                    if success:
+                        print("Received done message.")
+                    else:
+                        print("Failed to receive response from MCU.")
+
+                elif home_pos_total_steps == curr_pos_total_steps:
+                    print("Tip is already at home position.")
+                
             else:
                 print("Failed to receive response from MCU.")
     
@@ -1114,33 +1226,13 @@ class MeasGUI:
     '''
     def check_connection(self):
         port = self.parent.serial_ctrl.serial_port
-        print(f"{port}")
+        #print(f"{port}")   # debugging - delete later
         if port is None:
             InfoMsg = f"ERROR. Connect to COM PORT."
             messagebox.showerror("Connection Error", InfoMsg)
             return True
         else:
             return False
-        
-    '''
-    def validate_setpoint(self, setpoint):
-        pattern1 = [0-9]
-        return re.match(pattern1,setpoint)
-    
-    def validate_offset(offset):
-        pattern2 = [0-9]
-        return re.match(pattern2,offset)
-    
-    # stepper motor or piezo act
-    def validate_fine_adjust_inc(fine_inc):
-        pattern3 = [0-9]
-        return re.match(pattern3,fine_inc)
-    
-    # -10V to 10V
-    def validate_sample_bias(bias):
-        pattern4 = [0-9]
-        return re.match(pattern4,bias)
-    '''
 
     # should be displaying distance and current that is sent from mcu
     def update_distance(self, adc_curr, vbias, vpzo):
@@ -1179,7 +1271,7 @@ class MeasGUI:
         self.filemenu = tk.Menu(self.menubar, tearoff=0)
         self.filemenu.add_command(label="Save", command=self.save_graph)
         self.filemenu.add_command(label="Save As", command=self.save_graph_as)
-        self.filemenu.add_command(label="Export (.txt)", command=self.export_txt)
+        self.filemenu.add_command(label="Export (.txt)", command=self.export_data)
         self.filemenu.add_separator()
         self.filemenu.add_command(label="Exit", command=self.root.quit)
         
@@ -1192,7 +1284,7 @@ class MeasGUI:
         Saves the current graph image with a default file name.
         '''
         downloads_folder = os.path.join(os.path.expanduser("~"), "Downloads")
-        default_filename = os.path.join(downloads_folder, "graph.png")
+        default_filename = os.path.join(downloads_folder, "current_graph.png")
         self.parent.graph_gui.fig.savefig(default_filename)
         messagebox.showinfo("Save Graph", f"Graph saved in Downloads as {default_filename}")
 
@@ -1205,8 +1297,12 @@ class MeasGUI:
             self.parent.graph_gui.fig.savefig(file_path)
             messagebox.showinfo("Save Graph As", f"Graph saved as {file_path}")
     
-    def export_txt(self):
-        print("Exporting to .txt file.")
+    def export_data(self):
+        file_path = filedialog.asksaveasfilename(defaultextension=".txt", filetypes=[("Text files", "*.txt"), ("All files", "*.*")])
+        if file_path:
+            with open(file_path, 'w') as file:
+                file.write("Sample data to export")
+            messagebox.showinfo("Export Data", f"Data exported as {file_path}")
             
 # class for graph in homepage
 class GraphGUI:

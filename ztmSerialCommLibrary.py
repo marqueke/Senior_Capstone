@@ -42,6 +42,7 @@ idByte      = 0    # MSG ID -> 1 byte
 cmdByte     = 1    # CMD    -> 1 byte
 statByte    = 2    # STATUS -> 1 byte
 
+# Note: Add CMD_SET_SAMPLE_SIZE
 class ztmCMD(Enum): 
     CMD_CLR	, \
     CMD_SET_VBIAS,   \

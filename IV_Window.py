@@ -4,6 +4,7 @@ from tkinter import *
 from tkinter import messagebox, filedialog
 from PIL import Image
 import customtkinter as ctk
+import tkinter as tk
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.animation as animation
@@ -203,7 +204,7 @@ class IVWindow:
         self.label7.grid(row=0, column=2, pady=5, sticky="w")
         
         # Positioning the file drop-down menu
-        self.drop_menu.grid(row=0, column=0, padx=self.padx, pady=self.pady, sticky="w")
+        #self.drop_menu.grid(row=0, column=0, padx=self.padx, pady=self.pady, sticky="w")
     
     def init_data_btns(self):
         self.add_btn_image1 = ctk.CTkImage(Image.open("Images/Start_Btn.png"), size=(90,35))
@@ -259,32 +260,24 @@ class IVWindow:
         
     # file drop-down menu
     def DropDownMenu(self):
-        '''
-        Method to list all the File menu options in a drop menu
-        '''
-        self.menu_options = StringVar()
-        options = ["File",
-                   "Save",
-                   "Save As",
-                   "Export (.txt)",
-                   "Exit"]
-        self.menu_options.set(options[0]) 
-        self.drop_menu = OptionMenu(self.root, self.menu_options, *options, command=self.menu_selection)
-        self.drop_menu.config(width=10)
-    
-    def menu_selection(self, selection):
-        if selection == "Exit":
-            self.root.destroy()
-        elif selection == "Save":
-            self.save_graph()
-        elif selection == "Save As":
-            self.save_graph_as()
-        elif selection == "Export (.txt)":
-            self.export_data()
+        self.menubar = tk.Menu(self.root)
+        
+        #self.custom_font = tkFont.Font(size=8)
+        
+        self.filemenu = tk.Menu(self.menubar, tearoff=0)
+        self.filemenu.add_command(label="Save", command=self.save_graph)
+        self.filemenu.add_command(label="Save As", command=self.save_graph_as)
+        self.filemenu.add_command(label="Export (.txt)", command=self.export_data)
+        self.filemenu.add_separator()
+        self.filemenu.add_command(label="Exit", command=self.root.quit)
+        
+        self.menubar.add_cascade(label="File", menu=self.filemenu)
+        
+        self.root.config(menu=self.menubar)
     
     def save_graph(self):
         downloads_folder = os.path.join(os.path.expanduser("~"), "Downloads")
-        default_filename = os.path.join(downloads_folder, "graph.png")
+        default_filename = os.path.join(downloads_folder, "iv_graph.png")
         self.fig.savefig(default_filename)
         messagebox.showinfo("Save Graph", f"Graph saved in Downloads as {default_filename}")
         
