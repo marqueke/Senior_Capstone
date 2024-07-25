@@ -84,7 +84,7 @@ class IZWindow:
             value = default_value
         return value  
 
-    # dont think we're using
+    # dont think we're using, to delete if so
     def send_parameters(self):
 
         vpzo_min = self.get(self.label4, 0.0, "Voltage Piezo Minimum")

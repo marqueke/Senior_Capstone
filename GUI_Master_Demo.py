@@ -29,6 +29,9 @@ vbias_done_flag = 0
 sample_rate_save = None
 sample_rate_done_flag = 0
 
+home_pos_total_steps = None
+curr_pos_total_steps = None
+
 
 class RootGUI:
     def __init__(self):
@@ -570,6 +573,7 @@ class MeasGUI:
     '''
     def send_msg_retry(self, port, msg_type, cmd, status, *params, max_attempts=2, sleep_time=0.5):
         global curr_data
+        global home_pos_total_steps
         
         attempt = 0
         
@@ -602,6 +606,11 @@ class MeasGUI:
                     print(f"SUCCESS. Response received: {self.response}")
                     
                     return True
+                elif self.response[2] == ztmSTATUS.STATUS_STEP_COUNT.value and self.response[0] == MSG_D: #check on this message from MCU
+                    curr_pos_total_steps = int(struct.unpack('f', bytes(self.response[5:8]))[0], 3) #unpack bytes & convert
+                    print("Received values\n\Stepper Position Total (1/8) Steps: " + curr_pos_total_steps + "\n")
+                    return True
+
                 elif self.response[2] == ztmSTATUS.STATUS_MEASUREMENTS.value:
                     curr_data = round(struct.unpack('f', bytes(self.response[3:7]))[0], 3) #unpack bytes & convert
                     cStr = str(curr_data)  # format as a string
@@ -1093,29 +1102,19 @@ class MeasGUI:
                 print("Failed to receive response from MCU.")
 
     '''
-    Function to save the new home position and send it to the MCU
+    Function to save the new home position, where the tip is at when the function is called
     '''
     def save_home(self):
         if self.check_connection():
             return
         else:
-            ("\n----------SENDING NEW HOME POSITION----------")
-            port = self.parent.serial_ctrl.serial_port
-            
-            # set new home position
-            self.parent.ztm_serial.sendMsgC(port, ztmCMD.CMD_STEPPER_RESET_HOME_POSITION.value, ztmSTATUS.STATUS_CLR.value)
-            print("Reset home position.")
-        
-            ### Read DONE from the MCU
-            save_home_done = self.parent.serial_ctrl.read_bytes()
-            
-            ### Unpack data and display on the GUI
-            if save_home_done:
-                if save_home_done[2] != ztmSTATUS.STATUS_DONE.value:
-                    print(f"ERROR: wrong status recieved, status value: {save_home_done}")
-                else:
-                    self.parent.ztm_serial.unpackRxMsg(save_home_done)
-                    print("DONE STATUS RECEIVED.")
+            ("\n----------SETTING NEW HOME POSITION----------")
+            save_home_pos = self.send_msg_retry(self.parent.serial_ctrl.serial_port, MSG_C, ztmCMD.CMD_REQ_STEP_COUNT.value, ztmSTATUS.STATUS_CLR.value)
+            if save_home_pos:
+                print("Received total step count position from MCU and saved new home position.")
+
+                # curr_pos_total_steps is set in send_msg_retry(), we then set global variable home_pos_total_steps to save this as new home position
+                home_pos_total_steps = curr_pos_total_steps
             else:
                 print("Failed to receive response from MCU.")
     
@@ -1126,22 +1125,48 @@ class MeasGUI:
         if self.check_connection():
             return
         else:
-            ("\n----------SENDING TO RETURN HOME----------")
-            port = self.parent.serial_ctrl.serial_port
+            # if a home position has not been set, error message and return from function
+            if home_pos_total_steps == None:
+                InfoMsg = f"No Home Position has been set."
+                messagebox.showerror("INVALID", InfoMsg)
+                return
+
+            ("\n----------RETURN TO HOME POSITION----------")
+            # request total step for stepper motor from MCU
+            save_home_pos = self.send_msg_retry(self.parent.serial_ctrl.serial_port, MSG_C, ztmCMD.CMD_REQ_STEP_COUNT.value, ztmSTATUS.STATUS_CLR.value)
             
-            self.parent.ztm_serial.sendMsgC(port, ztmCMD.CMD_RETURN_TIP_HOME.value, ztmSTATUS.STATUS_CLR.value)
-            print("Returning tip to home position.")
-            
-            ### Read DONE from the MCU
-            return_home_done = self.parent.serial_ctrl.read_bytes()
-            
-            ### Unpack data and display on the GUI
-            if return_home_done:
-                if return_home_done[2] != ztmSTATUS.STATUS_DONE.value:
-                    print(f"ERROR: wrong status recieved, status value: {return_home_done}")
-                else:
-                    self.parent.ztm_serial.unpackRxMsg(return_home_done)
-                    print("DONE STATUS RECEIVED.")
+            if save_home_pos:
+                print("Received current step count position from MCU.")
+                
+                # if home position is lower than the tip's current position
+                if home_pos_total_steps > curr_pos_total_steps:
+                    return_dir = 1 # down
+                    num_of_steps = home_pos_total_steps - curr_pos_total_steps
+                    print(f"Home position is lower than current position by {num_of_steps} (1/8) steps\n")
+
+                    # send command to stepper motor for number of steps between current position and home position
+                    success = self.send_msg_retry(self.parent.serial_ctrl.serial_port, MSG_D, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_CLR.value, 3, return_dir, num_of_steps)
+                    if success:
+                        print("Received done message.")
+                    else:
+                        print("Failed to receive response from MCU.")
+
+                # if home position is higher than the tip's current position
+                elif home_pos_total_steps < curr_pos_total_steps:
+                    return_dir = 0 # up
+                    num_of_steps = curr_pos_total_steps - home_pos_total_steps
+                    print(f"Home position is higher than current position by {num_of_steps} (1/8) steps")
+
+                    # send command to stepper motor for number of steps between current position and home position
+                    success = self.send_msg_retry(self.parent.serial_ctrl.serial_port, MSG_D, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_CLR.value, 3, return_dir, num_of_steps)
+                    if success:
+                        print("Received done message.")
+                    else:
+                        print("Failed to receive response from MCU.")
+
+                elif home_pos_total_steps == curr_pos_total_steps:
+                    print("Tip is already at home position.")
+                
             else:
                 print("Failed to receive response from MCU.")
     
