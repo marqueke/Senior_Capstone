@@ -7,7 +7,7 @@ RootMaster = RootGUI()
 
 # Initialize other GUI components
 GUIMeas = MeasGUI(RootMaster.root, RootMaster)
-GUIGraph = GraphGUI(RootMaster.root)
+GUIGraph = GraphGUI(RootMaster.root, GUIMeas)
 GUICom = ComGUI(RootMaster.root, RootMaster)
 
 

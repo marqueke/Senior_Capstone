@@ -126,6 +126,7 @@ class usbMsgFunctions:
         port.flush() 
 
     # MSG B
+    # Note: account for parsing different commands and rateHz vs. sample size
     def sendMsgB(self, port, msgCmd, msgStatus, uint16_rateHz):
         ''' - port          = COM port variable assigned using pySerial functions
             - msgCmd        = ztmCMD value - see documentation for valid commands
@@ -216,65 +217,71 @@ class usbMsgFunctions:
 
         # clear buffer    
         port.flush()    
+        
     ###############################################
     # UNPACK MSG DATA - Reading MCU
-    def unpackRxMsg(self, rxMsg):
+    def unpackRxMsg(rxMsg):
         ################################
         # DEBUG - PRINT CMD AND STATUS #
-        cmdRx = ztmCMD(rxMsg[cmdByte])
-        print("Received : " + cmdRx.name)
-        statRx = ztmSTATUS(rxMsg[statByte])
-        print("Received : " + statRx.name + "\n")
+        try:
+            cmdRx = ztmCMD(rxMsg[cmdByte])
+            print("Received : " + cmdRx.name)
+            statRx = ztmSTATUS(rxMsg[statByte])
+            print("Received : " + statRx.name + "\n")
+   
         ################################
         
         # EXTRACT THE DATA FROM RX MSG #
-        if(rxMsg[0] == MSG_A):
-            
-            if(rxMsg[2] == ztmSTATUS.STATUS_MEASUREMENTS.value):              
-                adcRx_nA    = round(struct.unpack('f', bytes(rxMsg[3:7]))[0], 3)                                #unpack bytes & convert  
-                vBiasRx_V   = round(Convert.get_Vbias_float(struct.unpack('H',bytes(rxMsg[7:9]))[0]), 3)   #unpack bytes & convert
-                vPiezoRx_V  = round(Convert.get_Vpiezo_float(struct.unpack('H',bytes(rxMsg[9:11]))[0]), 3) #unpack bytes & convert
-                return adcRx_nA, vBiasRx_V, vPiezoRx_V
-            else:
+            if(rxMsg[0] == MSG_A):
+                if(rxMsg[cmdByte] != ztmCMD.CMD_CLR.value):
+                    # microcontroller should not send commands
+                    return False
+                elif(rxMsg[2] == ztmSTATUS.STATUS_MEASUREMENTS.value):              
+                    adcRx_nA    = round(struct.unpack('f', bytes(rxMsg[3:7]))[0], 4)                                #unpack bytes & convert  
+                    vBiasRx_V   = round(Convert.get_Vbias_float(struct.unpack('H',bytes(rxMsg[7:9]))[0]), 3)   #unpack bytes & convert
+                    vPiezoRx_V  = round(Convert.get_Vpiezo_float(struct.unpack('H',bytes(rxMsg[9:11]))[0]), 3) #unpack bytes & convert
+                    return adcRx_nA, vBiasRx_V, vPiezoRx_V
+                else:
+                    return False
+
+            elif (rxMsg[0] == MSG_B):
+                # microcontroller should not send msg B       
                 return False
-            
-        elif (rxMsg[0] == MSG_B):
-            # microcontroller should not send msg B       
-            return False
-        
-        elif (rxMsg[0] == MSG_C):
-            if(rxMsg[cmdByte] != ztmCMD.CMD_CLR):
-                # microcontroller should not send commands
-                return False
-            else:
-                statRx = ztmSTATUS(rxMsg[statByte])
-                print("Received : " + statRx.name + "\n")
-                return rxMsg[statByte]
-            
-        elif (rxMsg[0] == MSG_D):
-            if(rxMsg[cmdByte] != ztmCMD.CMD_CLR):
-                # microcontroller should not send commands
-                return False
-            else:
-                stepsRx = struct.unpack('i', bytes(rxMsg[3:7]))[0]               
-                stepsRx = stepsRx / 8   # return the number of full steps as a float for conversion
-                return stepsRx 
-            
-        elif (rxMsg[0] == MSG_E):
-            # microcontroller should not send msg E       
-            return False 
-        
-        elif (rxMsg[0] == MSG_F):
-            if(rxMsg[cmdByte] != ztmCMD.CMD_CLR):
-                # microcontroller should not send commands     
-                return False
-            else:
-                adcRxFFT_nA = round(struct.unpack('f', bytes(rxMsg[3:7]))[0], 3) # unpack bytes & convert                                     
-                freqRxFFT_Hz = round(struct.unpack('f', bytes(rxMsg[7:11]))[0], 3) # unpack bytes & convert 
-                return adcRxFFT_nA, freqRxFFT_Hz
-            
-        else:
-            return False
+
+            elif (rxMsg[0] == MSG_C):
+                if(rxMsg[cmdByte] != ztmCMD.CMD_CLR.value):
+                    # microcontroller should not send commands
+                    return False
+                else:
+                    statRx = ztmSTATUS(rxMsg[statByte])
+                    print("Received : " + statRx.name + "\n")
+                    return rxMsg[statByte]
+
+            elif (rxMsg[0] == MSG_D):
+                if(rxMsg[cmdByte] != ztmCMD.CMD_CLR.value):
+                    # microcontroller should not send commands
+                    return False
+                else:
+                    stepsRx = struct.unpack('i', bytes(rxMsg[5:9]))[0]               
+                    stepsRx = stepsRx / 8   # return the number of full steps as a float for conversion
+                    return stepsRx 
+
+            elif (rxMsg[0] == MSG_E):
+                # microcontroller should not send msg B       
+                return False 
+
+            elif (rxMsg[0] == MSG_F):
+                if(rxMsg[cmdByte] != ztmCMD.CMD_CLR.value):
+                    # microcontroller should not send commands     
+                    return False
+                else:
+                    adcRxFFT_nA = round(struct.unpack('f', bytes(rxMsg[3:7]))[0], 3) # unpack bytes & convert                                     
+                    freqRxFFT_Hz = round(struct.unpack('f', bytes(rxMsg[7:11]))[0], 3) # unpack bytes & convert 
+                    return adcRxFFT_nA, freqRxFFT_Hz
+
+        except:
+            print("Bytes not yet received.\n")   
+            return False  
             
     ###############################################
     # CALIBRATION SCRIPT MESSAGING FUNCTIONS

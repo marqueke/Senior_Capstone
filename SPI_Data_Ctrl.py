@@ -151,9 +151,13 @@ class SerialCtrl:
                 self.thread = threading.Thread(target=self.read_serial)
                 self.thread.start()
                 print("Reading thread started.")
+                
+                return True
             except serial.SerialException as e:
                 print(f"Error opening serial port: {e}")
                 self.serial_port = None
+                
+                return False
 
     def stop(self):
         self.running = False
