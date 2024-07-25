@@ -996,23 +996,23 @@ class MeasGUI:
             if self.step_up:
                 fine_adjust_dir = 0
                 self.step_up    = 0 
+                dir_name = "up direction"
             elif self.step_down:
                 fine_adjust_dir = 1
                 self.step_down  = 0
+                dir_name = "down direction"
                 
             print(f"\n----------SENDING STEPPER MOTOR {dir_name}----------")
                                                         
             # number of steps, hardcoded = 1, for fine adjust arrows
             num_of_steps = 1
 
-        success = self.send_msg_retry(self.parent.serial_ctrl.serial_port, MSG_D, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_CLR.value, self.fine_adjust_step_size, fine_adjust_dir, num_of_steps)
+            success = self.send_msg_retry(self.parent.serial_ctrl.serial_port, MSG_D, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_CLR.value, self.fine_adjust_step_size, fine_adjust_dir, num_of_steps)
         
-        if success:
-            print("Received done message.")
-        else:
-            print("Failed to receive response from MCU.")
-
-
+            if success:
+                print("Received done message.")
+            else:
+                print("Failed to receive response from MCU.")
 
     '''
     Function to save the new home position and send it to the MCU
@@ -1079,26 +1079,6 @@ class MeasGUI:
             return True
         else:
             return False
-        
-    '''
-    def validate_setpoint(self, setpoint):
-        pattern1 = [0-9]
-        return re.match(pattern1,setpoint)
-    
-    def validate_offset(offset):
-        pattern2 = [0-9]
-        return re.match(pattern2,offset)
-    
-    # stepper motor or piezo act
-    def validate_fine_adjust_inc(fine_inc):
-        pattern3 = [0-9]
-        return re.match(pattern3,fine_inc)
-    
-    # -10V to 10V
-    def validate_sample_bias(bias):
-        pattern4 = [0-9]
-        return re.match(pattern4,bias)
-    '''
 
     # should be displaying distance and current that is sent from mcu
     def update_distance(self, adc_curr, vbias, vpzo):
@@ -1108,15 +1088,12 @@ class MeasGUI:
         self.vpzo = vpzo
         #self.update_label()
 
-    
     def update_label(self):
-
         random_num = random.uniform(0, 5)
         self.label2.configure(text=f"{random_num:.3f} nA")
         self.label1.configure(text=f"{self.distance:.3f} nm")
         self.label2.after(100, self.update_label)
         
-    
     def get_current_label2(self):
         current_value = float(self.label2.cget("text").split()[0])  # assuming label2 text value is "value" nA
         return current_value

@@ -51,8 +51,13 @@ class IZWindow:
         print("Starting to read data...")
         if self.serial_ctrl:
             print("Serial controller is initialized, starting now...")
-            self.serial_ctrl.start()
-            self.send_parameters()
+            #self.serial_ctrl.start()
+            checked = self.check_sweep_params()
+            if checked:
+                self.run_piezo_sweep_process()
+            else:
+                print("Sweep Parameters invalid. Process not started.")
+            #self.send_parameters()
         else:
             print("Serial controller is not initialized.")
     
@@ -79,20 +84,21 @@ class IZWindow:
             value = default_value
         return value  
 
+    # dont think we're using
     def send_parameters(self):
 
-        vpzo_min = self.get_float_value(self.label4, 0.0, "Voltage Piezo Minimum")
-        vpzo_max = self.get_float_value(self.label5, 0.0, "Voltage Piezo Maximum")
+        vpzo_min = self.get(self.label4, 0.0, "Voltage Piezo Minimum")
+        vpzo_max = self.get(self.label5, 0.0, "Voltage Piezo Maximum")
 
         # convert vpzo to int
         vpzo_min_int = Convert.get_Vpiezo_int(vpzo_min)
         vpzo_max_int = Convert.get_Vpiezo_int(vpzo_max)
         
-        print(f"Vpzo min int: {vpzo_min_int}, Vpzo max int: {vpzo_max_int}")
+        print(f"Vpzo min int: {vpzo_min}, Vpzo max int: {vpzo_max}")
         
         # convert values to bytes
-        vpzo_min_bytes = struct.pack('>H', vpzo_min_int)
-        vpzo_max_bytes = struct.pack('>H', vpzo_max_int)
+        vpzo_min_bytes = struct.pack('>H', vpzo_min)
+        vpzo_max_bytes = struct.pack('>H', vpzo_max)
         
         
         # Construct the payload with vpzo in the correct position
@@ -212,18 +218,176 @@ class IZWindow:
         self.start_btn.grid(row=1, column=10, padx=5, pady=15, sticky="s")
         self.stop_btn.grid(row=2, column=10, padx=5, sticky="n")
         self.stop_led_btn.grid(row=1, column=11, padx=5, pady=15, sticky="sw")
-        self.sweep_btn.grid(row=14, column=10, sticky="n")
-        self.home_btn.grid(row=15, column=10, sticky="n")
-    
-    def open_iz_sweep_window(self):
-        '''
-        Method to open a new window when the "Piezo Sweep Parameters" button is clicked
-        '''
-        new_window = ctk.CTkToplevel(self.root)
-        SweepIZ_Window(new_window)
-    
-    def return_home(self):
-        self.root.destroy()
+        # need to switch RG LED on process state
+        #self.start_led_btn.grid(row=1, column=11, padx=5, pady=15, sticky="sw")
+
+    def init_parameters(self):
+        self.min_voltage = None
+        self.max_voltage = None
+        self.num_setpoints = None
+        self.piezo_volt_range = None
+        self.volt_per_step = None
+
+    def saveMinVoltage(self, event):
+        if 0 <= float(self.label4.get()) <= 10:
+            self.min_voltage = float(self.label4.get())
+            print(f"Saved min voltage value: {self.min_voltage}")
+        else:
+            InfoMsg = f"Invalid range. Stay within 0 - 10 V."
+            messagebox.showerror("INVALID", InfoMsg)
+
+    def saveMaxVoltage(self, event):
+        if 0 <= float(self.label5.get()) <= 10:
+            self.max_voltage = float(self.label5.get())
+            print(f"Saved min voltage value: {self.max_voltage}")
+        else:
+            InfoMsg = f"Invalid range. Stay within 0 - 10 V."
+            messagebox.showerror("INVALID", InfoMsg) 
+
+    def saveNumSetpoints(self, event):
+        self.num_setpoints = int(self.label9.get())
+        print(f"Saved number of setpoints value: {self.num_setpoints}")
+
+    # current, piezo voltage, piezo extension
+    def update_label(self):
+        #self.label1.configure(text=f"{self.piezo_distance:.3f} nm") # piezo extension
+        self.label2.configure(text=f"{vp_V:.3f} V") # piezo voltage
+        self.label3.configure(text=f"{curr_data:.3f} nA") # current
+        self.label2.after(100, self.update_label)
+
+    def check_sweep_params(self):
+        if self.min_voltage == None or self.min_voltage < 0 or self.min_voltage > 10:
+            InfoMsg = f"Invalid Min Voltage. Please update your paremeters."
+            messagebox.showerror("INVALID", InfoMsg)
+            return False
+        
+        if self.max_voltage == None or self.max_voltage <= 0 or self.max_voltage > 10:
+            InfoMsg = f"Invalid Max Voltage. Please update your paremeters."
+            messagebox.showerror("INVALID", InfoMsg) 
+            return False
+
+        if self.num_setpoints == None or self.num_setpoints <= 0:
+            InfoMsg = f"Invalid Number of Setpoints. Please update your paremeters."
+            messagebox.showerror("INVALID", InfoMsg) 
+            return False
+
+        self.piezo_volt_range = self.max_voltage - self.min_voltage
+        self.volt_per_step = self.piezo_volt_range / self.num_setpoints
+
+        if self.piezo_volt_range <= 0:
+            InfoMsg = f"Invalid sweep range. Max value must be higher than Min value."
+            messagebox.showerror("INVALID", InfoMsg) 
+            return False
+        
+        if self.volt_per_step < 0.001:
+            InfoMsg = f"Invalid Step Size.\nStep size: {self.volt_per_step:.6f}\nStep size needs to be greater than or equal 0.001V\nDecrease number of points or increase voltage range"
+            messagebox.showerror("INVALID", InfoMsg) 
+            return False
+        
+        return True
+            
+
+    def run_piezo_sweep_process(self):
+
+        # starting point for piezo sweep, set to user-input minimum voltage
+        self.vpiezo = self.min_voltage
+        # start to display parameters to user
+        self.label2.after(1, self.update_label)
+
+        for i in range(0, self.num_setpoints):
+            print(f"Sending MSG_A to port: {self.port}")
+
+            # sending vpiezo to MCU, looking for a DONE status in return
+            success = self.send_msg_retry(self.port, MSG_A, ztmCMD.CMD_PIEZO_ADJ.value, ztmSTATUS.STATUS_CLR.value, 0, 0, self.vpiezo)
+            if not success:
+                InfoMsg = f"Could not verify communication with MCU.\nSweep process aborted."
+                messagebox.showerror("INVALID", InfoMsg) 
+                return
+            
+            # sending a REQUEST_FOR_DATA command to MCU to receive current and vpiezo measurements
+            dataSuccess = self.send_msg_retry(self.port, MSG_C, ztmCMD.CMD_REQ_DATA.value, ztmSTATUS.STATUS_CLR.value)
+            if not dataSuccess:
+                InfoMsg = f"Did not receive data from MCU.\nSweep process aborted."
+                messagebox.showerror("INVALID", InfoMsg) 
+                return
+
+            # increment the piezo that sets the MCU, and increment through the number of setpoints for the for loop
+            self.vpiezo += self.volt_per_step
+            self.num_setpoints += 1
+        
+
+
+    '''
+    Function to send a message to the MCU and retry if we do
+    not receive expected response
+    '''
+    def send_msg_retry(self, port, msg_type, cmd, status, *params, max_attempts=2, sleep_time=0.5):
+        
+        attempt = 0
+        
+        while attempt < max_attempts:
+            if msg_type == MSG_A:
+                self.ztm_serial.sendMsgA(port, cmd, status, *params)
+            elif msg_type == MSG_B:
+                self.ztm_serial.sendMsgB(port, cmd, status, *params)
+            elif msg_type == MSG_C:
+                self.ztm_serial.sendMsgC(port, cmd, status, *params)
+            elif msg_type == MSG_D:
+                self.ztm_serial.sendMsgD(port, cmd, status, *params)
+            elif msg_type == MSG_E:
+                self.ztm_serial.sendMsgE(port, cmd, status, *params)
+            else:
+                raise ValueError(f"Unsupported message type: {msg_type}")
+            
+            self.response = self.serial_ctrl.ztmGetMsg()
+            
+            print(f"Serial response: {self.response}")
+            
+            ### Unpack data and display on the GUI
+            if self.response:
+                if self.response[2] == ztmSTATUS.STATUS_DONE.value:
+                    self.ztm_serial.unpackRxMsg(self.response)
+                    print(f"SUCCESS. Response received: {self.response}")
+                    
+                    return True
+                elif self.response[2] == ztmSTATUS.STATUS_MEASUREMENTS.value:
+                    curr_data = round(struct.unpack('f', bytes(self.response[3:7]))[0], 3) #unpack bytes & convert
+                    cStr = str(curr_data)  # format as a string
+                    print("Received values\n\tCurrent: " + cStr + " nA\n")
+                        
+                    vb_V = round(Convert.get_Vbias_float(struct.unpack('H',bytes(self.response[7:9]))[0]), 3) #unpack bytes & convert
+                    vbStr = str(vb_V)   # format as a string
+                    print("\tVbias: " + vbStr + " V\n")
+                        # vpiezo
+                    vp_V = round(Convert.get_Vpiezo_float(struct.unpack('H',bytes(self.response[9:11]))[0]), 3) #unpack bytes & convert
+                    vpStr = str(vp_V)   # format as a string
+                    print("\tVpiezo: " + vpStr + " V\n")
+                    
+                    #update for windows, params
+                    #self.label3.configure(text=f"{curr_data:.3f}")
+                    
+
+                    return True
+                elif self.response[2] == ztmSTATUS.STATUS_ACK.value:
+                    print("Received ACK from MCU.")
+                    
+                    return True
+                else:
+                    print(f"ERROR. Wrong status recieved: {self.response}")
+
+                    # if we want to decode the command or status & print to the console....
+                    cmdRx = ztmCMD(self.response[1])
+                    print("Received : " + cmdRx.name)
+                    statRx = ztmSTATUS(self.response[2])
+                    print("Received : " + statRx.name + "\n")
+                    
+                    attempt += 1
+            else:
+                print("ERROR. Failed to receive response from MCU.")
+
+                attempt += 1
+            time.sleep(sleep_time)
+        return False
         
     # file drop-down menu
     def DropDownMenu(self):
