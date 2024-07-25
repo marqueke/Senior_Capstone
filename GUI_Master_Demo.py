@@ -4,6 +4,8 @@ from PIL import Image, ImageGrab
 import customtkinter as ctk
 import serial, re, os, struct, time
 import serial.tools.list_ports
+import tkinter as tk
+import tkinter.font as tkFont
 
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -34,6 +36,7 @@ class RootGUI:
         self.root.title("Homepage")
         self.root.config(bg="#eeeeee")
         self.root.geometry("1100x650")
+        self.root.resizable(False, False)
         
         # Add a method to quit the application
         self.root.protocol("WM_DELETE_WINDOW", self.quit_application)
@@ -457,7 +460,7 @@ class MeasGUI:
         self.label9.grid(row=0, column=2, pady=5, sticky="w")
 
         # positioning the file drop-down menu
-        self.drop_menu.grid(row=0, column=0, padx=5, pady=5, sticky="w")
+        #self.drop_menu.grid(row=0, column=0, padx=5, pady=5, sticky="w")
         
         # vpiezo tip fine adjust
         self.vpiezo_btn_frame.grid(row=8, column=0, rowspan=3, columnspan=2, padx=5, sticky="e")
@@ -698,16 +701,22 @@ class MeasGUI:
     
     def savePiezoValue(self, event): 
         if self.check_connection():
+            self.root.focus()
             return
         else:
+            self.root.focus()
+            
             vpzo_value = float(self.label10.get())
         
             if vpzo_value < float(0.003):
-                print("Vpiezo is too small. Set to 3 mV.")
                 vpzo_value = float(0.003)
+                messagebox.showerror("Invalid Value", "Invalid input. Voltage is too small, defaulted to 3 mV.")
                 
             print(f"Saved vpiezo value: {vpzo_value}")
-            self.label12.configure(text=f"{self.total_voltage:.3f} ")
+            
+            self.label12.configure(text=f"{0:.3f} ")
+            self.label10.delete(0, END)
+            self.label10.insert(0, str(vpzo_value))
         
     def piezo_inc(self):
         if self.check_connection():
@@ -781,11 +790,14 @@ class MeasGUI:
     '''
     def saveCurrentSetpoint(self, _): 
         if self.check_connection():
+            self.root.focus()
             return
         else:
             global curr_setpoint 
             curr_setpoint = float(self.label3.get())
             print(f"\nSaved current setpoint value: {curr_setpoint}")
+            
+            self.root.focus()
             #self.start_seeking()
             
             #return curr_setpoint
@@ -796,10 +808,12 @@ class MeasGUI:
     '''
     def saveCurrentOffset(self, event): 
         if self.check_connection():
+            self.root.focus()
             return
         else:
             curr_offset = self.label4.get()
             print(f"\nSaved current offset value: {curr_offset}")
+            self.root.focus()
 
     '''
     Function to send vbias msg to the MCU and waits for a DONE response
@@ -807,8 +821,11 @@ class MeasGUI:
     '''
     def saveSampleBias(self, event): 
         if self.check_connection():
+            self.root.focus()
             return
         else:
+            self.root.focus()
+            
             print("\n----------SENDING SAMPLE BIAS----------")
             port = self.parent.serial_ctrl.serial_port
             global vbias_save
@@ -825,13 +842,13 @@ class MeasGUI:
             
             #vbias_done_flag = 1    # used for debugging - delete later
             
-
             if success:
                 print("Received done message.")
                 vbias_done_flag = 1
             else:
                 print("Failed to send vbias.")
                 vbias_done_flag = 0
+        
       
         
 
@@ -880,7 +897,6 @@ class MeasGUI:
                 sample_rate_done_flag = 1
             else:
                 print("Failed to send sample rate.")
-                sample_rate_done_flag = 0
                 
     '''
     Send sample size as an integer and sends that to the MCU
@@ -890,6 +906,8 @@ class MeasGUI:
             self.root.focus()
             return
         else:
+            self.root.focus()
+            
             print("\n----------SENDING SAMPLE SIZE----------")
             port = self.parent.serial_ctrl.serial_port
             
@@ -933,16 +951,11 @@ class MeasGUI:
                     #sample_rate_done_flag = 0
                 '''
                 
-                self.root.focus()
             except ValueError:
                 self.root.focus()
                 self.sample_size.delete(0, END)
                 messagebox.showerror("Invalid Value", "Please enter a whole number from [1-1024].")
                         
-        
-            
-        
-        
     '''
     Saves adjust stepper motor step size as an integer 'fine_adjust_step_size' 
     '''
@@ -1155,32 +1168,24 @@ class MeasGUI:
         current_value = float(self.label2.cget("text").split()[0])  # assuming label2 text value is "value" nA
         return current_value
         
-    # file drop-down menu
+    '''
+    Method to list all the File menu options in a drop menu
+    '''
     def DropDownMenu(self):
-        '''
-        Method to list all the File menu options in a drop menu
-        '''
-        self.menu_options = StringVar()
-        options = ["File",
-                   "Save",
-                   "Save As",
-                   "Export (.txt)",
-                   "Exit"]
-        self.menu_options.set(options[0])
-        self.drop_menu = OptionMenu(self.root, self.menu_options, *options, command=self.menu_selection)
-        self.drop_menu.config(width=10)
-
-    def menu_selection(self, selection):
-        if selection == "Exit":
-            self.root.quit()
-        elif selection == "Save":
-            self.save_graph()
-            pass
-        elif selection == "Save As":
-            self.save_graph_as()
-        elif selection == "Export (.txt)":
-            # export data into a .txt file
-            pass
+        self.menubar = tk.Menu(self.root)
+        
+        #self.custom_font = tkFont.Font(size=8)
+        
+        self.filemenu = tk.Menu(self.menubar, tearoff=0)
+        self.filemenu.add_command(label="Save", command=self.save_graph)
+        self.filemenu.add_command(label="Save As", command=self.save_graph_as)
+        self.filemenu.add_command(label="Export (.txt)", command=self.export_txt)
+        self.filemenu.add_separator()
+        self.filemenu.add_command(label="Exit", command=self.root.quit)
+        
+        self.menubar.add_cascade(label="File", menu=self.filemenu)
+        
+        self.root.config(menu=self.menubar)
     
     def save_graph(self):
         '''
@@ -1199,6 +1204,9 @@ class MeasGUI:
         if file_path:
             self.parent.graph_gui.fig.savefig(file_path)
             messagebox.showinfo("Save Graph As", f"Graph saved as {file_path}")
+    
+    def export_txt(self):
+        print("Exporting to .txt file.")
             
 # class for graph in homepage
 class GraphGUI:
