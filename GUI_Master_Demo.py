@@ -750,7 +750,7 @@ class MeasGUI:
     Save current offset and use to offset the graph
     '''
     def saveCurrentOffset(self, event): 
-        curr_offset = self.label4.get()
+        curr_offset = float(self.label4.get())
         print(f"\nSaved current offset value: {curr_offset}")
 
     '''

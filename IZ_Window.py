@@ -229,16 +229,16 @@ class IZWindow:
         self.volt_per_step = None
 
     def saveMinVoltage(self, event):
-        if 0 <= int(self.label4.get()) <= 10:
-            self.min_voltage = int(self.label4.get())
+        if 0 <= float(self.label4.get()) <= 10:
+            self.min_voltage = float(self.label4.get())
             print(f"Saved min voltage value: {self.min_voltage}")
         else:
             InfoMsg = f"Invalid range. Stay within 0 - 10 V."
             messagebox.showerror("INVALID", InfoMsg)
 
     def saveMaxVoltage(self, event):
-        if 0 <= int(self.label5.get()) <= 10:
-            self.max_voltage = int(self.label5.get())
+        if 0 <= float(self.label5.get()) <= 10:
+            self.max_voltage = float(self.label5.get())
             print(f"Saved min voltage value: {self.max_voltage}")
         else:
             InfoMsg = f"Invalid range. Stay within 0 - 10 V."
@@ -280,7 +280,7 @@ class IZWindow:
             return False
         
         if self.volt_per_step < 0.001:
-            InfoMsg = f"Invalid resolution.\nStep size: {self.volt_per_step:.6f}\nResolution needs to be greater than or equal 0.001V\nDecrease number of points or increase voltage range"
+            InfoMsg = f"Invalid Step Size.\nStep size: {self.volt_per_step:.6f}\Step size needs to be greater than or equal 0.001V\nDecrease number of points or increase voltage range"
             messagebox.showerror("INVALID", InfoMsg) 
             return False
         
