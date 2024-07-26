@@ -32,6 +32,7 @@ sample_rate_done_flag = 0
 home_pos_total_steps = None
 curr_pos_total_steps = None
 
+halt_process_flag = 0 # maybe, to be used 
 
 class RootGUI:
     def __init__(self):
@@ -337,7 +338,7 @@ class MeasGUI:
         self.vpzo_down = 0
         self.vpzo_up = 0
         self.total_voltage = 0.0
-        self.update_label()
+        # self.update_label()
     
         # define images
         self.add_btn_image0 = ctk.CTkImage(Image.open("Images/Vpzo_Up_Btn.png"), size=(40,40))
@@ -503,7 +504,7 @@ class MeasGUI:
             print("ButtonGUI: Stop button pressed")
             self.start_btn.configure(state="normal")
             self.stop_btn.configure(state="disabled")
-            self.parent.stop_reading()
+            # self.parent.stop_reading()
 
 
     '''
@@ -671,7 +672,9 @@ class MeasGUI:
             return
         else:
             print("\n----------START SEEKING TUNNELING CURRENT----------")
-            
+            self.label2.after(0, self.update_label)  # to move once we start receiving data
+            self.root.after(1000, self.parent.graph_gui.update_graph) # to move once we start receiving data
+
             # access global variables
             global curr_setpoint
             global curr_data
@@ -749,6 +752,8 @@ class MeasGUI:
 
                 # when completed, tip_approach_done_flag = 1
                     # BUT add a condition to check if the done flag already = 1
+                # self.label2.after(0, self.update_label)  # to move here somewhere once we start receiving actual data
+                # self.root.after(1000, self.parent.graph_gui.update_graph) # to move here somewhere once we start receiving actual data
                 # move on to periodic data routine
                 
             
@@ -1192,10 +1197,15 @@ class MeasGUI:
         #self.update_label()
 
     def update_label(self):
-        random_num = random.uniform(0, 5)
+        random_num = random.uniform(0, 5) 
         self.label2.configure(text=f"{random_num:.3f} nA")
+        #self.label2.configure(text=f"{curr_data:.3f} nA") # swap this in one we start receiving data
         self.label1.configure(text=f"{self.distance:.3f} nm")
         self.label2.after(100, self.update_label)
+
+        
+
+
         
     def get_current_label2(self):
         current_value = float(self.label2.cget("text").split()[0])  # assuming label2 text value is "value" nA
@@ -1251,7 +1261,7 @@ class GraphGUI:
         self.time_counter = 0   # counter to simulate the passage of time
         
         self.create_graph()
-        self.update_graph()
+        # self.update_graph() # this updates graph on startup
         
     def create_graph(self):
         # Create a figure
