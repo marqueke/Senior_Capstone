@@ -3,11 +3,13 @@
 from tkinter import *
 from tkinter import messagebox, filedialog
 from PIL import Image
+import tkinter as tk
 import customtkinter as ctk
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
+import os, struct, time
 import os, struct, time
 
 from Sweep_IZ import SweepIZ_Window  # import the IZ Sweep Window Class
@@ -19,9 +21,21 @@ from ztmSerialCommLibrary import ztmCMD, ztmSTATUS, usbMsgFunctions, MSG_A, MSG_
 curr_data = 0
 vp_V = 0
 
+curr_data = 0
+vp_V = 0
+
 class IZWindow:
     def __init__(self, root, port):
+    def __init__(self, root, port):
         self.root = root
+        self.port = port
+
+        # check if a serial connection has been established when opening the window
+        if self.port == None:
+            InfoMsg = f"No serial connection detected.\nConnect to USB via homepage and try again."
+            messagebox.showerror("INVALID", InfoMsg) 
+            self.root.destroy()
+
         self.port = port
 
         # check if a serial connection has been established when opening the window
@@ -41,16 +55,29 @@ class IZWindow:
         
         #self.data_ctrl.set_serial_ctrl(self.serial_ctrl)
         self.ztm_serial = usbMsgFunctions(self)
+        self.serial_ctrl = SerialCtrl(self.port, 9600, self.data_ctrl.decode_data)
+        print(f"Connected to {self.port}...")
+        
+        #self.data_ctrl.set_serial_ctrl(self.serial_ctrl)
+        self.ztm_serial = usbMsgFunctions(self)
         
         # Initialize the widgets
         self.init_meas_widgets()
         self.init_graph_widgets()
+        self.init_parameters()
         self.init_parameters()
     
     def start_reading(self):
         print("Starting to read data...")
         if self.serial_ctrl:
             print("Serial controller is initialized, starting now...")
+            #self.serial_ctrl.start()
+            checked = self.check_sweep_params()
+            if checked:
+                self.run_piezo_sweep_process()
+            else:
+                print("Sweep Parameters invalid. Process not started.")
+            #self.send_parameters()
             #self.serial_ctrl.start()
             checked = self.check_sweep_params()
             if checked:
@@ -141,17 +168,23 @@ class IZWindow:
         
         # min voltage
         self.frame4 = LabelFrame(self.root, text="Minimum Piezo Voltage (V)", padx=10, pady=2, bg="#A7C7E7")
+        self.frame4 = LabelFrame(self.root, text="Minimum Piezo Voltage (V)", padx=10, pady=2, bg="#A7C7E7")
         self.label4 = Entry(self.frame4, bg="white", width=30)
+        self.label4.bind("<Return>", self.saveMinVoltage)
         self.label4.bind("<Return>", self.saveMinVoltage)
         
         # max voltage
         self.frame5 = LabelFrame(self.root, text="Maximum Piezo Voltage (V)", padx=10, pady=2, bg="#A7C7E7")
+        self.frame5 = LabelFrame(self.root, text="Maximum Piezo Voltage (V)", padx=10, pady=2, bg="#A7C7E7")
         self.label5 = Entry(self.frame5, bg="white", width=30)
+        self.label5.bind("<Return>", self.saveMaxVoltage)
         self.label5.bind("<Return>", self.saveMaxVoltage)
     
         # number of setpoints
         self.frame7 = LabelFrame(self.root, text="Number of Setpoints", padx=10, pady=2, bg="#A7C7E7")
+        self.frame7 = LabelFrame(self.root, text="Number of Setpoints", padx=10, pady=2, bg="#A7C7E7")
         self.label9 = Entry(self.frame7, bg="white", width=30)
+        self.label9.bind("<Return>", self.saveNumSetpoints)
         self.label9.bind("<Return>", self.saveNumSetpoints)
 
         # user notes text box
@@ -166,6 +199,18 @@ class IZWindow:
         # optional graphic parameters
         self.padx = 10
         self.pady = 10
+        
+        # init buttons
+        self.add_btn_image1 = ctk.CTkImage(Image.open("Images/Start_Btn.png"), size=(90,35))
+        self.add_btn_image2 = ctk.CTkImage(Image.open("Images/Stop_Btn.png"), size=(90,35))
+        self.add_btn_image3 = ctk.CTkImage(Image.open("Images/Start_LED.png"), size=(35,35))
+        self.add_btn_image4 = ctk.CTkImage(Image.open("Images/Stop_LED.png"), size=(35,35))
+        
+        self.start_btn = ctk.CTkButton(self.root, image=self.add_btn_image1, text="", width=90, height=35, fg_color="#d0cee2", bg_color="#d0cee2", corner_radius=0, command=self.start_reading)
+        self.stop_btn = ctk.CTkButton(self.root, image=self.add_btn_image2, text="", width=90, height=35, fg_color="#d0cee2", bg_color="#d0cee2", corner_radius=0, command=self.stop_reading)
+        self.start_led_btn = ctk.CTkButton(self.root, image=self.add_btn_image3, text="", width=35, height=35, fg_color="#d0cee2", bg_color="#d0cee2", corner_radius=0)
+        self.stop_led_btn = ctk.CTkButton(self.root, image=self.add_btn_image4, text="", width=35, height=35, fg_color="#d0cee2", bg_color="#d0cee2", corner_radius=0)
+
         
         # init buttons
         self.add_btn_image1 = ctk.CTkImage(Image.open("Images/Start_Btn.png"), size=(90,35))
@@ -227,6 +272,15 @@ class IZWindow:
         self.num_setpoints = None
         self.piezo_volt_range = None
         self.volt_per_step = None
+        # need to switch RG LED on process state
+        #self.start_led_btn.grid(row=1, column=11, padx=5, pady=15, sticky="sw")
+
+    def init_parameters(self):
+        self.min_voltage = None
+        self.max_voltage = None
+        self.num_setpoints = None
+        self.piezo_volt_range = None
+        self.volt_per_step = None
 
     def saveMinVoltage(self, event):
         if 0 <= float(self.label4.get()) <= 10:
@@ -245,6 +299,7 @@ class IZWindow:
             messagebox.showerror("INVALID", InfoMsg) 
 
     def saveNumSetpoints(self, event):
+        self.num_setpoints = int(self.label9.get())
         self.num_setpoints = int(self.label9.get())
         print(f"Saved number of setpoints value: {self.num_setpoints}")
 
@@ -290,10 +345,32 @@ class IZWindow:
     def run_piezo_sweep_process(self):
 
         # starting point for piezo sweep, set to user-input minimum voltage
+        # starting point for piezo sweep, set to user-input minimum voltage
         self.vpiezo = self.min_voltage
         # start to display parameters to user
         self.label2.after(1, self.update_label)
+        # start to display parameters to user
+        self.label2.after(1, self.update_label)
 
+        for i in range(0, self.num_setpoints):
+            print(f"Sending MSG_A to port: {self.port}")
+
+            # sending vpiezo to MCU, looking for a DONE status in return
+            success = self.send_msg_retry(self.port, MSG_A, ztmCMD.CMD_PIEZO_ADJ.value, ztmSTATUS.STATUS_CLR.value, 0, 0, self.vpiezo)
+            if not success:
+                InfoMsg = f"Could not verify communication with MCU.\nSweep process aborted."
+                messagebox.showerror("INVALID", InfoMsg) 
+                return
+            
+            # sending a REQUEST_FOR_DATA command to MCU to receive current and vpiezo measurements
+            dataSuccess = self.send_msg_retry(self.port, MSG_C, ztmCMD.CMD_REQ_DATA.value, ztmSTATUS.STATUS_CLR.value)
+            if not dataSuccess:
+                InfoMsg = f"Did not receive data from MCU.\nSweep process aborted."
+                messagebox.showerror("INVALID", InfoMsg) 
+                return
+
+            # increment the piezo that sets the MCU, and increment through the number of setpoints for the for loop
+            self.vpiezo += self.volt_per_step
         for i in range(0, self.num_setpoints):
             print(f"Sending MSG_A to port: {self.port}")
 
@@ -388,21 +465,96 @@ class IZWindow:
                 attempt += 1
             time.sleep(sleep_time)
         return False
+
+
+    '''
+    Function to send a message to the MCU and retry if we do
+    not receive expected response
+    '''
+    def send_msg_retry(self, port, msg_type, cmd, status, *params, max_attempts=2, sleep_time=0.5):
+        
+        attempt = 0
+        
+        while attempt < max_attempts:
+            if msg_type == MSG_A:
+                self.ztm_serial.sendMsgA(port, cmd, status, *params)
+            elif msg_type == MSG_B:
+                self.ztm_serial.sendMsgB(port, cmd, status, *params)
+            elif msg_type == MSG_C:
+                self.ztm_serial.sendMsgC(port, cmd, status, *params)
+            elif msg_type == MSG_D:
+                self.ztm_serial.sendMsgD(port, cmd, status, *params)
+            elif msg_type == MSG_E:
+                self.ztm_serial.sendMsgE(port, cmd, status, *params)
+            else:
+                raise ValueError(f"Unsupported message type: {msg_type}")
+            
+            self.response = self.serial_ctrl.ztmGetMsg()
+            
+            print(f"Serial response: {self.response}")
+            
+            ### Unpack data and display on the GUI
+            if self.response:
+                if self.response[2] == ztmSTATUS.STATUS_DONE.value:
+                    self.ztm_serial.unpackRxMsg(self.response)
+                    print(f"SUCCESS. Response received: {self.response}")
+                    
+                    return True
+                elif self.response[2] == ztmSTATUS.STATUS_MEASUREMENTS.value:
+                    curr_data = round(struct.unpack('f', bytes(self.response[3:7]))[0], 3) #unpack bytes & convert
+                    cStr = str(curr_data)  # format as a string
+                    print("Received values\n\tCurrent: " + cStr + " nA\n")
+                        
+                    vb_V = round(Convert.get_Vbias_float(struct.unpack('H',bytes(self.response[7:9]))[0]), 3) #unpack bytes & convert
+                    vbStr = str(vb_V)   # format as a string
+                    print("\tVbias: " + vbStr + " V\n")
+                        # vpiezo
+                    vp_V = round(Convert.get_Vpiezo_float(struct.unpack('H',bytes(self.response[9:11]))[0]), 3) #unpack bytes & convert
+                    vpStr = str(vp_V)   # format as a string
+                    print("\tVpiezo: " + vpStr + " V\n")
+                    
+                    #update for windows, params
+                    #self.label3.configure(text=f"{curr_data:.3f}")
+                    
+
+                    return True
+                elif self.response[2] == ztmSTATUS.STATUS_ACK.value:
+                    print("Received ACK from MCU.")
+                    
+                    return True
+                else:
+                    print(f"ERROR. Wrong status recieved: {self.response}")
+
+                    # if we want to decode the command or status & print to the console....
+                    cmdRx = ztmCMD(self.response[1])
+                    print("Received : " + cmdRx.name)
+                    statRx = ztmSTATUS(self.response[2])
+                    print("Received : " + statRx.name + "\n")
+                    
+                    attempt += 1
+            else:
+                print("ERROR. Failed to receive response from MCU.")
+
+                attempt += 1
+            time.sleep(sleep_time)
+        return False
         
     # file drop-down menu
     def DropDownMenu(self):
-        '''
-        Method to list all the File menu options in a drop menu
-        '''
-        self.menu_options = StringVar()
-        options = ["File",
-                   "Save",
-                   "Save As",
-                   "Export (.txt)",
-                   "Exit"]
-        self.menu_options.set(options[0]) 
-        self.drop_menu = OptionMenu(self.root, self.menu_options, *options, command=self.menu_selection)
-        self.drop_menu.config(width=10)
+        self.menubar = tk.Menu(self.root)
+        
+        #self.custom_font = tkFont.Font(size=8)
+        
+        self.filemenu = tk.Menu(self.menubar, tearoff=0)
+        self.filemenu.add_command(label="Save", command=self.save_graph)
+        self.filemenu.add_command(label="Save As", command=self.save_graph_as)
+        self.filemenu.add_command(label="Export (.txt)", command=self.export_data)
+        self.filemenu.add_separator()
+        self.filemenu.add_command(label="Exit", command=self.root.quit)
+        
+        self.menubar.add_cascade(label="File", menu=self.filemenu)
+        
+        self.root.config(menu=self.menubar)
 
     def menu_selection(self, selection):
         if selection == "Exit":
@@ -416,7 +568,7 @@ class IZWindow:
     
     def save_graph(self):
         downloads_folder = os.path.join(os.path.expanduser("~"), "Downloads")
-        default_filename = os.path.join(downloads_folder, "graph.png")
+        default_filename = os.path.join(downloads_folder, "iz_graph.png")
         self.fig.savefig(default_filename)
         messagebox.showinfo("Save Graph", f"Graph saved in Downloads as {default_filename}")
         
