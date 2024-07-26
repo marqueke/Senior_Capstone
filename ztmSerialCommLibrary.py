@@ -47,6 +47,7 @@ class ztmCMD(Enum):
     CMD_CLR	, \
     CMD_SET_VBIAS,   \
     CMD_SET_ADC_SAMPLE_RATE	,   \
+    CMD_SET_ADC_SAMPLE_SIZE,    \
     CMD_PERIODIC_DATA_ENABLE	,   \
     CMD_PERIODIC_DATA_DISABLE	,   \
     CMD_REQ_DATA	,   \
@@ -71,7 +72,7 @@ class ztmCMD(Enum):
     CMD_DAC_CAL_SET_MID_SCALE	,   \
     CMD_DAC_CAL_STORE_MID_SCALE	,   \
     CMD_DAC_CAL_CHECK, \
-    CMD_DAC_CAL_STOP = range(0 , 28)
+    CMD_DAC_CAL_STOP = range(0 , 29)
 
 class ztmSTATUS(Enum):
     STATUS_ACK,\
@@ -114,17 +115,26 @@ class usbMsgFunctions:
         vbiasBytes = struct.pack('H', Convert.get_Vbias_int(vbias))
         vpzoBytes = struct.pack('H', Convert.get_Vpiezo_int(vpzo))
 
-        for byte in headerA:
-            port.write(serial.to_bytes([byte]))
-        for byte in currentBytes:
-            port.write(serial.to_bytes([byte]))
-        for byte in vbiasBytes:
-            port.write(serial.to_bytes([byte]))
-        for byte in vpzoBytes:
-            port.write(serial.to_bytes([byte]))
-            
-        # clear buffer    
-        port.flush() 
+        retry = 0
+        maxRetries = 10
+        while retry < maxRetries:  
+            try:   
+                for byte in headerA:
+                    port.write(serial.to_bytes([byte]))
+                for byte in currentBytes:
+                    port.write(serial.to_bytes([byte]))
+                for byte in vbiasBytes:
+                    port.write(serial.to_bytes([byte]))
+                for byte in vpzoBytes:
+                    port.write(serial.to_bytes([byte]))
+                # clear buffer    
+                port.flush() 
+                return True
+            except serial.SerialException as e:
+                print(f"Write operation failed: {e}")
+                retry += 1
+        print("Failed to send message\n")    
+        return False 
 
     # MSG B
     # Note: account for parsing different commands and rateHz vs. sample size
@@ -156,17 +166,24 @@ class usbMsgFunctions:
             - msgStatus     = ztmStatus value - usually STATUS_CLR
             - Function transmits Msg C, does not return anything.
             - MSG C is meant solely to send/receive commands and statuses (ex. ACK or DONE)'''    
-        headerC = [MSG_C, msgCmd, msgStatus]
-    
-        #send header
-        for byte in headerC:
-            port.write(serial.to_bytes([0])) # changed from padByte to 0 to pass an int
-        # send payload
-        for i in range(0, payloadBytes):
-            port.write(serial.to_bytes(0))
-    
-        # clear buffer    
-        port.flush()  
+        #headerC = [MSG_C, msgCmd, msgStatus]
+        
+        payload = padByte * 8
+
+        messageC = struct.pack('BBBBBBBBBBB', MSG_C, msgCmd, msgStatus, *payload)
+        retry = 0
+        maxRetries = 10
+        while retry < maxRetries:
+            try:   
+                for byte in messageC:
+                    port.write(serial.to_bytes([byte]))
+                port.flush()  
+                return True
+            except serial.SerialException as e:
+                print(f"Write operation failed: {e}")
+                retry += 1
+        print("Failed to send message\n")    
+        return False  
 
     # MSG D
     def sendMsgD(self, port, msgCmd, msgStatus, size, dir, count):
@@ -221,7 +238,7 @@ class usbMsgFunctions:
         
     ###############################################
     # UNPACK MSG DATA - Reading MCU
-    def unpackRxMsg(rxMsg):
+    def unpackRxMsg(self, rxMsg):
         ################################
         # DEBUG - PRINT CMD AND STATUS #
         try:

@@ -55,8 +55,21 @@ class SerialCtrl:
 
 
     
-    def ztmGetMsg(self):
-
+    def ztmGetMsg(self, port):
+        ''' Attempt to read a message from the ZTM controller'''
+        attempts = 0
+        #response = b''  # Initialize an empty byte string to store the response
+        while(attempts < 10):
+            try:
+                response = port.read(8)
+                return response
+            except serial.SerialException as e:
+                print(f"Read operation failed: {e}")    
+                attempts += 1        
+        if attempts == 10:
+            print(f"Failed to receive complete message.\n")   
+            return False
+        '''
         response = b''  # Initialize an empty byte string to store the response
 
         while len(response) < 11:
@@ -82,6 +95,7 @@ class SerialCtrl:
                 return response    
         else:
             print(f"Failed to receive complete message.\n")    
+        '''
     
 
     # function to read msg of 11 bytes

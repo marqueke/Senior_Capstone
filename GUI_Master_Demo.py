@@ -69,12 +69,14 @@ class RootGUI:
         print("Starting to read data...")
         if self.serial_ctrl:
             print("Serial controller is initialized, starting now...")
-            self.meas_gui.start_seeking()
+            #self.meas_gui.start_seeking()
+            self.meas_gui.enable_periodics()
         else:
             print("Serial controller is not initialized.")
     
     def stop_reading(self):
         print("Stopped reading data...")
+        self.ztm_serial.sendMsgC(self.serial_ctrl.serial_port, ztmCMD.CMD_PERIODIC_DATA_DISABLE, ztmSTATUS.STATUS_CLR)
         self.serial_ctrl.stop()
         
     # ??
@@ -504,6 +506,13 @@ class MeasGUI:
         
         attempt = 0
         
+        msg_print = [msg_type, cmd, status]
+        
+        # Convert each element in msg_print to a hex string
+        msg_print_hex = ' '.join(format(x, '02X') for x in msg_print)
+        
+        print(f"\nMESSAGE BEING SENT: {msg_print_hex}")
+        
         while attempt < max_attempts:
             if msg_type == MSG_A:
                 self.parent.ztm_serial.sendMsgA(port, cmd, status, *params)
@@ -519,53 +528,63 @@ class MeasGUI:
                 raise ValueError(f"Unsupported message type: {msg_type}")
             
             #self.response = self.parent.serial_ctrl.read_bytes()
-            self.response = self.parent.serial_ctrl.ztmGetMsg()
+            testMsg = self.parent.serial_ctrl.ztmGetMsg(port)
             
-            print(f"Serial response: {self.response}")
+            #self.response = 0
+            
+            print(f"Serial response: {testMsg}")
             
             #curr_bytes = self.response[3:7]
             #print(f"Received current in bytes: {curr_bytes}")
             
             ### Unpack data and display on the GUI
-            if self.response:
-                if self.response[2] == ztmSTATUS.STATUS_DONE.value:
-                    self.parent.ztm_serial.unpackRxMsg(self.response)
-                    print(f"SUCCESS. Response received: {self.response}")
+            if testMsg:
+                if testMsg[2] == ztmSTATUS.STATUS_ACK.value:
+                    print("Received ACK from MCU.")
                     
                     return True
-                elif self.response[2] == ztmSTATUS.STATUS_STEP_COUNT.value and self.response[0] == MSG_D: #check on this message from MCU
-                    total_steps = int(struct.unpack('f', bytes(self.response[5:8]))[0], 3) #unpack bytes & convert
+                elif testMsg[2] == ztmSTATUS.STATUS_DONE.value:
+                    self.parent.ztm_serial.unpackRxMsg(testMsg)
+                    print(f"SUCCESS. Response received: {testMsg}")
+                    
+                    return True
+                
+                elif testMsg[2] == ztmSTATUS.STATUS_STEP_COUNT.value and testMsg[0] == MSG_D: #check on this message from MCU
+                    total_steps = int(struct.unpack('f', bytes(testMsg[5:8]))[0], 3) #unpack bytes & convert
                     print("Received values\nStepper Position Total (1/8) Steps: " + total_steps + "\n")
                     return total_steps
-                elif self.response[2] == ztmSTATUS.STATUS_MEASUREMENTS.value:
-                    '''
-                    curr_data = round(struct.unpack('f', bytes(self.response[3:7]))[0], 3) #unpack bytes & convert
+                elif testMsg[2] == ztmSTATUS.STATUS_MEASUREMENTS.value and len(testMsg) == 11:
+                    
+                    
+                    curr_data = round(struct.unpack('f', bytes(testMsg[3:7]))[0], 3) #unpack bytes & convert
                     cStr = str(curr_data)  # format as a string
                     print("Received values\n\tCurrent: " + cStr + " nA\n")
                         
-                    vb_V = round(Convert.get_Vbias_float(struct.unpack('H',bytes(self.response[7:9]))[0]), 3) #unpack bytes & convert
+                    vb_V = round(Convert.get_Vbias_float(struct.unpack('H',bytes(testMsg[7:9]))[0]), 3) #unpack bytes & convert
                     vbStr = str(vb_V)   # format as a string
                     print("\tVbias: " + vbStr + " V\n")
                         # vpiezo
-                    vp_V = round(Convert.get_Vpiezo_float(struct.unpack('H',bytes(self.response[9:11]))[0]), 3) #unpack bytes & convert
+                    vp_V = round(Convert.get_Vpiezo_float(struct.unpack('H',bytes(testMsg[9:11]))[0]), 3) #unpack bytes & convert
                     vpStr = str(vp_V)   # format as a string
                     print("\tVpiezo: " + vpStr + " V\n")
-                    '''
+                    
+                    
                     return True
-                elif self.response[2] == ztmSTATUS.STATUS_ACK.value:
+                elif testMsg[2] == ztmSTATUS.STATUS_ACK.value:
                     print("Received ACK from MCU.")
                     
                     return True
                 else:
-                    print(f"ERROR. Wrong status recieved: {self.response}")
+                    print(f"ERROR. Wrong status recieved: {testMsg}")
 
                     # if we want to decode the command or status & print to the console....
-                    cmdRx = ztmCMD(self.response[1])
+                    cmdRx = ztmCMD(testMsg[1])
                     print("Received : " + cmdRx.name)
-                    statRx = ztmSTATUS(self.response[2])
+                    statRx = ztmSTATUS(testMsg[2])
                     print("Received : " + statRx.name + "\n")
                     
                     attempt += 1
+                
             else:
                 print("ERROR. Failed to receive response from MCU.")
 
@@ -715,6 +734,8 @@ class MeasGUI:
                 self.enable_periodics()
                 
     def enable_periodics(self):
+        count = 0
+        
         if self.check_connection():
             return
         else:
@@ -723,14 +744,33 @@ class MeasGUI:
             
             port = self.parent.serial_ctrl.serial_port
             
+            #enable_data_success = self.parent.ztm_serial.sendMsgC(port, ztmCMD.CMD_PERIODIC_DATA_ENABLE, ztmSTATUS.STATUS_CLR)
+            
             enable_data_success = self.send_msg_retry(port, MSG_C, ztmCMD.CMD_PERIODIC_DATA_ENABLE.value, ztmSTATUS.STATUS_CLR.value)
             
-            #self.parent.ztm_serial.sendMsgC(port, ztmCMD.CMD_PERIODIC_DATA_ENABLE.value, ztmSTATUS.STATUS_CLR.value)
+            if enable_data_success:
+                response = self.parent.serial_ctrl.ztmGetMsg(port)
+                while count < 10:
+                    if response[2] == ztmSTATUS.STATUS_MEASUREMENTS.value:
+                        print(f"Response received: {response}")
+                            #curr_data = round(struct.unpack('f', bytes(response[3:7]))[0], 3) #unpack bytes & convert
+                            #cStr = str(curr_data)  # format as a string
+                            #print("Received values\n\tCurrent: " + cStr + " nA\n")
+                        
+                            # display
+                            #self.label2.configure(text=f"{curr_data:.3f}")
+                        time.sleep(0.5)
+                    else:
+                            print("Error. Not receiving the response needed.")
+                    count += 1
+            else:
+                print("Enabling periodic data msg failed.")
             
+            '''
             if enable_data_success:
                 while self.count < sample_size_save:
                     # receive data from MCU
-                    self.response = self.parent.serial_ctrl.ztmGetMsg()
+                    self.response = self.parent.serial_ctrl.ztmGetMsg(port)
                     
                     # verify the msg
                     if self.response[2] == ztmSTATUS.STATUS_MEASUREMENTS.value:
@@ -746,6 +786,8 @@ class MeasGUI:
                     self.count += 1
             else:
                 print("Enabling periodic data msg failed.")
+            '''
+            
                 
     
         disable_success = self.send_msg_retry(port, MSG_C, ztmCMD.CMD_PERIODIC_DATA_DISABLE.value, ztmSTATUS.STATUS_CLR.value)
@@ -1023,7 +1065,7 @@ class MeasGUI:
                 print(f"Sending cmd adjust sample size to mcu for: {sample_size_save}")
                 
                 # Note: msg will be defined at a later time
-                '''
+                
                 success = self.send_msg_retry(port, MSG_B, ztmCMD.CMD_SET_ADC_SAMPLE_SIZE.value, ztmSTATUS.STATUS_CLR.value, sample_size_save)
                 
             
@@ -1033,7 +1075,7 @@ class MeasGUI:
                 else:
                     print("Failed to send sample size.")
                     #sample_size_done_flag = 0
-                '''
+                
                 
             except ValueError:
                 self.root.focus()
@@ -1129,14 +1171,16 @@ class MeasGUI:
             else:
                 print("Failed to receive stepper motor adjustment.")
             '''
-            
             # NEED TO ADD SEND MSG RETRY
-            self.parent.ztm_serial.sendMsgD(port, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_CLR.value, self.fine_adjust_step_size, fine_adjust_dir, num_of_steps)
+            steps = self.send_msg_retry(port, MSG_D, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_CLR.value, self.fine_adjust_step_size, fine_adjust_dir, num_of_steps)
             print(f"Sending {dir_name} cmd stepper motor adjust to mcu: {self.fine_adjust_var.get()} step")
+            print(f"Response: {steps}")
 
+
+            '''
             ### Read DONE from the MCU 
             #done_response = self.parent.serial_ctrl.read_bytes()
-            done_response = self.parent.serial_ctrl.ztmGetMsg()
+            done_response = self.parent.serial_ctrl.ztmGetMsg(port)
             
             ### Unpack data and display on the GUI
             # looking for STATUS_DONE
@@ -1149,6 +1193,7 @@ class MeasGUI:
                     print(f"Response recieved: {msg_received}")
             else:
                 print("Failed to receive response from MCU.")
+            '''
             
                   
         
