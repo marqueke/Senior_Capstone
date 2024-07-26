@@ -26,7 +26,6 @@ vp_V = 0
 
 class IZWindow:
     def __init__(self, root, port):
-    def __init__(self, root, port):
         self.root = root
         self.port = port
 

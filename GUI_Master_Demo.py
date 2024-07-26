@@ -612,7 +612,7 @@ class MeasGUI:
                     return True
 
                 elif self.response[2] == ztmSTATUS.STATUS_MEASUREMENTS.value:
-                    '''
+                    
                     curr_data = round(struct.unpack('f', bytes(self.response[3:7]))[0], 3) #unpack bytes & convert
                     cStr = str(curr_data)  # format as a string
                     print("Received values\n\tCurrent: " + cStr + " nA\n")
@@ -624,7 +624,7 @@ class MeasGUI:
                     vp_V = round(Convert.get_Vpiezo_float(struct.unpack('H',bytes(self.response[9:11]))[0]), 3) #unpack bytes & convert
                     vpStr = str(vp_V)   # format as a string
                     print("\tVpiezo: " + vpStr + " V\n")
-                    '''
+                    
                     return True
                 elif self.response[2] == ztmSTATUS.STATUS_ACK.value:
                     print("Received ACK from MCU.")
@@ -672,23 +672,25 @@ class MeasGUI:
             return
         else:
             # inside of this function updates curr_pos_total_steps
-            curr_pos_total_steps = self.send_msg_retry(self.parent.serial_ctrl.serial_port, MSG_C, ztmCMD.CMD_REQ_STEP_COUNT.value, ztmSTATUS.STATUS_CLR.value)
-        
+            successMsg = self.send_msg_retry(self.parent.serial_ctrl.serial_port, MSG_C, ztmCMD.CMD_REQ_STEP_COUNT.value, ztmSTATUS.STATUS_CLR.value)
+            if successMsg:
+                print("Received current stepper position from MCU.")
+            else:
+                print("ERROR. Current position not received.")
+                return
+            
+            # skip tip approach process
+            if curr_pos_total_steps == home_pos_total_steps and home_pos_total_steps != None:
+                print("We are at the correct position to begin data acquisition.")
+                self.enable_periodics()
+
+            # check if home pos != none and is valid
+            # check curr position vs home pos
+            # else return and tell user
+
             print("\n----------START SEEKING TUNNELING CURRENT----------")
-            self.label2.after(0, self.update_label)  # to move once we start receiving data
-            self.root.after(1000, self.parent.graph_gui.update_graph) # to move once we start receiving data
-
-            
-            # access global variables
-            global curr_setpoint
-            global curr_data
-            
-            global vbias_save
-            global vbias_done_flag
-            
-            global sample_rate_save
-            global sample_rate_done_flag
-
+            #self.label2.after(0, self.update_label)  # to move once we start receiving data
+            #self.root.after(1000, self.parent.graph_gui.update_graph) # to move once we start receiving data
             
             # check for port connection
             port = self.parent.serial_ctrl.serial_port
@@ -796,7 +798,13 @@ class MeasGUI:
             
             #self.parent.ztm_serial.sendMsgC(port, ztmCMD.CMD_PERIODIC_DATA_ENABLE.value, ztmSTATUS.STATUS_CLR.value)
             
+
             if enable_data_success:
+                '''
+                - unsure about sample_size
+                - while not 'stop_process_flag' (= 0)
+                - stop button will trigger flag, breaking 'break' while loop and data acquisition, which then triggers 'disable_success' to disable periodic data transfer
+                '''
                 while self.count < sample_size_save:
                     # receive data from MCU
                     self.response = self.parent.serial_ctrl.ztmGetMsg()
