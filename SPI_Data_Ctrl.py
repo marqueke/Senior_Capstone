@@ -55,33 +55,21 @@ class SerialCtrl:
 
 
     
-    # def ztmGetMsg(self):
-
-    #     response = b''  # Initialize an empty byte string to store the response
-
-    #     while len(response) < 11:
-    #         try:
-    #             chunk = self.serial_port.read(11 - len(response))
-    #             if chunk:
-    #                 response += chunk
-    #             else:
-    #                 print("Unexpected end of data or timeout occurred.\n")
-    #                 break
-    #         except serial.serialutil.SerialException as e:
-    #             print(f"Serial communication error: {e}\n")
-    #             break
-    #         except Exception as e:
-    #             print(f"Unexpected error: {e}\n")
-    #             break  
-    #         # check if valid message
-    #     if len(response) == 11:
-    #         if response[0] not in [MSG_A, MSG_B, MSG_C, MSG_D, MSG_E]:
-    #             print("Message received out of order.\n")
-    #         else:
-    #             print(f"Successful response: {response.hex()}")
-    #             return response    
-    #     else:
-    #         print(f"Failed to receive complete message.\n")       
+    def ztmGetMsg(self, port):
+        ''' Attempt to read a message from the ZTM controller'''
+        
+        attempts = 0
+        #response = b''  # Initialize an empty byte string to store the response
+        while(attempts < 10):
+            try:
+                response = port.read(11)
+                return response
+            except serial.SerialException as e:
+                print(f"Read operation failed: {e}")    
+                attempts += 1        
+        if attempts == 10:
+            print(f"Failed to receive complete message.\n")   
+            return False
     
         
     # function to read msg of 11 bytes
@@ -143,9 +131,7 @@ class SerialCtrl:
                     stopbits=serial.STOPBITS_ONE,
                     timeout=2,  # Set a timeout for read operations
                     write_timeout=2,  # Set a timeout for write operations
-                    xonxoff=False,
-                    rtscts=False,
-                    dsrdtr=False
+                    xonxoff=True,
                 )
                 self.running = True
                 self.thread = threading.Thread(target=self.read_serial)
