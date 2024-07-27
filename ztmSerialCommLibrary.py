@@ -100,7 +100,7 @@ class usbMsgFunctions:
     # STANDARD COMMAND MESSAGES FOR ZTM CONTROLLER #
     ################################################
 
-    # MSG A 
+# MSG A 
     def sendMsgA(self, port, msgCmd, msgStatus, current_nA, vbias, vpzo):
         ''' - port       = COM port variable assigned using pySerial functions
             - msgCmd     = ztmCMD value - see documentation for valid commands
@@ -108,25 +108,28 @@ class usbMsgFunctions:
             - current_nA = current as float, units of nA
             - vbias      = bias voltage as a float, units of volts
             - vpzo       = piezo voltage as a float, units of volts
-            - Function transmits Msg A, does not return anything. '''
-        headerA = [MSG_A, msgCmd, msgStatus]
-    
-        currentBytes = struct.pack('f', current_nA)
-        vbiasBytes = struct.pack('H', Convert.get_Vbias_int(vbias))
-        vpzoBytes = struct.pack('H', Convert.get_Vpiezo_int(vpzo))
+            - Function transmits Msg A, returns True if successful, else false. '''
+        
+        #headerA = [MSG_A, msgCmd, msgStatus]
+    #
+        #currentBytes = struct.pack('f', current_nA)
+        #vbiasBytes = struct.pack('H', ztmConvert.get_Vbias_int(vbias))
+        #vpzoBytes = struct.pack('H', ztmConvert.get_Vpiezo_int16(vpzo))
 
+        messageA = struct.pack('<BBBfHH', MSG_A, msgCmd, msgStatus, current_nA, Convert.get_Vbias_int(vbias), Convert.get_Vpiezo_int(vpzo))
         retry = 0
         maxRetries = 10
         while retry < maxRetries:  
             try:   
-                for byte in headerA:
-                    port.write(serial.to_bytes([byte]))
-                for byte in currentBytes:
-                    port.write(serial.to_bytes([byte]))
-                for byte in vbiasBytes:
-                    port.write(serial.to_bytes([byte]))
-                for byte in vpzoBytes:
-                    port.write(serial.to_bytes([byte]))
+                port.write(serial.to_bytes(messageA)) 
+                #for byte in headerA:
+                #    port.write(serial.to_bytes([byte]))
+                #for byte in currentBytes:
+                #    port.write(serial.to_bytes([byte]))
+                #for byte in vbiasBytes:
+                #    port.write(serial.to_bytes([byte]))
+                #for byte in vpzoBytes:
+                #    port.write(serial.to_bytes([byte]))
                 # clear buffer    
                 port.flush() 
                 return True
@@ -143,21 +146,34 @@ class usbMsgFunctions:
             - msgCmd        = ztmCMD value - see documentation for valid commands
             - msgStatus     = ztmStatus value - usually STATUS_CLR
             - uint16_rateHz = data rate to assign, units of Hz, max limit 65535
-            - Function transmits Msg B, does not return anything. '''
-        headerB = [MSG_B, msgCmd, msgStatus]
-        payloadByteLen = payloadBytes - 2
-    
+            - Function transmits Msg B, returns True if successful, else false. '''
+        #headerB = [MSG_B, msgCmd, msgStatus]
+        #padBytes = padByte * (payloadBytes - 2)
+
+        payload = bytes(payloadBytes - 2) 
         rateHzBytes = struct.pack('H', uint16_rateHz)
         
-        for byte in headerB:
-            port.write(serial.to_bytes([byte]))
-        for byte in rateHzBytes:
-            port.write(serial.to_bytes([byte]))
-        
-        for i in range(0, payloadByteLen):
-            port.write(serial.to_bytes([0]))
-        # clear buffer    
-        port.flush()       
+        messageB = struct.pack('<BBBHBBBBBB', MSG_B, msgCmd, msgStatus, uint16_rateHz, *payload)
+        retry = 0
+        maxRetries = 10
+        while retry < maxRetries:  
+            try:      
+                port.write(serial.to_bytes(messageB)) 
+                #for byte in headerB:
+                #    port.write(serial.to_bytes([byte]))
+                #for byte in rateHzBytes:
+                #    port.write(serial.to_bytes([byte]))
+#
+                #for _ in range(payloadByteLen):
+                #    port.write(serial.to_bytes(padByte))
+                # clear buffer    
+                port.flush()       
+                return True
+            except serial.SerialException as e:
+                print(f"Write operation failed: {e}")
+                retry += 1
+        print("Failed to send message\n")    
+        return False        
 
     # MSG C
     def sendMsgC(self, port, msgCmd, msgStatus):
@@ -166,17 +182,25 @@ class usbMsgFunctions:
             - msgStatus     = ztmStatus value - usually STATUS_CLR
             - Function transmits Msg C, does not return anything.
             - MSG C is meant solely to send/receive commands and statuses (ex. ACK or DONE)'''    
-        #headerC = [MSG_C, msgCmd, msgStatus]
         
+        #headerC = [MSG_C, msgCmd, msgStatus]
         payload = padByte * 8
-
         messageC = struct.pack('BBBBBBBBBBB', MSG_C, msgCmd, msgStatus, *payload)
         retry = 0
         maxRetries = 10
         while retry < maxRetries:
             try:   
-                for byte in messageC:
-                    port.write(serial.to_bytes([byte]))
+                port.write(serial.to_bytes(messageC))
+                #for byte in messageC:
+                #    port.write(serial.to_bytes([byte]))
+                #send header
+                #for byte in headerC:
+                #    port.write(serial.to_bytes([byte]))
+                ## send payload
+                #for _ in range(payloadBytes):
+                #    port.write(serial.to_bytes(padByte))
+                # clear buffer    
+                time.sleep(0.001)
                 port.flush()  
                 return True
             except serial.SerialException as e:
@@ -194,26 +218,40 @@ class usbMsgFunctions:
             - dir           = direction assignment, raise or lower the top plate of microscope
                               ex. DIR_UP (value should be 1 or 0)
             - count         = number of steps at the designated step size
-            - Function transmits Msg D, does not return anything. '''        
+            - Function transmits Msg D, returns True if successful, else false. '''        
         headerD = [MSG_D, msgCmd, msgStatus]
         sizeDir = [size, dir]
         countBytes = struct.pack('i', count)
         padBytes = [0x00, 0x00]
-    
-        for byte in headerD:
-            port.write(serial.to_bytes([byte]))
-        for byte in sizeDir:
-            port.write(serial.to_bytes([byte]))
-    
-        for byte in countBytes:
-            port.write(serial.to_bytes([byte]))  
-        for byte in padBytes:
-            port.write(serial.to_bytes([byte])) 
+        payload = bytes(2)
+        messageD = struct.pack('<BBBBBiBB', MSG_D, msgCmd, msgStatus, size, dir, count, *payload)
 
-        # clear buffer    
-        port.flush()     
+        retry = 0
+        maxRetries = 10
+        while retry < maxRetries:
+            try:     
+                port.write(serial.to_bytes(messageD))
+                #for byte in headerD:
+                #    port.write(serial.to_bytes([byte]))
+                #for byte in sizeDir:
+                #    port.write(serial.to_bytes([byte]))
+#
+                #for byte in countBytes:
+                #    port.write(serial.to_bytes([byte]))  
+                #for byte in padBytes:
+                #    port.write(serial.to_bytes([byte])) 
+#
+                ## clear buffer    
+                port.flush()   
+                return True  
+            except serial.SerialException as e:
+                print(f"Write operation failed: {e}")
+                retry += 1
+        print("Failed to send message\n")    
+        return False    
 
     # MSG E
+    # Not needed for GUI
     def sendMsgE(self, port, sineVbiasAmp, uint16_rateHz):
         ''' - port          = COM port variable assigned using pySerial functions
             - uint16_rateHz = vbias frequency, units of Hz, max valid freq = 5000 Hz
@@ -223,18 +261,32 @@ class usbMsgFunctions:
         sineVbiasBytes = struct.pack('H', Convert.get_Vbias_int(sineVbiasAmp))
         rateHzBytes = struct.pack('H', uint16_rateHz)
         payloadByteLen = payloadBytes - 4
-    
-        for byte in headerE:
-            port.write(serial.to_bytes([byte]))
-        for byte in sineVbiasBytes:
-            port.write(serial.to_bytes([byte]))    
-        for byte in rateHzBytes:
-            port.write(serial.to_bytes([byte]))  
-        for i in range(0, payloadByteLen):
-            port.write(serial.to_bytes(padByte)) # might need to change from padByte to 0 to pass an int
+        payload = bytes(4)
+        messageE = struct.pack('<BBBHHBBBB', MSG_E, ztmCMD.CMD_VBIAS_SET_SINE.value, ztmSTATUS.STATUS_CLR.value, 
+                                                Convert.get_Vbias_int(sineVbiasAmp), uint16_rateHz, *payload)
 
-        # clear buffer    
-        port.flush()    
+        retry = 0
+        maxRetries = 10
+        while retry < maxRetries:
+            try:    
+                port.write(serial.to_bytes(messageE))
+                #for byte in headerE:
+                #    port.write(serial.to_bytes([byte]))
+                #for byte in sineVbiasBytes:
+                #    port.write(serial.to_bytes([byte]))    
+                #for byte in rateHzBytes:
+                #    port.write(serial.to_bytes([byte]))  
+                #for _ in range(payloadByteLen):
+                #    port.write(serial.to_bytes(padByte))
+
+                # clear buffer    
+                port.flush()
+                return True
+            except serial.SerialException as e:
+                print(f"Write operation failed: {e}")
+                retry += 1
+        print("Failed to send message\n")    
+        return False    
         
     ###############################################
     # UNPACK MSG DATA - Reading MCU

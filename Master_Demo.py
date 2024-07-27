@@ -10,6 +10,5 @@ GUIMeas = MeasGUI(RootMaster.root, RootMaster)
 GUIGraph = GraphGUI(RootMaster.root, GUIMeas)
 GUICom = ComGUI(RootMaster.root, RootMaster)
 
-
 # Start the Tkinter event loop
 RootMaster.root.mainloop()
