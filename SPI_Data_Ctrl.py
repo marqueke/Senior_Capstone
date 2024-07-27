@@ -55,33 +55,33 @@ class SerialCtrl:
 
 
     
-    def ztmGetMsg(self):
+    # def ztmGetMsg(self):
 
-        response = b''  # Initialize an empty byte string to store the response
+    #     response = b''  # Initialize an empty byte string to store the response
 
-        while len(response) < 11:
-            try:
-                chunk = self.serial_port.read(11 - len(response))
-                if chunk:
-                    response += chunk
-                else:
-                    print("Unexpected end of data or timeout occurred.\n")
-                    break
-            except serial.serialutil.SerialException as e:
-                print(f"Serial communication error: {e}\n")
-                break
-            except Exception as e:
-                print(f"Unexpected error: {e}\n")
-                break  
-            # check if valid message
-        if len(response) == 11:
-            if response[0] not in [MSG_A, MSG_B, MSG_C, MSG_D, MSG_E]:
-                print("Message received out of order.\n")
-            else:
-                print(f"Successful response: {response.hex()}")
-                return response    
-        else:
-            print(f"Failed to receive complete message.\n")       
+    #     while len(response) < 11:
+    #         try:
+    #             chunk = self.serial_port.read(11 - len(response))
+    #             if chunk:
+    #                 response += chunk
+    #             else:
+    #                 print("Unexpected end of data or timeout occurred.\n")
+    #                 break
+    #         except serial.serialutil.SerialException as e:
+    #             print(f"Serial communication error: {e}\n")
+    #             break
+    #         except Exception as e:
+    #             print(f"Unexpected error: {e}\n")
+    #             break  
+    #         # check if valid message
+    #     if len(response) == 11:
+    #         if response[0] not in [MSG_A, MSG_B, MSG_C, MSG_D, MSG_E]:
+    #             print("Message received out of order.\n")
+    #         else:
+    #             print(f"Successful response: {response.hex()}")
+    #             return response    
+    #     else:
+    #         print(f"Failed to receive complete message.\n")       
     
         
     # function to read msg of 11 bytes

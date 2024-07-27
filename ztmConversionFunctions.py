@@ -29,10 +29,10 @@ class ztmConvert:
         curr_int18 = round((curr_float_nA * 200000000 * (2 ** 18)) / (5 * 1000000000)) 
 
         # Convert to 2's complement if negative
-        if curr_int18 < 0:
-            curr_int18 = curr_int18 * -1
-            curr_int18 = curr_int18 | (2 ** 17)
-            curr_int18 = (curr_int18 ^ ((2 ** 17) - 1)) + 1
+        #if curr_int18 < 0:
+        #    curr_int18 = curr_int18 * -1
+        #    curr_int18 = curr_int18 | (2 ** 17)
+        #    curr_int18 = (curr_int18 ^ ((2 ** 17) - 1)) + 1
         return curr_int18
 
     def get_Vbias_float_V(Vbias_int) -> float:
@@ -56,7 +56,10 @@ class ztmConvert:
 
         :return val: Vbias Voltage in 16-bit format used by DAC
         """
+
         Vbias_int = round(((Vbias_float_V + 10) * (2 ** 16)) / (4 * 5))
+        if(Vbias_int == 65536):
+            Vbias_int -= 1
         return Vbias_int
 
     def get_Vpiezo_float_V(Vpiezo_int16) -> float:
@@ -81,5 +84,9 @@ class ztmConvert:
         :return val: Vpiezo Voltage in 16-bit format used by DAC
         """
         Vpiezo_int16 = round(Vpiezo_float_V * (2 ** 16) / (2 * 5))
+
+        if Vpiezo_int16 == 65536:
+            Vpiezo_int16 -= 1
+
         return Vpiezo_int16
     

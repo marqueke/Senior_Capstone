@@ -572,9 +572,13 @@ class MeasGUI:
     Function to send a message to the MCU and retry if we do
     not receive expected response
     '''
-    def send_msg_retry(self, port, msg_type, cmd, status, *params, max_attempts=2, sleep_time=0.5):
+    def send_msg_retry(self, port, msg_type, cmd, status, *params, max_attempts=1, sleep_time=0.5):
 
-        
+        msg_print = [msg_type, cmd, status]
+        # Convert each element in msg_print to a hex string
+        msg_print_hex = ' '.join(format(x, '02X') for x in msg_print)
+        print(f"\nMESSAGE BEING SENT: {msg_print_hex}")
+
         attempt = 0
         
         while attempt < max_attempts:
@@ -591,23 +595,19 @@ class MeasGUI:
             else:
                 raise ValueError(f"Unsupported message type: {msg_type}")
             
-            #self.response = self.parent.serial_ctrl.read_bytes()
-            self.response = self.parent.serial_ctrl.ztmGetMsg()
-            
+            self.response = self.parent.ztm_serial.ztmGetMsg(port)
             print(f"Serial response: {self.response}")
-            
-            #curr_bytes = self.response[3:7]
-            #print(f"Received current in bytes: {curr_bytes}")
             
             ### Unpack data and display on the GUI
             if self.response:
+                #why are we unpacking status done
                 if self.response[2] == ztmSTATUS.STATUS_DONE.value:
                     self.parent.ztm_serial.unpackRxMsg(self.response)
                     print(f"SUCCESS. Response received: {self.response}")
                     
                     return True
                 elif self.response[2] == ztmSTATUS.STATUS_STEP_COUNT.value and self.response[0] == MSG_D: #check on this message from MCU
-                    curr_pos_total_steps = int(struct.unpack('f', bytes(self.response[5:8]))[0], 3) #unpack bytes & convert
+                    curr_pos_total_steps = int(struct.unpack('I', bytes(self.response[5:8]))[0], 3) #unpack bytes & convert
                     print("Received values\n\Stepper Position Total (1/8) Steps: " + curr_pos_total_steps + "\n")
                     return True
 
@@ -807,7 +807,7 @@ class MeasGUI:
                 '''
                 while self.count < sample_size_save:
                     # receive data from MCU
-                    self.response = self.parent.serial_ctrl.ztmGetMsg()
+                    self.response = self.parent.ztm_serial.ztmGetMsg(port)
                     
                     # verify the msg
                     if self.response[2] == ztmSTATUS.STATUS_MEASUREMENTS.value:
@@ -1276,10 +1276,6 @@ class MeasGUI:
         self.label1.configure(text=f"{self.distance:.3f} nm")
         self.label2.after(100, self.update_label)
 
-        
-
-
-        
     def get_current_label2(self):
         current_value = float(self.label2.cget("text").split()[0])  # assuming label2 text value is "value" nA
         return current_value
