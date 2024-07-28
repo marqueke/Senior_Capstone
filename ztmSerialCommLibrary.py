@@ -219,10 +219,7 @@ class usbMsgFunctions:
                               ex. DIR_UP (value should be 1 or 0)
             - count         = number of steps at the designated step size
             - Function transmits Msg D, returns True if successful, else false. '''        
-        headerD = [MSG_D, msgCmd, msgStatus]
-        sizeDir = [size, dir]
-        countBytes = struct.pack('i', count)
-        padBytes = [0x00, 0x00]
+
         payload = bytes(2)
         messageD = struct.pack('<BBBBBiBB', MSG_D, msgCmd, msgStatus, size, dir, count, *payload)
 
@@ -231,16 +228,6 @@ class usbMsgFunctions:
         while retry < maxRetries:
             try:     
                 port.write(serial.to_bytes(messageD))
-                #for byte in headerD:
-                #    port.write(serial.to_bytes([byte]))
-                #for byte in sizeDir:
-                #    port.write(serial.to_bytes([byte]))
-#
-                #for byte in countBytes:
-                #    port.write(serial.to_bytes([byte]))  
-                #for byte in padBytes:
-                #    port.write(serial.to_bytes([byte])) 
-#
                 ## clear buffer    
                 port.flush()   
                 return True  
@@ -248,7 +235,7 @@ class usbMsgFunctions:
                 print(f"Write operation failed: {e}")
                 retry += 1
         print("Failed to send message\n")    
-        return False    
+        return False   
 
     # MSG E
     # Not needed for GUI
@@ -324,7 +311,7 @@ class usbMsgFunctions:
                     return False
                 else:
                     statRx = ztmSTATUS(rxMsg[statByte])
-                    print("Received : " + statRx.name + "\n")
+                    #print("Received : " + statRx.name + "\n")
                     return rxMsg[statByte]
 
             elif (rxMsg[0] == MSG_D):
