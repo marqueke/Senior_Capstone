@@ -122,15 +122,7 @@ class usbMsgFunctions:
         while retry < maxRetries:  
             try:   
                 port.write(serial.to_bytes(messageA)) 
-                #for byte in headerA:
-                #    port.write(serial.to_bytes([byte]))
-                #for byte in currentBytes:
-                #    port.write(serial.to_bytes([byte]))
-                #for byte in vbiasBytes:
-                #    port.write(serial.to_bytes([byte]))
-                #for byte in vpzoBytes:
-                #    port.write(serial.to_bytes([byte]))
-                # clear buffer    
+                # clear buffer
                 port.flush() 
                 return True
             except serial.SerialException as e:
@@ -159,13 +151,6 @@ class usbMsgFunctions:
         while retry < maxRetries:  
             try:      
                 port.write(serial.to_bytes(messageB)) 
-                #for byte in headerB:
-                #    port.write(serial.to_bytes([byte]))
-                #for byte in rateHzBytes:
-                #    port.write(serial.to_bytes([byte]))
-#
-                #for _ in range(payloadByteLen):
-                #    port.write(serial.to_bytes(padByte))
                 # clear buffer    
                 port.flush()       
                 return True
@@ -191,14 +176,6 @@ class usbMsgFunctions:
         while retry < maxRetries:
             try:   
                 port.write(serial.to_bytes(messageC))
-                #for byte in messageC:
-                #    port.write(serial.to_bytes([byte]))
-                #send header
-                #for byte in headerC:
-                #    port.write(serial.to_bytes([byte]))
-                ## send payload
-                #for _ in range(payloadBytes):
-                #    port.write(serial.to_bytes(padByte))
                 # clear buffer    
                 time.sleep(0.001)
                 port.flush()  
@@ -257,15 +234,6 @@ class usbMsgFunctions:
         while retry < maxRetries:
             try:    
                 port.write(serial.to_bytes(messageE))
-                #for byte in headerE:
-                #    port.write(serial.to_bytes([byte]))
-                #for byte in sineVbiasBytes:
-                #    port.write(serial.to_bytes([byte]))    
-                #for byte in rateHzBytes:
-                #    port.write(serial.to_bytes([byte]))  
-                #for _ in range(payloadByteLen):
-                #    port.write(serial.to_bytes(padByte))
-
                 # clear buffer    
                 port.flush()
                 return True

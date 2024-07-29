@@ -10,6 +10,9 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 import os, struct, time
+import datetime
+import matplotlib.dates as mdates
+import csv
 
 import random # for graph - delete later
 
@@ -17,7 +20,7 @@ from Sweep_IZ import SweepIZ_Window  # import the IZ Sweep Window Class
 from SPI_Data_Ctrl import SerialCtrl
 from Data_Com_Ctrl import DataCtrl
 from value_conversion import Convert
-from ztmSerialCommLibrary import ztmCMD, ztmSTATUS, usbMsgFunctions, MSG_A, MSG_B, MSG_C, MSG_D, MSG_E, MSG_F
+from ztmSerialCommLibrary import ztmCMD, ztmSTATUS, usbMsgFunctions, MSG_A, MSG_B, MSG_C, MSG_D, MSG_E
 
 curr_data = 0
 vp_V = 0
@@ -39,8 +42,8 @@ class IZWindow:
         self.root.geometry("750x675")   # (length x width)
 
         # initialize data and serial control
-        self.data_ctrl = DataCtrl(9600, self.handle_data)
-        self.serial_ctrl = SerialCtrl(self.port, 9600, self.data_ctrl.decode_data)
+        self.data_ctrl = DataCtrl(460800, self.handle_data)
+        self.serial_ctrl = SerialCtrl(self.port, 460800, self.data_ctrl.decode_data)
         print(f"Connected to {self.port}...")
         
         #self.data_ctrl.set_serial_ctrl(self.serial_ctrl)
@@ -126,7 +129,7 @@ class IZWindow:
         # user notes text box
         self.frame6 = LabelFrame(self.root, text="NOTES", padx=10, pady=5, bg="#A7C7E7")
         self.label6 = Text(self.frame6, height=7, width=30)
-        self.label7 = Text(self.frame6, height=1, width=8)
+        self.label7 = Text(self.frame6, height=1, width=8, wrap="none")
         self.label8 = Label(self.frame6, text="Date:", height=1, width=5)
         
         # setup the drop option menu
@@ -141,13 +144,11 @@ class IZWindow:
         self.add_btn_image2 = ctk.CTkImage(Image.open("Images/Stop_Btn.png"), size=(90,35))
         self.add_btn_image3 = ctk.CTkImage(Image.open("Images/Start_LED.png"), size=(35,35))
         self.add_btn_image4 = ctk.CTkImage(Image.open("Images/Stop_LED.png"), size=(35,35))
-        self.add_btn_image5 = ctk.CTkImage(Image.open("Images/Homepage_Btn.png"), size=(90,35))
         
         self.start_btn = ctk.CTkButton(self.root, image=self.add_btn_image1, text="", width=90, height=35, fg_color="#d0cee2", bg_color="#d0cee2", corner_radius=0, command=self.start_reading)
         self.stop_btn = ctk.CTkButton(self.root, image=self.add_btn_image2, text="", width=90, height=35, fg_color="#d0cee2", bg_color="#d0cee2", corner_radius=0, command=self.stop_reading)
-        self.start_led_btn = ctk.CTkLabel(self.root, image=self.add_btn_image3, text="", width=35, height=35, fg_color="#d0cee2", bg_color="#d0cee2", corner_radius=0)
-        self.stop_led_btn = ctk.CTkLabel(self.root, image=self.add_btn_image4, text="", width=35, height=35, fg_color="#d0cee2", bg_color="#d0cee2", corner_radius=0)
-        #self.greenLED = ctk.CTkLabel(self.root)
+        self.green_LED = ctk.CTkLabel(self.root, image=self.add_btn_image3, text="", width=35, height=35, fg_color="#d0cee2", bg_color="#d0cee2", corner_radius=0)
+        self.red_LED = ctk.CTkLabel(self.root, image=self.add_btn_image4, text="", width=35, height=35, fg_color="#d0cee2", bg_color="#d0cee2", corner_radius=0)
 
         # put on the grid all the elements
         self.publish_meas_widgets()
@@ -188,22 +189,8 @@ class IZWindow:
 
         self.start_btn.grid(row=1, column=10, padx=5, pady=15, sticky="s")
         self.stop_btn.grid(row=2, column=10, padx=5, sticky="n")
-        self.stop_led_btn.grid(row=1, column=11, padx=5, pady=15, sticky="sw")
-        # need to switch RG LED on process state
-        #self.start_led_btn.grid(row=1, column=11, padx=5, pady=15, sticky="sw")
+        self.red_LED.grid(row=1, column=11, padx=5, pady=15, sticky="sw")
 
-    def change_LED(self, color):
-        print(f"COLORED PASSED: {color}")
-        if color == 0:
-            self.stop_led_btn = ctk.CTkLabel(self.root, image=self.add_btn_image4, text="", width=35, height=35, fg_color="#d0cee2", bg_color="#d0cee2", corner_radius=0)
-            self.stop_led_btn.grid(row=1, column=11, padx=5, pady=15, sticky="sw")
-            print(f"LED SHOULD BE: {color}")
-        elif color == 1:
-            self.stop_led_btn = ctk.CTkLabel(self.root, image=self.add_btn_image3, text="", width=35, height=35, fg_color="#d0cee2", bg_color="#d0cee2", corner_radius=0)
-            self.stop_led_btn.grid(row=1, column=11, padx=5, pady=15, sticky="sw")
-            print(f"LED SHOULD BE: {color}")
-
-            
     def init_parameters(self):
         self.min_voltage = None
         self.max_voltage = None
@@ -215,34 +202,36 @@ class IZWindow:
         self.STOP_BTN_FLAG = 0
 
     def saveMinVoltage(self, event):
+        self.root.focus()
         if 0 <= float(self.label4.get()) <= 10:
             self.min_voltage = float(self.label4.get())
             print(f"Saved min voltage value: {self.min_voltage}")
         else:
-            InfoMsg = f"Invalid range. Stay within 0 - 10 V."
+            InfoMsg = f"Invalid range. Stay within 0 to 10 V."
             messagebox.showerror("INVALID", InfoMsg)
 
     def saveMaxVoltage(self, event):
+        self.root.focus()
         if 0 <= float(self.label5.get()) <= 10:
             self.max_voltage = float(self.label5.get())
             print(f"Saved min voltage value: {self.max_voltage}")
         else:
-            InfoMsg = f"Invalid range. Stay within 0 - 10 V."
+            InfoMsg = f"Invalid range. Stay within 0 to 10 V."
             messagebox.showerror("INVALID", InfoMsg) 
 
     def saveNumSetpoints(self, event):
+        self.root.focus()
         self.num_setpoints = int(self.label9.get())
         print(f"Saved number of setpoints value: {self.num_setpoints}")
 
-    # current, piezo voltage, piezo extension
-    def update_label(self):
-        #self.label1.configure(text=f"{self.piezo_distance:.3f} nm") # piezo extension
-        
+    # current and piezo voltage
+    def update_label(self):   
+        global curr_data     
         self.label2.configure(text=f"{vp_V:.3f} V") # piezo voltage
         
         self.random_num = random.uniform(0, 5) 
-        self.label3.configure(text=f"{self.random_num:.3f} nA")
-        #self.label3.configure(text=f"{curr_data:.3f} nA") # current
+        #self.label3.configure(text=f"{self.random_num:.3f} nA")
+        self.label3.configure(text=f"{curr_data:.3f} nA") # current
 
         #self.label2.after(100, self.update_label)
 
@@ -284,6 +273,7 @@ class IZWindow:
             
 
     def run_piezo_sweep_process(self):
+        global vp_V
         GREEN = 1
         RED = 0
         self.change_LED(GREEN)
@@ -296,43 +286,37 @@ class IZWindow:
         plt.ion()
 
         # while self.STOP_BTN_FLAG == 0:
-        for i in range(0, self.num_setpoints):
-            
-
-            # print(f"Sending MSG_A to port: {self.port}")
-
-            # # sending vpiezo to MCU, looking for a DONE status in return
-            # success = self.send_msg_retry(self.port, MSG_A, ztmCMD.CMD_PIEZO_ADJ.value, ztmSTATUS.STATUS_CLR.value, 0, 0, self.vpiezo)
-            # if not success:
-            #     InfoMsg = f"Could not verify communication with MCU.\nSweep process aborted."
-            #     messagebox.showerror("INVALID", InfoMsg) 
-            #     return
-            
-            # # sending a REQUEST_FOR_DATA command to MCU to receive current and vpiezo measurements
-            # dataSuccess = self.send_msg_retry(self.port, MSG_C, ztmCMD.CMD_REQ_DATA.value, ztmSTATUS.STATUS_CLR.value)
-            # if not dataSuccess:
-            #     InfoMsg = f"Did not receive data from MCU.\nSweep process aborted."
-            #     messagebox.showerror("INVALID", InfoMsg) 
-            #     return
-
-            # to do: update label with received values
-            global vp_V
-            vp_V = self.vpiezo
+        for i in range(0, self.num_setpoints + 1):
 
             if self.STOP_BTN_FLAG == 1:
-                break
+                break            
 
-            # number of points displayed on the graph at a time, may change as desired
-            x_axis_display_max_number_of_points = 300
-            if i > x_axis_display_max_number_of_points:
-                self.adjusted_x_axis = vp_V - (x_axis_display_max_number_of_points * self.volt_per_step)
+            # sending vpiezo to MCU, looking for a DONE status in return
+            success = self.send_msg_retry(self.port, MSG_A, ztmCMD.CMD_PIEZO_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, 0, 0, self.vpiezo)
+            if not success:
+                InfoMsg = f"Could not verify communication with MCU.\nSweep process aborted."
+                messagebox.showerror("INVALID", InfoMsg) 
+                self.sweep_finished()
+                return
+            
+            # sending a REQUEST_FOR_DATA command to MCU to receive current and vpiezo measurements
+            dataSuccess = self.send_msg_retry(self.port, MSG_C, ztmCMD.CMD_REQ_DATA.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_MEASUREMENTS.value)
+            if not dataSuccess:
+                InfoMsg = f"Did not receive data from MCU.\nSweep process aborted."
+                messagebox.showerror("INVALID", InfoMsg) 
+                self.sweep_finished()
+                return
 
             # updates labels with measurements received from MCU
             self.update_label()
+
+            if i > self.x_axis_display_max_number_of_points:
+                self.adjusted_x_axis = vp_V - (self.x_axis_display_max_number_of_points * self.volt_per_step)
+
             # updates graph display
             self.update_graph(vp_V)
 
-            # increment the piezo that sets the MCU
+            # increment the piezo voltage for the sweep
             self.vpiezo += self.volt_per_step
 
         if self.STOP_BTN_FLAG == 1:
@@ -346,29 +330,48 @@ class IZWindow:
             InfoMsg = f"The voltage sweep has completed."
             messagebox.showerror("Successful Sweep", InfoMsg)
 
+        self.sweep_finished()
+
+    def sweep_finished(self):
         # disable plot interative mode
         plt.ioff()
-        # reset button states
+        # # reset button states
+        RED = 0
+        self.change_LED(RED)
         self.start_btn.configure(state="normal")
         self.stop_btn.configure(state="disabled")
         self.STOP_BTN_FLAG = 0
 
+    def change_LED(self, color):
+        if color == 0:
+            self.green_LED.grid_remove()
+            self.red_LED.grid(row=1, column=11, padx=5, pady=15, sticky="sw")
+        elif color == 1:
+            self.red_LED.grid_remove()
+            self.green_LED.grid(row=1, column=11, padx=5, pady=15, sticky="sw")
 
 
     '''
     Function to send a message to the MCU and retry if we do
     not receive expected response
     '''
-    def send_msg_retry(self, port, msg_type, cmd, status, *params, max_attempts=1, sleep_time=0.5):
+    def send_msg_retry(self, port, msg_type, cmd, status, status_response, *params, max_attempts=1, sleep_time=0.5):
         
-        msg_print = [msg_type, cmd, status]
-        # Convert each element in msg_print to a hex string
-        msg_print_hex = ' '.join(format(x, '02X') for x in msg_print)
-        print(f"\nMESSAGE BEING SENT: {msg_print_hex}")
-
+        
+        global curr_data
+        global vp_V
+        
         attempt = 0
         
+        msg_print = [msg_type, cmd, status]
+        
+        # Convert each element in msg_print to a hex string
+        msg_print_hex = ' '.join(format(x, '02X') for x in msg_print)
+        
+        print(f"\nMESSAGE BEING SENT: {msg_print_hex}")
+        
         while attempt < max_attempts:
+            print(f"\n========== ATTEMPT NUMBER: {attempt+1} ==========")
             if msg_type == MSG_A:
                 self.ztm_serial.sendMsgA(port, cmd, status, *params)
             elif msg_type == MSG_B:
@@ -382,55 +385,57 @@ class IZWindow:
             else:
                 raise ValueError(f"Unsupported message type: {msg_type}")
             
-            self.response = self.ztm_serial.ztmGetMsg(port)
-            print(f"Serial response: {self.response}")
+            # returns 11 bytes of payload FALSE or byte response
+            testMsg = self.serial_ctrl.ztmGetMsg(port)
+            #testMsg = self.parent.serial_ctrl.read_bytes()
+            
+            testMsg_hex = [b for b in testMsg]
+            
+            print(f"Serial response: {testMsg_hex}")
+            
+            # returns false or different values
+            # msgA returns current, vbias, vpzo
+            # msgB returns FALSE
+            # msgC returns FALSE or status byte
+            # msgD returns FALSE or num full steps
+            # msgE returns FALSE
+            # msgF returns FFT current data and frequency
+            #self.parent.ztm_serial.unpackRxMsg(testMsg)
             
             ### Unpack data and display on the GUI
-            if self.response:
-                if self.response[2] == ztmSTATUS.STATUS_DONE.value:
-                    self.ztm_serial.unpackRxMsg(self.response)
-                    print(f"SUCCESS. Response received: {self.response}")
+            if testMsg:
+                if testMsg_hex[2] == status_response and len(testMsg) == 11:
+                    unpackResponse = self.ztm_serial.unpackRxMsg(testMsg)
+                    print(f"Received correct status response from MCU: {testMsg[2]}")
                     
-                    return True
-                elif self.response[2] == ztmSTATUS.STATUS_MEASUREMENTS.value:
-                    curr_data = round(struct.unpack('f', bytes(self.response[3:7]))[0], 3) #unpack bytes & convert
-                    cStr = str(curr_data)  # format as a string
-                    print("Received values\n\tCurrent: " + cStr + " nA\n")
-                        
-                    vb_V = round(Convert.get_Vbias_float(struct.unpack('H',bytes(self.response[7:9]))[0]), 3) #unpack bytes & convert
-                    vbStr = str(vb_V)   # format as a string
-                    print("\tVbias: " + vbStr + " V\n")
-                        # vpiezo
-                    vp_V = round(Convert.get_Vpiezo_float(struct.unpack('H',bytes(self.response[9:11]))[0]), 3) #unpack bytes & convert
-                    vpStr = str(vp_V)   # format as a string
-                    print("\tVpiezo: " + vpStr + " V\n")
-                    
-                    #update for windows, params
-                    #self.label3.configure(text=f"{curr_data:.3f}")
-                    
-
-                    return True
-                elif self.response[2] == ztmSTATUS.STATUS_ACK.value:
-                    print("Received ACK from MCU.")
-                    
+                    if unpackResponse:
+                        if testMsg_hex[2] == ztmSTATUS.STATUS_MEASUREMENTS.value:
+                            curr_data = round(struct.unpack('f', bytes(testMsg[3:7]))[0], 3) #unpack bytes & convert
+                            cStr = str(curr_data)  # format as a string
+                            print("Received values\n\tCurrent: " + cStr + " nA\n")
+                                
+                            vb_V = round(Convert.get_Vbias_float(struct.unpack('H',bytes(testMsg[7:9]))[0]), 3) #unpack bytes & convert
+                            vbStr = str(vb_V)   # format as a string
+                            print("\tVbias: " + vbStr + " V\n")
+                                # vpiezo
+                            vp_V = round(Convert.get_Vpiezo_float(struct.unpack('H',bytes(testMsg[9:11]))[0]), 3) #unpack bytes & convert
+                            vpStr = str(vp_V)   # format as a string
+                            print("\tVpiezo: " + vpStr + " V\n")
+                            
+                            return True
                     return True
                 else:
-                    print(f"ERROR. Wrong status recieved: {self.response}")
-
-                    # if we want to decode the command or status & print to the console....
-                    cmdRx = ztmCMD(self.response[1])
-                    print("Received : " + cmdRx.name)
-                    statRx = ztmSTATUS(self.response[2])
-                    print("Received : " + statRx.name + "\n")
-                    
-                    attempt += 1
+                    print(f"ERROR. Wrong response recieved: {testMsg}")
+                    print(f"Length of message received {len(testMsg)}")
+                    print(f"\tReceived status: {testMsg[2]}")
+                    print(f"\tExpected status: {status_response}")
+                             
             else:
                 print("ERROR. Failed to receive response from MCU.")
 
-                attempt += 1
             time.sleep(sleep_time)
-        return False
-        
+            attempt += 1
+    
     # file drop-down menu
     def DropDownMenu(self):
         self.menubar = tk.Menu(self.root)
@@ -440,7 +445,7 @@ class IZWindow:
         self.filemenu = tk.Menu(self.menubar, tearoff=0)
         self.filemenu.add_command(label="Save", command=self.save_graph)
         self.filemenu.add_command(label="Save As", command=self.save_graph_as)
-        self.filemenu.add_command(label="Export (.txt)", command=self.export_data)
+        self.filemenu.add_command(label="Export (.csv)", command=self.export_data)
         self.filemenu.add_separator()
         self.filemenu.add_command(label="Exit", command=self.root.quit)
         
@@ -460,37 +465,91 @@ class IZWindow:
             self.fig.savefig(file_path)
             messagebox.showinfo("Save Graph As", f"Graph saved as {file_path}")
     
+    '''
+    Handles the exporting of data collected into a .csv file
+    '''  
     def export_data(self):
-        file_path = filedialog.asksaveasfilename(defaultextension=".txt", filetypes=[("Text files", "*.txt"), ("All files", "*.*")])
+        file_path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("Excel.CSV", "*.csv"), ("All files", "*.*")])
         if file_path:
-            with open(file_path, 'w') as file:
-                file.write("Sample data to export")
-            messagebox.showinfo("Export Data", f"Data exported as {file_path}")
-                
-    def init_graph_widgets(self):
-        self.fig, self.ax = plt.subplots()
+            with open(file_path, 'w', newline='') as file:
+                # collects the user input text from the notes widget
+                header_text = self.label6.get(1.0, ctk.END)
+                header_text = header_text.strip()
+                header_date = self.label7.get(1.0, ctk.END)
+                header_date = header_date.strip()
 
-        self.ax.set_xlabel('Delta Z (V)')
+                # conjoining and formatting data
+                headers = ["Piezo Voltage (V)", "Tunneling Current (nA)"]
+                data_to_export = [headers]
+                data_to_export.extend(zip(self.x_data, self.y_data))
+                
+                # writing to file being created
+                writer = csv.writer(file)
+                if header_date:
+                    writer.writerow(['Date:', header_date])
+                if header_text:
+                    writer.writerow(['Notes:',header_text])
+                writer.writerows(data_to_export)
+
+            messagebox.showinfo("Export Data", f"Data exported as {file_path}")
+
+    '''
+    Function to initialize the data arrays and the graphical display
+    '''      
+    def init_graph_widgets(self):
+        #configures plot
+        self.fig, self.ax = plt.subplots()
+        self.ax.set_xlabel('Piezo Voltage (V)')
         self.ax.set_ylabel('Tunneling Current (nA)')
         self.fig.set_figwidth(7)
         self.fig.set_figheight(4.5)
+
+        # initializes graphical data    
         self.y_data = []
         self.x_data = []
-        #self.time_counter = 0   # counter to simulate the passage of time
         self.line, = self.ax.plot([], [], 'r-')
         
         # Create a canvas to embed the figure in Tkinter
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.root)
         self.canvas.get_tk_widget().grid(row=1, column=0, columnspan=10, rowspan=8, padx=10, pady=10)
 
+        # number of points displayed on the graph at a time, may change as desired
+        self.x_axis_display_max_number_of_points = 200
 
-        # Start animation
-        #self.ani = animation.FuncAnimation(self.fig, self.animate, interval=1, cache_frame_data=False)
+    '''
+    This will update the visual graph with the data points obtained during
+    the Piezo Voltage Sweep. The data points are appended to the data arrays.
+    '''
+    def update_graph(self, xAxisDataPoint):
+        # fetch data from label 3
+        current_data = self.get_current_label3()
         
+        # update data with next data points
+        self.y_data.append(current_data)
+        self.x_data.append(xAxisDataPoint)
+        
+        # update graph with new data
+        self.line.set_data(self.x_data, self.y_data)
+        self.ax.relim()
+
+        # set x-axis limits for tracking data visually
+        self.ax.set_xlim(self.min_voltage-0.001, vp_V)
+        # if threshold for display has been hit, update x-axis limits to follow data as it updates
+        if self.adjusted_x_axis != None:
+           self.ax.set_xlim(self.adjusted_x_axis, vp_V)
+        self.ax.autoscale_view()
+        
+        # redraw canvas
+        self.canvas.draw()
+        self.canvas.flush_events()
+
+    '''
+    Resets the visual graph and clears the data points.
+    '''
     def reset_graph(self):
         self.adjusted_x_axis = None
         self.ax.clear()
-        self.ax.set_xlabel('Delta Z (V)')
+        self.ax.set_xlabel('Piezo Voltage (V)')
         self.ax.set_ylabel('Tunneling Current (nA)')
         self.y_data = []
         self.x_data = []
@@ -498,29 +557,5 @@ class IZWindow:
         self.canvas.draw()
         self.canvas.flush_events()
 
-    def update_graph(self, xAxisDataPoint):
-        # fetch data from label 3
-        current_data = self.get_current_label3()
         
-        # update data
-        self.y_data.append(current_data)
-        self.x_data.append(xAxisDataPoint)
-        #self.time_counter += 1
-        
-        # update plot data
-        self.line.set_data(self.x_data, self.y_data)
-        self.ax.relim()
-        # set x-axis limits
-        self.ax.set_xlim(self.min_voltage, vp_V)
-        # if threshold for display has been hit, update x-axis limits to follow data as it updates
-        if self.adjusted_x_axis != None:
-            self.ax.set_xlim(self.adjusted_x_axis, vp_V)
-        self.ax.autoscale_view()
-        
-        # redraw canvas
-        self.canvas.draw()
-        self.canvas.flush_events()
-        
-        # schedule next update
-        #self.root.after(1000, self.update_graph)
-        # self.root.after(100)
+   
