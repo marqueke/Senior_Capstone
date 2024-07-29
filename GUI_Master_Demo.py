@@ -628,7 +628,7 @@ class MeasGUI:
     Function to send a message to the MCU and retry if we do
     not receive expected response
     '''
-    def send_msg_retry(self, port, msg_type, cmd, status, status_response, *params, max_attempts=1, sleep_time=0.5):
+    def send_msg_retry(self, port, msg_type, cmd, status, status_response, *params, max_attempts=10, sleep_time=0.5):
         """_summary_
 
         Args:
@@ -942,7 +942,8 @@ class MeasGUI:
             if enable_data_success:
                 print("Received DONE.")
                 
-                while count < 10:
+                while True:
+                    print("HERE.")
                     response = self.parent.serial_ctrl.ztmGetMsg(port)
                     if response[2] == ztmSTATUS.STATUS_MEASUREMENTS.value:
                         print("Received MEASUREMENTS response.")
@@ -957,8 +958,7 @@ class MeasGUI:
                     self.adc_curr = curr_data
                     self.update_label()
                     self.parent.graph_gui.update_graph()
-                    count +=1
-                    #time.sleep(1.0)
+                    
             else:
                 print("Did not receive DONE.")
 
@@ -1405,10 +1405,10 @@ class MeasGUI:
             return False
 
     def update_label(self):
-        random_num = random.uniform(0, 5) 
+        #random_num = random.uniform(0, 5) 
         self.label2.configure(text=f"{self.adc_curr:.3f} nA")
         #self.label2.configure(text=f"{curr_data:.3f} nA") # swap this in one we start receiving data
-        self.label1.configure(text=f"{self.distance:.3f} nm")
+        #self.label1.configure(text=f"{self.distance:.3f} nm")
 
     def get_current_label2(self):
         current_value = float(self.label2.cget("text").split()[0])  # assuming label2 text value is "value" nA
@@ -1510,7 +1510,7 @@ class GraphGUI:
         
         # update data with next data points
         self.y_data.append(current_data)
-        self.x_data.append(datetime.time)
+        self.x_data.append(datetime.datetime.now())
         
         # update graph with new data
         self.line.set_data(self.x_data, self.y_data)
