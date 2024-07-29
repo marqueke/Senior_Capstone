@@ -15,6 +15,9 @@ from Data_Com_Ctrl import DataCtrl
 from value_conversion import Convert
 from ztmSerialCommLibrary import usbMsgFunctions, ztmCMD, ztmSTATUS, MSG_A, MSG_B, MSG_C, MSG_D, MSG_E, MSG_F
 from SPI_Data_Ctrl import SerialCtrl
+import datetime
+import matplotlib.dates as mdates
+import csv
 
 import random # for graph - delete later
 
@@ -77,11 +80,7 @@ class RootGUI:
         print("Stopped reading data...")
         self.meas_gui.send_msg_retry(self.serial_ctrl.serial_port, MSG_C, ztmCMD.CMD_PERIODIC_DATA_DISABLE, ztmSTATUS.STATUS_DONE)
         #self.serial_ctrl.stop()    # used to close the serial read thread- but we do not want that
-        
-    # ??
-    def update_distance(self, adc_curr, vbias, vpzo):
-        print(f"RootGUI: Updating distance with data: ADC_CURR={adc_curr}, VBIAS={vbias}, VPZO={vpzo}")
-        self.meas_gui.update_distance(adc_curr, vbias, vpzo)
+
     
     def handle_data(self, raw_data):
         print(f"Handling raw data: {raw_data.hex()}")
@@ -583,7 +582,7 @@ class MeasGUI:
     Function to send a message to the MCU and retry if we do
     not receive expected response
     '''
-    def send_msg_retry(self, port, msg_type, cmd, status, status_response, *params, max_attempts=10, sleep_time=0.5):
+    def send_msg_retry(self, port, msg_type, cmd, status, status_response, *params, max_attempts=1, sleep_time=0.5):
         #global curr_data
         
         attempt = 0
@@ -841,6 +840,11 @@ class MeasGUI:
         ########## 
             print("\n********** BEGIN ENABLING PERIODIC DATA **********")
             
+            # resets visual graph and data
+            self.parent.graph_gui.reset_graph()
+            # turns interactive graph on
+            plt.ion()
+
             port = self.parent.serial_ctrl.serial_port
             
             #enable_data_success = self.parent.ztm_serial.sendMsgC(port, ztmCMD.CMD_PERIODIC_DATA_ENABLE, ztmSTATUS.STATUS_CLR)
@@ -860,10 +864,18 @@ class MeasGUI:
                         print("Received values\n\tCurrent: " + cStr + " nA\n")
                     else:
                         print("Did not receive MEASUREMENTS response.")
+                    
+                    # use this to call _update_graph() everytime a data point is recieved.
+                    self.adc_curr = curr_data
+                    self.update_label()
+                    self.parent.graph_gui.update_graph()
                     count +=1
-                    time.sleep(1.0)
+                    #time.sleep(1.0)
             else:
                 print("Did not receive DONE.")
+
+            # turns interactive graph off
+            plt.ioff()
 
                 
     def savePiezoValue(self, event): 
@@ -1208,7 +1220,7 @@ class MeasGUI:
             # number of steps, hardcoded = 1, for fine adjust arrows
             num_of_steps = 1
 
-            success = self.send_msg_retry(self.parent.serial_ctrl.serial_port, MSG_D, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_CLR.value, self.fine_adjust_step_size, fine_adjust_dir, num_of_steps)
+            success = self.send_msg_retry(self.parent.serial_ctrl.serial_port, MSG_D, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, self.fine_adjust_step_size, fine_adjust_dir, num_of_steps)
         
             if success:
                 print("Received done message.")
@@ -1219,6 +1231,9 @@ class MeasGUI:
     Function to save the new home position, where the tip is at when the function is called
     '''
     def save_home(self):
+        global home_pos_total_steps
+        global curr_pos_total_steps
+
         if self.check_connection():
             return
         else:
@@ -1236,6 +1251,9 @@ class MeasGUI:
     Function to return to the home position and send it to the MCU
     '''
     def return_home(self):
+        global home_pos_total_steps
+        global curr_pos_total_steps
+
         if self.check_connection():
             return
         else:
@@ -1248,7 +1266,7 @@ class MeasGUI:
             ("\n----------RETURN TO HOME POSITION----------")
             # request total step for stepper motor from MCU
             save_home_pos = self.send_msg_retry(self.parent.serial_ctrl.serial_port, MSG_C, ztmCMD.CMD_REQ_STEP_COUNT.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value)
-            
+             
             if save_home_pos:
                 print("Received current step count position from MCU.")
                 
@@ -1297,17 +1315,9 @@ class MeasGUI:
         else:
             return False
 
-    # should be displaying distance and current that is sent from mcu
-    def update_distance(self, adc_curr, vbias, vpzo):
-        print(f"MeasGUI: Updating distance with data: ADC_CURR={adc_curr}, VBIAS={vbias}, VPZO={vpzo}")
-        self.adc_curr = adc_curr
-        self.vbias = vbias
-        self.vpzo = vpzo
-        #self.update_label()
-
     def update_label(self):
         random_num = random.uniform(0, 5) 
-        self.label2.configure(text=f"{random_num:.3f} nA")
+        self.label2.configure(text=f"{self.adc_curr:.3f} nA")
         #self.label2.configure(text=f"{curr_data:.3f} nA") # swap this in one we start receiving data
         self.label1.configure(text=f"{self.distance:.3f} nm")
         self.label2.after(100, self.update_label)
@@ -1327,7 +1337,7 @@ class MeasGUI:
         self.filemenu = tk.Menu(self.menubar, tearoff=0)
         self.filemenu.add_command(label="Save", command=self.save_graph)
         self.filemenu.add_command(label="Save As", command=self.save_graph_as)
-        self.filemenu.add_command(label="Export (.txt)", command=self.export_data)
+        self.filemenu.add_command(label="Export (.csv)", command=self.export_data)
         self.filemenu.add_separator()
         self.filemenu.add_command(label="Exit", command=self.root.quit)
         
@@ -1353,56 +1363,94 @@ class MeasGUI:
             self.parent.graph_gui.fig.savefig(file_path)
             messagebox.showinfo("Save Graph As", f"Graph saved as {file_path}")
     
+    '''
+    Handles the exporting of data collected into a .csv file
+    ''' 
     def export_data(self):
-        file_path = filedialog.asksaveasfilename(defaultextension=".txt", filetypes=[("Text files", "*.txt"), ("All files", "*.*")])
+        file_path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("Excel.CSV", "*.csv"), ("All files", "*.*")])
         if file_path:
-            with open(file_path, 'w') as file:
-                file.write("Sample data to export")
+            with open(file_path, 'w', newline='') as file:
+                header_text = self.label7.get(1.0, ctk.END)
+                header_text = header_text.strip()
+                header_date = self.label8.get(1.0, ctk.END)
+                header_date = header_date.strip()
+
+                # conjoining and formatting data
+                headers = ["Time", "Tunneling Current (nA)"]
+                data_to_export = [headers]
+                data_to_export.extend(zip(self.parent.graph_gui.x_data, self.parent.graph_gui.y_data))
+
+                # writing to file being created
+                writer = csv.writer(file)
+                writer.writerow(['Date:', header_date])
+                writer.writerow(['Notes:',header_text])
+                writer.writerows(data_to_export)
+
             messagebox.showinfo("Export Data", f"Data exported as {file_path}")
             
-# class for graph in homepage
+     
 class GraphGUI:
+    '''
+    Function to initialize the data arrays and the graphical display
+    ''' 
     def __init__(self, root, meas_gui):
         self.root = root
         self.meas_gui = meas_gui
-        self.data = []
-        self.time = []
-        self.time_counter = 0   # counter to simulate the passage of time
-        
-        self.create_graph()
-        # self.update_graph() # this updates graph on startup
-        
-    def create_graph(self):
-        # Create a figure
+
+        #configures plot
         self.fig, self.ax = plt.subplots()
         self.ax.set_xlabel('Time (s)')
         self.ax.set_ylabel('Tunneling Current (nA)')
+       
+        # initializes graphical data
+        self.y_data = []
+        self.x_data = []
         self.line, = self.ax.plot([], [], 'r-')
-        
+
         # Create a canvas to embed the figure in Tkinter
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.root)
         self.canvas.get_tk_widget().grid(row=0, column=3, columnspan=6, rowspan=10, padx=10, pady=5)
-
+    
+    '''
+    This will update the visual graph with the data points obtained during
+    the Piezo Voltage Sweep. The data points are appended to the data arrays.
+    '''
     def update_graph(self):
         # fetch data from label 2
         current_data = self.meas_gui.get_current_label2()
         
-        # update data
-        self.data.append(current_data)
-        self.time.append(self.time_counter)
-        self.time_counter += 1
+        # update data with next data points
+        self.y_data.append(current_data)
+        self.x_data.append(datetime.time)
         
-        # update plot data
-        self.line.set_data(self.time, self.data)
+        # update graph with new data
+        self.line.set_data(self.x_data, self.y_data)
         self.ax.relim()
+
+        # set x-axis parameters
+        self.ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M:%S'))
+        self.ax.xaxis.set_major_locator(mdates.SecondLocator(interval=2))
+        # controls how much time is shown within the graph, currently displays the most recent 10 seconds
+        self.ax.set_xlim(datetime.datetime.now() - datetime.timedelta(seconds=10), datetime.datetime.now())
         self.ax.autoscale_view()
         
         # redraw canvas
         self.canvas.draw()
-        
-        # schedule next update
-        self.root.after(1000, self.update_graph)
+        self.canvas.flush_events()
 
+    '''
+    Resets the visual graph and clears the data points.
+    '''
+    def reset_graph(self):
+        self.ax.clear()
+        self.ax.set_xlabel('Time (s)')
+        self.ax.set_ylabel('Tunneling Current (nA)')
+        self.y_data = []
+        self.x_data = []
+        self.line, = self.ax.plot([], [], 'r-')
+        self.canvas.draw()
+        self.canvas.flush_events()
+        
 if __name__ == "__main__":
     root_gui = RootGUI()
     root_gui.root.mainloop()
