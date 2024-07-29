@@ -202,35 +202,63 @@ class IZWindow:
         self.STOP_BTN_FLAG = 0
 
     def saveMinVoltage(self, event):
-        if 0 <= float(self.label4.get()) <= 10:
-            self.min_voltage = float(self.label4.get())
-            print(f"Saved min voltage value: {self.min_voltage}")
+        if self.isValidVoltageInput(self.label4.get()):
+            if 0 <= float(self.label4.get()) <= 10:
+                self.min_voltage = float(self.label4.get())
+                print(f"Saved min voltage value: {self.min_voltage}")
+                self.root.focus()
+            else:
+                InfoMsg = f"Invalid range. Stay within 0 - 10 V."
+                messagebox.showerror("INVALID", InfoMsg)
+                self.root.focus()
         else:
-            InfoMsg = f"Invalid range. Stay within 0 - 10 V."
+            InfoMsg = f"Invalid input. Stay within 0 - 10 V."
+            messagebox.showerror("INVALID", InfoMsg)
+        
+    def saveMaxVoltage(self, event):
+        if self.isValidVoltageInput(self.label5.get()):
+            if 0 <= float(self.label5.get()) <= 10:
+                self.max_voltage = float(self.label5.get())
+                print(f"Saved min voltage value: {self.max_voltage}")
+                self.root.focus()
+            else:
+                InfoMsg = f"Invalid range. Stay within 0 - 10 V."
+                messagebox.showerror("INVALID", InfoMsg) 
+                self.root.focus()
+        else:
+            InfoMsg = f"Invalid input. Stay within 0 - 10 V."
             messagebox.showerror("INVALID", InfoMsg)
 
-    def saveMaxVoltage(self, event):
-        if 0 <= float(self.label5.get()) <= 10:
-            self.max_voltage = float(self.label5.get())
-            print(f"Saved min voltage value: {self.max_voltage}")
-        else:
-            InfoMsg = f"Invalid range. Stay within 0 - 10 V."
-            messagebox.showerror("INVALID", InfoMsg) 
+    def isValidVoltageInput(self, text):
+        try:
+            float(text)
+            return True
+        except ValueError:
+            return False
 
     def saveNumSetpoints(self, event):
-        self.num_setpoints = int(self.label9.get())
-        print(f"Saved number of setpoints value: {self.num_setpoints}")
+        if self.isValidSetpointInput(self.label9.get()):
+            self.num_setpoints = int(self.label9.get())
+            print(f"Saved number of setpoints value: {self.num_setpoints}")
+            self.root.focus()
+        else:
+            InfoMsg = f"Invalid input. Please enter an integer."
+            messagebox.showerror("INVALID", InfoMsg)
+
+    def isValidSetpointInput(self, text):
+        try:
+            int(text)
+            return True
+        except ValueError:
+            return False
 
     # current and piezo voltage
     def update_label(self):   
-        global curr_data     
+        global curr_data
+        global vp_V     
         self.label2.configure(text=f"{vp_V:.3f} V") # piezo voltage
-        
-        self.random_num = random.uniform(0, 5) 
-        #self.label3.configure(text=f"{self.random_num:.3f} nA")
         self.label3.configure(text=f"{curr_data:.3f} nA") # current
 
-        #self.label2.after(100, self.update_label)
 
     def get_current_label3(self):
         current_value = float(self.label3.cget("text").split()[0])  # assuming label3 text value is "value" nA
@@ -354,7 +382,6 @@ class IZWindow:
     '''
     def send_msg_retry(self, port, msg_type, cmd, status, status_response, *params, max_attempts=1, sleep_time=0.5):
         
-        
         global curr_data
         global vp_V
         
@@ -415,7 +442,7 @@ class IZWindow:
                             vbStr = str(vb_V)   # format as a string
                             print("\tVbias: " + vbStr + " V\n")
                                 # vpiezo
-                            vp_V = round(Convert.get_Vpiezo_float(struct.unpack('H',bytes(testMsg[9:11]))[0]), 3) #unpack bytes & convert
+                            vp_V = round(Convert.get_Vpiezo_float(struct.unpack('H',bytes(testMsg[9:11]))[0]), 4) #unpack bytes & convert
                             vpStr = str(vp_V)   # format as a string
                             print("\tVpiezo: " + vpStr + " V\n")
                             
