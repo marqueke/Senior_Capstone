@@ -29,6 +29,7 @@ class SerialCtrl:
                         self.buffer = self.buffer[11:]
                         #print(f"Processing frame: {frame.hex}")
                         self.callback(frame)
+                    return raw_data
             except serial.SerialException as e:
                 print(f"Error reading serial port: {e}")
                 self.running = False
@@ -59,7 +60,7 @@ class SerialCtrl:
         ''' Attempt to read a message from the ZTM controller'''
         
         attempts = 0
-        #response = b''  # Initialize an empty byte string to store the response
+        response = b''  # Initialize an empty byte string to store the response
         while(attempts < 10):
             try:
                 response = port.read(11)

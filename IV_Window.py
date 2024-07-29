@@ -41,16 +41,22 @@ class IVWindow:
         print("Starting to read data...")
         if self.serial_ctrl:
             print("Serial controller is initialized, starting now...")
+            self.start_btn.configure(state="disabled")
+            self.stop_btn.configure(state="normal")
             self.serial_ctrl.start()
-            
+            self.startup_leds()
             port = self.serial_ctrl.serial_port
             self.send_parameters(port)
+            
         else:
             print("Serial controller is not initialized.")
     
     def stop_reading(self):
         print("Stopped reading data...")
-        self.serial_ctrl.stop()
+        self.start_btn.configure(state="normal")
+        self.stop_btn.configure(state="disabled")
+        self.stop_leds()
+        self.serial_ctrl.stop()     # need to change later
     
     def handle_data(self, raw_data):
         print(f"Handling raw data: {raw_data.hex()}")
@@ -210,29 +216,40 @@ class IVWindow:
         self.add_btn_image1 = ctk.CTkImage(Image.open("Images/Start_Btn.png"), size=(90,35))
         self.add_btn_image2 = ctk.CTkImage(Image.open("Images/Stop_Btn.png"), size=(90,35))
         self.add_btn_image3 = ctk.CTkImage(Image.open("Images/Homepage_Btn.png"), size=(90,35))
-        self.add_btn_image4 = ctk.CTkImage(Image.open("Images/Sweep_IV_Btn.png"), size=(90,35))
+        #self.add_btn_image4 = ctk.CTkImage(Image.open("Images/Sweep_IV_Btn.png"), size=(90,35))
+        self.add_btn_image4 = ctk.CTkImage(Image.open("Images/Start_LED.png"), size=(35,35))
         self.add_btn_image5 = ctk.CTkImage(Image.open("Images/Stop_LED.png"), size=(35,35))
 																						   
         
         self.start_btn = ctk.CTkButton(self.root, image=self.add_btn_image1, text="", width=90, height=35, fg_color="#b1ddf0", bg_color="#b1ddf0", corner_radius=0, command=self.start_reading)
         self.stop_btn = ctk.CTkButton(self.root, image=self.add_btn_image2, text="", width=90, height=35, fg_color="#b1ddf0", bg_color="#b1ddf0", corner_radius=0, command=self.stop_reading)
-        self.home_btn = ctk.CTkButton(self.root, image=self.add_btn_image3, text="", width=90, height=35, fg_color="#b1ddf0", bg_color="#b1ddf0", corner_radius=0)
-        self.sweep_btn = ctk.CTkButton(self.root, image=self.add_btn_image4, text="", width=90, height=35, fg_color="#b1ddf0", bg_color="#b1ddf0", corner_radius=0, command=self.open_iv_sweep_window)
-																																									   
-        self.stop_led_btn = ctk.CTkButton(self.root, image=self.add_btn_image5, text="", width=35, height=35, fg_color="#b1ddf0", bg_color="#b1ddf0", corner_radius=0)
+        self.home_btn = ctk.CTkButton(self.root, image=self.add_btn_image3, text="", width=90, height=35, fg_color="#b1ddf0", bg_color="#b1ddf0", corner_radius=0, command=self.return_home)																																				   
+        self.start_led_btn = ctk.CTkLabel(self.root, image=self.add_btn_image4, text="", width=35, height=35, fg_color="#d0cee2", bg_color="#d0cee2", corner_radius=0)
+        self.stop_led_btn = ctk.CTkLabel(self.root, image=self.add_btn_image5, text="", width=35, height=35, fg_color="#d0cee2", bg_color="#d0cee2", corner_radius=0)
         
         self.publish_data_btns()
         
     def publish_data_btns(self):
         self.start_btn.grid(row=1, column=10, padx=5, pady=15, sticky="s")
         self.stop_btn.grid(row=2, column=10, padx=5, sticky="n")
-        self.stop_led_btn.grid(row=1, column=11, padx=5, pady=15, sticky="s")
-        self.sweep_btn.grid(row=14, column=10, sticky="n")
         self.home_btn.grid(row=15, column=10, sticky="n")
+        self.stop_led_btn.grid(row=1, column=11, padx=5, pady=15, sticky="s")
+        #self.sweep_btn.grid(row=14, column=10, sticky="n")
     
-    '''
+    def startup_leds(self):
+        '''
+        Method to change the leds upon the user pressing the stop button
+        '''
+        self.stop_led_btn.grid_remove()
+        self.start_led_btn.grid(row=1, column=11, padx=5, pady=15, sticky="s")
     
-    '''
+    def stop_leds(self):
+        '''
+        Method to change the leds upon the user pressing the stop button
+        '''
+        self.stop_led_btn.grid()
+        self.start_led_btn.grid_remove()
+        
     # update vbias
     def update_vbias(self, vbias):
         vbias_str = str(vbias)
@@ -240,10 +257,6 @@ class IVWindow:
         
     def update_label(self):
         self.label2.configure(text=f"{self.vbias:.3f} V")
-        #self.label2.delete(0, END)
-        #self.label2.insert(0, f"{self.vbias:.3f}")
-        #self.label3.delete(0, END)
-        #self.label3.insert(0, f"{self.vpzo:.3f}")
         self.vbias = self.vbias + 1
         self.label2.after(1000, self.update_label)
         
