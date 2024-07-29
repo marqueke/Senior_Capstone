@@ -332,11 +332,11 @@ class MeasGUI:
         '''
         
         self.initialize_widgets()
-        
+
+    '''
+    Initializes widgets needed for data.
+    '''  
     def initialize_widgets(self):
-        """
-        Initializes widgets needed for data.
-        """
         # optional graphic parameters
         self.padx = 20
         self.pady = 10
@@ -507,12 +507,7 @@ class MeasGUI:
         self.label8.grid(row=0, column=2, pady=5, sticky="e")
         self.label9.grid(row=0, column=2, pady=5, sticky="w")
 
-        # positioning the file drop-down menu
-        self.drop_menu.grid(row=0, column=0, padx=5, pady=5, sticky="w")
-
-        '''
-        Method to display all button widgets
-        '''
+        # positioning of buttons
         self.vpiezo_btn_frame.grid(row=8, column=0, rowspan=3, columnspan=2, padx=5, sticky="e")
         self.vpiezo_adjust_btn_up.grid(row=0, column=0)
         self.vpiezo_adjust_btn_down.grid(row=1, column=0)
@@ -529,7 +524,6 @@ class MeasGUI:
 
         # positioning for home and save home pos buttons
         self.save_home_pos.grid(row=8, column=9)
-        
         self.return_to_home_frame.grid(row=9, column=9)
         self.return_to_home_pos.grid(row=0, column=0)
 
@@ -630,72 +624,11 @@ class MeasGUI:
             self.stop_leds()            
             # self.parent.stop_reading()
 
-    def publish(self):
-        """
-        Method to publish widgets in the MeasGUI class.
-        """
-        # positioning distance text box
-        self.frame1.grid(row=11, column=4, padx=5, pady=5, sticky="sw")
-        self.label1.grid(row=0, column=0, padx=5, pady=5)
-
-        # positioning current text box
-        self.frame2.grid(row=11, column=5, padx=5, pady=5, sticky="sw")
-        self.label2.grid(row=0, column=1, padx=5, pady=5)   
-        
-        # positioning current setpoint text box
-        self.frame3.grid(row=12, column=4, padx=5, pady=5, sticky="w")
-        self.label3.grid(row=1, column=0, padx=5, pady=5) 
-        
-        # positioning current offset text box
-        self.frame4.grid(row=12, column=5, padx=5, pady=5, sticky="w")
-        self.label4.grid(row=1, column=1, padx=5, pady=5) 
-
-        # positioning sample bias text box
-        self.frame6.grid(row=13, column=5, padx=5, pady=5, sticky="nw")
-        self.label6.grid(row=2, column=0, padx=5, pady=5) 
-
-        # positioning the notes text box
-        self.frame7.grid(row=11, column=7, rowspan=3, pady=5, sticky="n")
-        self.label7.grid(row=1, column=0, pady=5, columnspan=3, rowspan=3) 
-        self.label8.grid(row=0, column=2, pady=5, sticky="e")
-        self.label9.grid(row=0, column=2, pady=5, sticky="w")
-
-        # positioning the file drop-down menu
-        #self.drop_menu.grid(row=0, column=0, padx=5, pady=5, sticky="w")
-        
-        # vpiezo tip fine adjust
-        self.vpiezo_btn_frame.grid(row=8, column=0, rowspan=3, columnspan=2, padx=5, sticky="e")
-        self.vpiezo_adjust_btn_up.grid(row=0, column=0)
-        self.vpiezo_adjust_btn_down.grid(row=1, column=0)
-        
-        # stepper motor adjust
-        self.fine_adjust_frame.grid(row=11, column=0, rowspan=4, columnspan=2, padx=5, sticky="e")
-        self.fine_adjust_btn_up.grid(row=0, column=0)
-        self.fine_adjust_btn_down.grid(row=1, column=0)
-        
-        # start/stop buttons
-        self.start_btn.grid(row=2, column=9, sticky="e")
-        self.stop_btn.grid(row=3, column=9, sticky="ne")
-        
-        # sweep windows buttons
-        self.acquire_iv_btn.grid(row=4, column=9, sticky="ne")
-        self.acquire_iz_btn.grid(row=5, column=9, sticky="ne")
-        
-        # led
-        self.stop_led_btn.grid(row=2, column=10, sticky="e")
-
-        # save home position
-        self.save_home_pos.grid(row=8, column=9)
-        
-        # reset home position
-        self.return_to_home_frame.grid(row=9, column=9)
-        self.return_to_home_pos.grid(row=0, column=0)
-
     '''
     Function to send a message to the MCU and retry if we do
     not receive expected response
     '''
-    def send_msg_retry(self, port, msg_type, cmd, status, status_response, *params, max_attempts=10, sleep_time=0.5):
+    def send_msg_retry(self, port, msg_type, cmd, status, status_response, *params, max_attempts=1, sleep_time=0.5):
         """_summary_
 
         Args:
