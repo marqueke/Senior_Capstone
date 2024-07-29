@@ -222,12 +222,13 @@ class IZWindow:
         print(f"Saved number of setpoints value: {self.num_setpoints}")
 
     # current and piezo voltage
-    def update_label(self):        
+    def update_label(self):   
+        global curr_data     
         self.label2.configure(text=f"{vp_V:.3f} V") # piezo voltage
         
         self.random_num = random.uniform(0, 5) 
-        self.label3.configure(text=f"{self.random_num:.3f} nA")
-        #self.label3.configure(text=f"{curr_data:.3f} nA") # current
+        #self.label3.configure(text=f"{self.random_num:.3f} nA")
+        self.label3.configure(text=f"{curr_data:.3f} nA") # current
 
         #self.label2.after(100, self.update_label)
 
@@ -287,31 +288,24 @@ class IZWindow:
             if self.STOP_BTN_FLAG == 1:
                 break            
 
-            # print(f"Sending MSG_A to port: {self.port}")
-
-            # # sending vpiezo to MCU, looking for a DONE status in return
-            # success = self.send_msg_retry(self.port, MSG_A, ztmCMD.CMD_PIEZO_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, 0, 0, self.vpiezo)
-            # if not success:
-            #     InfoMsg = f"Could not verify communication with MCU.\nSweep process aborted."
-            #     messagebox.showerror("INVALID", InfoMsg) 
-            #     self.sweep_finished()
-            #     return
+            # sending vpiezo to MCU, looking for a DONE status in return
+            success = self.send_msg_retry(self.port, MSG_A, ztmCMD.CMD_PIEZO_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, 0, 0, self.vpiezo)
+            if not success:
+                InfoMsg = f"Could not verify communication with MCU.\nSweep process aborted."
+                messagebox.showerror("INVALID", InfoMsg) 
+                self.sweep_finished()
+                return
             
-            # # sending a REQUEST_FOR_DATA command to MCU to receive current and vpiezo measurements
-            # dataSuccess = self.send_msg_retry(self.port, MSG_C, ztmCMD.CMD_REQ_DATA.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_MEASUREMENTS.value)
-            # if not dataSuccess:
-            #     InfoMsg = f"Did not receive data from MCU.\nSweep process aborted."
-            #     messagebox.showerror("INVALID", InfoMsg) 
-            #     self.sweep_finished()
-            #     return
-
-            # to do: update label with received values
-            # need to add current update from live data when implemented
-            vp_V = self.vpiezo
+            # sending a REQUEST_FOR_DATA command to MCU to receive current and vpiezo measurements
+            dataSuccess = self.send_msg_retry(self.port, MSG_C, ztmCMD.CMD_REQ_DATA.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_MEASUREMENTS.value)
+            if not dataSuccess:
+                InfoMsg = f"Did not receive data from MCU.\nSweep process aborted."
+                messagebox.showerror("INVALID", InfoMsg) 
+                self.sweep_finished()
+                return
 
             # updates labels with measurements received from MCU
             self.update_label()
-
 
             if i > self.x_axis_display_max_number_of_points:
                 self.adjusted_x_axis = vp_V - (self.x_axis_display_max_number_of_points * self.volt_per_step)
@@ -359,7 +353,10 @@ class IZWindow:
     not receive expected response
     '''
     def send_msg_retry(self, port, msg_type, cmd, status, status_response, *params, max_attempts=1, sleep_time=0.5):
-        #global curr_data
+        
+        
+        global curr_data
+        global vp_V
         
         attempt = 0
         
@@ -386,7 +383,7 @@ class IZWindow:
                 raise ValueError(f"Unsupported message type: {msg_type}")
             
             # returns 11 bytes of payload FALSE or byte response
-            testMsg = self.ztm_serial.ztmGetMsg(port)
+            testMsg = self.serial_ctrl.ztmGetMsg(port)
             #testMsg = self.parent.serial_ctrl.read_bytes()
             
             testMsg_hex = [b for b in testMsg]
@@ -436,81 +433,6 @@ class IZWindow:
             time.sleep(sleep_time)
             attempt += 1
     
-    '''
-    OLD SEND_MSG_RETRY FUNCTION
-    '''
-    # def send_msg_retry(self, port, msg_type, cmd, status, *params, max_attempts=1, sleep_time=0.5):
-        
-    #     msg_print = [msg_type, cmd, status]
-    #     # Convert each element in msg_print to a hex string
-    #     msg_print_hex = ' '.join(format(x, '02X') for x in msg_print)
-    #     print(f"\nMESSAGE BEING SENT: {msg_print_hex}")
-
-    #     attempt = 0
-        
-    #     while attempt < max_attempts:
-    #         if msg_type == MSG_A:
-    #             self.ztm_serial.sendMsgA(port, cmd, status, *params)
-    #         elif msg_type == MSG_B:
-    #             self.ztm_serial.sendMsgB(port, cmd, status, *params)
-    #         elif msg_type == MSG_C:
-    #             self.ztm_serial.sendMsgC(port, cmd, status, *params)
-    #         elif msg_type == MSG_D:
-    #             self.ztm_serial.sendMsgD(port, cmd, status, *params)
-    #         elif msg_type == MSG_E:
-    #             self.ztm_serial.sendMsgE(port, cmd, status, *params)
-    #         else:
-    #             raise ValueError(f"Unsupported message type: {msg_type}")
-            
-    #         self.response = self.ztm_serial.ztmGetMsg(port)
-    #         print(f"Serial response: {self.response}")
-            
-    #         ### Unpack data and display on the GUI
-    #         if self.response:
-    #             if self.response[2] == ztmSTATUS.STATUS_DONE.value:
-    #                 self.ztm_serial.unpackRxMsg(self.response)
-    #                 print(f"SUCCESS. Response received: {self.response}")
-                    
-    #                 return True
-    #             elif self.response[2] == ztmSTATUS.STATUS_MEASUREMENTS.value:
-    #                 curr_data = round(struct.unpack('f', bytes(self.response[3:7]))[0], 3) #unpack bytes & convert
-    #                 cStr = str(curr_data)  # format as a string
-    #                 print("Received values\n\tCurrent: " + cStr + " nA\n")
-                        
-    #                 vb_V = round(Convert.get_Vbias_float(struct.unpack('H',bytes(self.response[7:9]))[0]), 3) #unpack bytes & convert
-    #                 vbStr = str(vb_V)   # format as a string
-    #                 print("\tVbias: " + vbStr + " V\n")
-    #                     # vpiezo
-    #                 vp_V = round(Convert.get_Vpiezo_float(struct.unpack('H',bytes(self.response[9:11]))[0]), 3) #unpack bytes & convert
-    #                 vpStr = str(vp_V)   # format as a string
-    #                 print("\tVpiezo: " + vpStr + " V\n")
-                    
-    #                 #update for windows, params
-    #                 #self.label3.configure(text=f"{curr_data:.3f}")
-                    
-
-    #                 return True
-    #             elif self.response[2] == ztmSTATUS.STATUS_ACK.value:
-    #                 print("Received ACK from MCU.")
-                    
-    #                 return True
-    #             else:
-    #                 print(f"ERROR. Wrong status recieved: {self.response}")
-
-    #                 # if we want to decode the command or status & print to the console....
-    #                 cmdRx = ztmCMD(self.response[1])
-    #                 print("Received : " + cmdRx.name)
-    #                 statRx = ztmSTATUS(self.response[2])
-    #                 print("Received : " + statRx.name + "\n")
-                    
-    #                 attempt += 1
-    #         else:
-    #             print("ERROR. Failed to receive response from MCU.")
-
-    #             attempt += 1
-    #         time.sleep(sleep_time)
-    #     return False
-        
     # file drop-down menu
     def DropDownMenu(self):
         '''
@@ -568,8 +490,10 @@ class IZWindow:
                 
                 # writing to file being created
                 writer = csv.writer(file)
-                writer.writerow(['Date:', header_date])
-                writer.writerow(['Notes:',header_text])
+                if header_date:
+                    writer.writerow(['Date:', header_date])
+                if header_text:
+                    writer.writerow(['Notes:',header_text])
                 writer.writerows(data_to_export)
 
             messagebox.showinfo("Export Data", f"Data exported as {file_path}")
@@ -595,7 +519,7 @@ class IZWindow:
         self.canvas.get_tk_widget().grid(row=1, column=0, columnspan=10, rowspan=8, padx=10, pady=10)
 
         # number of points displayed on the graph at a time, may change as desired
-        self.x_axis_display_max_number_of_points = 300
+        self.x_axis_display_max_number_of_points = 200
 
     '''
     This will update the visual graph with the data points obtained during
@@ -613,11 +537,6 @@ class IZWindow:
         self.line.set_data(self.x_data, self.y_data)
         self.ax.relim()
 
-        # use to show homepage graph tracking
-        # self.ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M:%S'))
-        # self.ax.xaxis.set_major_locator(mdates.SecondLocator(interval=2))
-        # self.ax.set_xlim(datetime.datetime.now() - datetime.timedelta(seconds=10), datetime.datetime.now())
-        
         # set x-axis limits for tracking data visually
         self.ax.set_xlim(self.min_voltage-0.001, vp_V)
         # if threshold for display has been hit, update x-axis limits to follow data as it updates

@@ -43,6 +43,7 @@ home_pos_total_steps = None
 curr_pos_total_steps = None
 
 tip_app_total_steps = None
+STOP_BTN_FLAG = 0
 
 class RootGUI:
     def __init__(self):
@@ -615,14 +616,17 @@ class MeasGUI:
         3. Calls the `stop_leds` method to change the LED status.
         4. Calls the parent's `stop_reading` method in the RootGUI class to stop data reading.
         """
+        global STOP_BTN_FLAG
         if self.check_connection():
             return
         else:
             print("ButtonGUI: Stop button pressed")
             self.start_btn.configure(state="normal")
             self.stop_btn.configure(state="disabled")
+            STOP_BTN_FLAG = 1
             self.stop_leds()            
             # self.parent.stop_reading()
+            # self.parent.serial_ctrl.stop()
 
     '''
     Function to send a message to the MCU and retry if we do
@@ -921,6 +925,7 @@ class MeasGUI:
     def enable_periodics(self):
         count = 0
         measure_count = 0
+        global STOP_BTN_FLAG
         
         if self.check_connection():
             return
@@ -943,7 +948,9 @@ class MeasGUI:
                 print("Received DONE.")
                 
                 while True:
-                    print("HERE.")
+                    if STOP_BTN_FLAG == 1:
+                        break
+
                     response = self.parent.serial_ctrl.ztmGetMsg(port)
                     if response[2] == ztmSTATUS.STATUS_MEASUREMENTS.value:
                         print("Received MEASUREMENTS response.")
@@ -958,7 +965,8 @@ class MeasGUI:
                     self.adc_curr = curr_data
                     self.update_label()
                     self.parent.graph_gui.update_graph()
-                    
+                
+                STOP_BTN_FLAG = 0    
             else:
                 print("Did not receive DONE.")
 
@@ -1467,12 +1475,15 @@ class MeasGUI:
                 # conjoining and formatting data
                 headers = ["Time", "Tunneling Current (nA)"]
                 data_to_export = [headers]
-                data_to_export.extend(zip(self.parent.graph_gui.x_data, self.parent.graph_gui.y_data))
+                data_to_export.extend(zip(self.parent.graph_gui.time_data, self.parent.graph_gui.y_data))
 
                 # writing to file being created
                 writer = csv.writer(file)
-                writer.writerow(['Date:', header_date])
-                writer.writerow(['Notes:',header_text])
+                # if the header notes widget has been used, include information in .csv
+                if header_date:
+                    writer.writerow(['Date:', header_date])
+                if header_text:
+                    writer.writerow(['Notes:',header_text])
                 writer.writerows(data_to_export)
 
             messagebox.showinfo("Export Data", f"Data exported as {file_path}")
@@ -1494,6 +1505,8 @@ class GraphGUI:
         # initializes graphical data
         self.y_data = []
         self.x_data = []
+        # use this to export data with milliseconds included
+        self.time_data = []
         self.line, = self.ax.plot([], [], 'r-')
 
         # Create a canvas to embed the figure in Tkinter
@@ -1504,13 +1517,20 @@ class GraphGUI:
     This will update the visual graph with the data points obtained during
     the Piezo Voltage Sweep. The data points are appended to the data arrays.
     '''
+    #updates every 36ms
     def update_graph(self):
         # fetch data from label 2
         current_data = self.meas_gui.get_current_label2()
         
         # update data with next data points
         self.y_data.append(current_data)
-        self.x_data.append(datetime.datetime.now())
+        time_now = datetime.datetime.now()
+        # append current time to x axis on graph
+        self.x_data.append(time_now)
+        
+        # append time to include milliseconds for exported data
+        formatted_time = time_now.strftime('%H:%M:%S.%f')[:-3]
+        self.time_data.append(formatted_time)
         
         # update graph with new data
         self.line.set_data(self.x_data, self.y_data)
@@ -1536,6 +1556,7 @@ class GraphGUI:
         self.ax.set_ylabel('Tunneling Current (nA)')
         self.y_data = []
         self.x_data = []
+        self.time_data = []
         self.line, = self.ax.plot([], [], 'r-')
         self.canvas.draw()
         self.canvas.flush_events()
