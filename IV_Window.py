@@ -10,6 +10,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 import os, struct, time
+import csv
 
 from Sweep_IV import SweepIV_Window  # import the IV Sweep Window Class
 from SPI_Data_Ctrl import SerialCtrl
@@ -44,6 +45,7 @@ class IVWindow:
         
         # Initialize the widgets
         self.init_meas_widgets()
+        self.init_parameters()
         self.init_graph_widgets()
         
         self.vbias = 0
@@ -56,8 +58,7 @@ class IVWindow:
             #self.serial_ctrl.start()
             checked = self.check_sweep_params()
             if checked:
-                self.start_btn.configure(state="disabled")
-                self.stop_btn.configure(state="normal")
+                self.disable_widgets()
                 self.run_bias_sweep_process()
             else:
                 print("Sweep Parameters invalid. Process not started.")
@@ -68,8 +69,7 @@ class IVWindow:
     
     def stop_reading(self):
         print("Stopped reading data...")
-        self.start_btn.configure(state="normal")
-        self.stop_btn.configure(state="disabled")
+        self.enable_widgets()
         self.STOP_BTN_FLAG = 1
         self.serial_ctrl.stop() # need to change later
     
@@ -187,22 +187,23 @@ class IVWindow:
         # user notes text box
         self.frame5 = LabelFrame(self.root, text="NOTES", padx=10, pady=5, bg="#A7C7E7")
         self.label5 = Text(self.frame5, height=7, width=30)
-        self.label6 = Text(self.frame5, height=1, width=8)
+        self.label5.bind("<Return>", self.save_notes)
+        self.label6 = Entry(self.frame5, width=10)
+        self.label6.bind("<Return>", self.save_date)
         self.label7 = Label(self.frame5, padx=10, text="Date:", height=1, width=5)
 
         self.add_btn_image1 = ctk.CTkImage(Image.open("Images/Start_Btn.png"), size=(90,35))
         self.add_btn_image2 = ctk.CTkImage(Image.open("Images/Stop_Btn.png"), size=(90,35))
-        self.add_btn_image3 = ctk.CTkImage(Image.open("Images/Homepage_Btn.png"), size=(90,35))
-        #self.add_btn_image4 = ctk.CTkImage(Image.open("Images/Sweep_IV_Btn.png"), size=(90,35))
+        #self.add_btn_image3 = ctk.CTkImage(Image.open("Images/Homepage_Btn.png"), size=(90,35))
         self.add_btn_image4 = ctk.CTkImage(Image.open("Images/Start_LED.png"), size=(35,35))
         self.add_btn_image5 = ctk.CTkImage(Image.open("Images/Stop_LED.png"), size=(35,35))
 																						   
         
         self.start_btn = ctk.CTkButton(self.root, image=self.add_btn_image1, text="", width=90, height=35, fg_color="#b1ddf0", bg_color="#b1ddf0", corner_radius=0, command=self.start_reading)
         self.stop_btn = ctk.CTkButton(self.root, image=self.add_btn_image2, text="", width=90, height=35, fg_color="#b1ddf0", bg_color="#b1ddf0", corner_radius=0, command=self.stop_reading)
-        self.home_btn = ctk.CTkButton(self.root, image=self.add_btn_image3, text="", width=90, height=35, fg_color="#b1ddf0", bg_color="#b1ddf0", corner_radius=0, command=self.return_home)																																				   
-        self.start_led_btn = ctk.CTkLabel(self.root, image=self.add_btn_image4, text="", width=35, height=35, fg_color="#d0cee2", bg_color="#d0cee2", corner_radius=0)
-        self.stop_led_btn = ctk.CTkLabel(self.root, image=self.add_btn_image5, text="", width=35, height=35, fg_color="#d0cee2", bg_color="#d0cee2", corner_radius=0)
+        #self.home_btn = ctk.CTkButton(self.root, image=self.add_btn_image3, text="", width=90, height=35, fg_color="#b1ddf0", bg_color="#b1ddf0", corner_radius=0, command=self.return_home)																																				   
+        self.green_LED = ctk.CTkLabel(self.root, image=self.add_btn_image4, text="", width=35, height=35, fg_color="#d0cee2", bg_color="#d0cee2", corner_radius=0)
+        self.red_LED = ctk.CTkLabel(self.root, image=self.add_btn_image5, text="", width=35, height=35, fg_color="#d0cee2", bg_color="#d0cee2", corner_radius=0)
         
         # setup the drop option menu
         self.DropDownMenu()
@@ -243,12 +244,8 @@ class IVWindow:
         
         self.start_btn.grid(row=1, column=10, padx=5, pady=15, sticky="s")
         self.stop_btn.grid(row=2, column=10, padx=5, sticky="n")
-        self.home_btn.grid(row=15, column=10, sticky="n")
-        self.stop_led_btn.grid(row=1, column=11, padx=5, pady=15, sticky="s")
-        #self.sweep_btn.grid(row=14, column=10, sticky="n")
-        
-        # Positioning the file drop-down menu
-        #self.drop_menu.grid(row=0, column=0, padx=self.padx, pady=self.pady, sticky="w")
+        #self.home_btn.grid(row=15, column=10, sticky="n")
+        self.red_LED.grid(row=1, column=11, padx=5, pady=15, sticky="s")
 
     def return_home(self):
         self.root.destroy()
@@ -262,6 +259,38 @@ class IVWindow:
         self.random_num = 0
         self.adjusted_x_axis = None
         self.STOP_BTN_FLAG = 0
+
+    def disable_widgets(self):
+        """
+        Function to disable entry widgets when we start seeking.
+        Disabling:
+            - min voltage
+            - max voltage
+            - number of setpoints
+            - start button
+            - stop button
+        """
+        self.label3.configure(state="disabled")
+        self.label4.configure(state="disabled")
+        self.label8.configure(state="disabled")
+        self.start_btn.configure(state="disabled")
+        self.stop_btn.configure(state="normal")
+
+    def enable_widgets(self):
+        """
+        Function to enable entry widgets when the process is stopped.
+        Enabling:
+            - min voltage
+            - max voltage
+            - number of setpoints
+            - start button
+            - stop button
+        """
+        self.label3.configure(state="normal")
+        self.label4.configure(state="normal")
+        self.label8.configure(state="normal")
+        self.start_btn.configure(state="normal")
+        self.stop_btn.configure(state="disabled")
         
     def saveMinVoltage(self, event):
         self.root.focus()
@@ -362,7 +391,7 @@ class IVWindow:
                 break            
 
             # sending vbias to MCU, looking for a DONE status in return
-            success = self.send_msg_retry(self.port, MSG_A, ztmCMD.CMD_SET_VBIAS.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, 0, 0, self.vbias)
+            success = self.send_msg_retry(self.port, MSG_A, ztmCMD.CMD_SET_VBIAS.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, 0, self.vbias, 0)
             if not success:
                 InfoMsg = f"Could not verify communication with MCU.\nSweep process aborted."
                 messagebox.showerror("INVALID", InfoMsg) 
@@ -386,8 +415,8 @@ class IVWindow:
             # updates graph display
             self.update_graph(vb_V)
 
-            # increment the piezo voltage for the sweep
-            self.vpiezo += self.volt_per_step
+            # increment the bias voltage for the sweep
+            self.vbias += self.volt_per_step
 
         if self.STOP_BTN_FLAG == 1:
             self.change_LED(RED)
@@ -411,7 +440,92 @@ class IVWindow:
         self.start_btn.configure(state="normal")
         self.stop_btn.configure(state="disabled")
         self.STOP_BTN_FLAG = 0
+
+    '''
+    Function to send a message to the MCU and retry if we do
+    not receive expected response
+    '''
+    def send_msg_retry(self, port, msg_type, cmd, status, status_response, *params, max_attempts=1, sleep_time=0.5):
+        global curr_data
+        global vb_V
         
+        attempt = 0
+        
+        msg_print = [msg_type, cmd, status]
+        
+        # Convert each element in msg_print to a hex string
+        msg_print_hex = ' '.join(format(x, '02X') for x in msg_print)
+        
+        print(f"\nMESSAGE BEING SENT: {msg_print_hex}")
+        
+        while attempt < max_attempts:
+            print(f"\n========== ATTEMPT NUMBER: {attempt+1} ==========")
+            if msg_type == MSG_A:
+                self.ztm_serial.sendMsgA(port, cmd, status, *params)
+            elif msg_type == MSG_B:
+                self.ztm_serial.sendMsgB(port, cmd, status, *params)
+            elif msg_type == MSG_C:
+                self.ztm_serial.sendMsgC(port, cmd, status, *params)
+            elif msg_type == MSG_D:
+                self.ztm_serial.sendMsgD(port, cmd, status, *params)
+            elif msg_type == MSG_E:
+                self.ztm_serial.sendMsgE(port, cmd, status, *params)
+            else:
+                raise ValueError(f"Unsupported message type: {msg_type}")
+            
+            # returns 11 bytes of payload FALSE or byte response
+            testMsg = self.serial_ctrl.ztmGetMsg(port)
+            #testMsg = self.parent.serial_ctrl.read_bytes()
+            
+            testMsg_hex = [b for b in testMsg]
+            
+            print(f"Serial response: {testMsg_hex}")
+            
+            ### Unpack data and display on the GUI
+            if testMsg:
+                if testMsg_hex[2] == status_response and len(testMsg) == 11:
+                    unpackResponse = self.ztm_serial.unpackRxMsg(testMsg)
+                    print(f"Received correct status response from MCU: {testMsg[2]}")
+                    
+                    if unpackResponse:
+                        if testMsg_hex[2] == ztmSTATUS.STATUS_MEASUREMENTS.value:
+                            curr_data = round(struct.unpack('f', bytes(testMsg[3:7]))[0], 3) #unpack bytes & convert
+                            cStr = str(curr_data)  # format as a string
+                            print("Received values\n\tCurrent: " + cStr + " nA\n")
+                                
+                            vb_V = round(Convert.get_Vbias_float(struct.unpack('H',bytes(testMsg[7:9]))[0]), 3) #unpack bytes & convert
+                            vbStr = str(vb_V)   # format as a string
+                            print("\tVbias: " + vbStr + " V\n")
+                                # vpiezo
+                            vp_V = round(Convert.get_Vpiezo_float(struct.unpack('H',bytes(testMsg[9:11]))[0]), 3) #unpack bytes & convert
+                            vpStr = str(vp_V)   # format as a string
+                            print("\tVpiezo: " + vpStr + " V\n")
+                            
+                            return True
+                    return True
+                else:
+                    print(f"ERROR. Wrong response recieved: {testMsg}")
+                    print(f"Length of message received {len(testMsg)}")
+                    print(f"\tReceived status: {testMsg[2]}")
+                    print(f"\tExpected status: {status_response}")
+                             
+            else:
+                print("ERROR. Failed to receive response from MCU.")
+
+            time.sleep(sleep_time)
+            attempt += 1
+            
+    def save_notes(self, _=None):
+            self.root.focus()
+            note = self.label5.get(1.0, ctk.END)
+            note = note.strip()
+            return note
+    
+    def save_date(self, _=None):
+            self.root.focus()
+            date = self.label6.get()
+            return date
+                
     # file drop-down menu
     def DropDownMenu(self):
         self.menubar = tk.Menu(self.root)
@@ -423,7 +537,7 @@ class IVWindow:
         self.filemenu.add_command(label="Save As", command=self.save_graph_as)
         self.filemenu.add_command(label="Export (.txt)", command=self.export_data)
         self.filemenu.add_separator()
-        self.filemenu.add_command(label="Exit", command=self.root.quit)
+        self.filemenu.add_command(label="Exit", command=self.exit_application)
         
         self.menubar.add_cascade(label="File", menu=self.filemenu)
         
@@ -442,12 +556,37 @@ class IVWindow:
             messagebox.showinfo("Save Graph As", f"Graph saved as {file_path}")
     
     def export_data(self):
-        file_path = filedialog.asksaveasfilename(defaultextension=".txt", filetypes=[("Text files", "*.txt"), ("All files", "*.*")])
+        file_path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV files", "*.csv"), ("All files", "*.*")])
         if file_path:
-            with open(file_path, 'w') as file:
-                file.write("Sample data to export")
+            with open(file_path, 'w', newline='') as file:
+                # collects the user input text from the notes widget
+                header_text = self.save_notes()
+                header_date = self.save_date()
+
+                # conjoining and formatting data
+                headers = ["Bias Voltage (V)", "Tunneling Current (nA)"]
+                data_to_export = [headers]
+                data_to_export.extend(zip(self.x_data, self.y_data))
+
+                # writing to file being created
+                writer = csv.writer(file)
+                # if the header notes widget has been used, include information in .csv
+                if header_date:
+                    writer.writerow(['Date:', header_date])
+                if header_text:
+                    writer.writerow(['Notes:',header_text])
+                writer.writerows(data_to_export)
+
             messagebox.showinfo("Export Data", f"Data exported as {file_path}")
     
+    def exit_application(self):
+        """
+        Method to handle the exit command from the drop-down menu.
+        """
+        self.root.destroy()
+        # Re-enable the main window (homepage)
+        parent_window = self.root.master
+        parent_window.attributes("-disabled", False)
             
     def init_graph_widgets(self):
         self.fig, self.ax = plt.subplots()

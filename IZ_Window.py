@@ -63,8 +63,7 @@ class IZWindow:
             #self.serial_ctrl.start()
             checked = self.check_sweep_params()
             if checked:
-                self.start_btn.configure(state="disabled")
-                self.stop_btn.configure(state="normal")
+                self.disable_widgets()
                 self.run_piezo_sweep_process()
             else:
                 print("Sweep Parameters invalid. Process not started.")
@@ -74,8 +73,7 @@ class IZWindow:
     
     def stop_reading(self):
         print("Stopped reading data...")
-        self.start_btn.configure(state="normal")
-        self.stop_btn.configure(state="disabled")
+        self.enable_widgets()
         self.STOP_BTN_FLAG = 1
         self.serial_ctrl.stop()
     
@@ -129,7 +127,9 @@ class IZWindow:
         # user notes text box
         self.frame6 = LabelFrame(self.root, text="NOTES", padx=10, pady=5, bg="#A7C7E7")
         self.label6 = Text(self.frame6, height=7, width=30)
-        self.label7 = Text(self.frame6, height=1, width=8, wrap="none")
+        self.label6.bind("<Return>", self.save_notes)
+        self.label7 = Entry(self.frame6, width=8)
+        self.label7.bind("<Return>", self.save_date)
         self.label8 = Label(self.frame6, text="Date:", height=1, width=5)
         
         # setup the drop option menu
@@ -201,6 +201,38 @@ class IZWindow:
         self.adjusted_x_axis = None
         self.STOP_BTN_FLAG = 0
 
+    def disable_widgets(self):
+        """
+        Function to disable entry widgets when we start seeking.
+        Disabling:
+            - min voltage
+            - max voltage
+            - number of setpoints
+            - start button
+            - stop button
+        """
+        self.label4.configure(state="disabled")
+        self.label5.configure(state="disabled")
+        self.label9.configure(state="disabled")
+        self.start_btn.configure(state="disabled")
+        self.stop_btn.configure(state="normal")
+
+    def enable_widgets(self):
+        """
+        Function to enable entry widgets when the process is stopped.
+        Enabling:
+            - min voltage
+            - max voltage
+            - number of setpoints
+            - start button
+            - stop button
+        """
+        self.label4.configure(state="normal")
+        self.label5.configure(state="normal")
+        self.label9.configure(state="normal")
+        self.start_btn.configure(state="normal")
+        self.stop_btn.configure(state="disabled")
+        
     def saveMinVoltage(self, event):
         self.root.focus()
         if 0 <= float(self.label4.get()) <= 10:
@@ -356,8 +388,6 @@ class IZWindow:
     not receive expected response
     '''
     def send_msg_retry(self, port, msg_type, cmd, status, status_response, *params, max_attempts=1, sleep_time=0.5):
-        
-        
         global curr_data
         global vp_V
         
@@ -393,15 +423,6 @@ class IZWindow:
             
             print(f"Serial response: {testMsg_hex}")
             
-            # returns false or different values
-            # msgA returns current, vbias, vpzo
-            # msgB returns FALSE
-            # msgC returns FALSE or status byte
-            # msgD returns FALSE or num full steps
-            # msgE returns FALSE
-            # msgF returns FFT current data and frequency
-            #self.parent.ztm_serial.unpackRxMsg(testMsg)
-            
             ### Unpack data and display on the GUI
             if testMsg:
                 if testMsg_hex[2] == status_response and len(testMsg) == 11:
@@ -435,7 +456,18 @@ class IZWindow:
 
             time.sleep(sleep_time)
             attempt += 1
+
+    def save_notes(self, _=None):
+            self.root.focus()
+            note = self.label6.get(1.0, ctk.END)
+            note = note.strip()
+            return note
     
+    def save_date(self, _=None):
+            self.root.focus()
+            date = self.label7.get()
+            return date
+        
     # file drop-down menu
     def DropDownMenu(self):
         self.menubar = tk.Menu(self.root)
@@ -447,7 +479,7 @@ class IZWindow:
         self.filemenu.add_command(label="Save As", command=self.save_graph_as)
         self.filemenu.add_command(label="Export (.csv)", command=self.export_data)
         self.filemenu.add_separator()
-        self.filemenu.add_command(label="Exit", command=self.root.quit)
+        self.filemenu.add_command(label="Exit", command=self.exit_application)
         
         self.menubar.add_cascade(label="File", menu=self.filemenu)
         
@@ -473,10 +505,8 @@ class IZWindow:
         if file_path:
             with open(file_path, 'w', newline='') as file:
                 # collects the user input text from the notes widget
-                header_text = self.label6.get(1.0, ctk.END)
-                header_text = header_text.strip()
-                header_date = self.label7.get(1.0, ctk.END)
-                header_date = header_date.strip()
+                header_text = self.save_notes()
+                header_date = self.save_date()
 
                 # conjoining and formatting data
                 headers = ["Piezo Voltage (V)", "Tunneling Current (nA)"]
@@ -493,6 +523,15 @@ class IZWindow:
 
             messagebox.showinfo("Export Data", f"Data exported as {file_path}")
 
+    def exit_application(self):
+        """
+        Method to handle the exit command from the drop-down menu.
+        """
+        self.root.destroy()
+        # Re-enable the main window (homepage)
+        parent_window = self.root.master
+        parent_window.attributes("-disabled", False)
+        
     '''
     Function to initialize the data arrays and the graphical display
     '''      

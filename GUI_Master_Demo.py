@@ -45,6 +45,8 @@ tip_app_total_steps = None
 
 startup_flag = 0
 
+STOP_BTN_FLAG = 0
+
 class RootGUI:
     def __init__(self):
         """
@@ -102,13 +104,16 @@ class RootGUI:
         Disables the reading of periodic data.
         """
         print("Stopped reading data...")
-        '''
-        success = self.meas_gui.send_msg_retry(self.serial_ctrl.serial_port, MSG_C, ztmCMD.CMD_PERIODIC_DATA_DISABLE.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_ACK.value)
+        
+        success = self.meas_gui.send_msg_retry(self.serial_ctrl.serial_port, MSG_C, ztmCMD.CMD_PERIODIC_DATA_DISABLE.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value)
         while success == False:
-            success = self.meas_gui.send_msg_retry(self.serial_ctrl.serial_port, MSG_C, ztmCMD.CMD_PERIODIC_DATA_DISABLE.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_ACK.value)
-        '''
+            success = self.meas_gui.send_msg_retry(self.serial_ctrl.serial_port, MSG_C, ztmCMD.CMD_PERIODIC_DATA_DISABLE.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value)
+        
+        # will need to move this section so it only runs when we receive a valid response back
+        self.meas_gui.stop_leds()
+        self.meas_gui.enable_widgets()
         #self.serial_ctrl.running = False
-        self.serial_ctrl.stop()    # used to close the serial read thread- but we do not want that
+        #self.serial_ctrl.stop()    # used to close the serial read thread- but we do not want that
         
     def handle_data(self, raw_data):
         """
@@ -505,26 +510,85 @@ class MeasGUI:
             - stepper motor up
             - stepper motor down
             - vbias
+            - iv window
+            - iz window
+            - reset home
+            - save home
+            - start btn
+            - stop btn
         '''
-        self.vpiezo_adjust_btn_down["state"] = "disabled"
-        self.vpiezo_adjust_btn_up["state"] = "disabled"
+        self.vpiezo_adjust_btn_down.configure(state="disabled")
+        self.vpiezo_adjust_btn_up.configure(state="disabled")
+        self.label10.configure(state="disabled")
+        self.label3.configure(state="disabled")
+        self.label4.configure(state="disabled")
+        self.sample_rate_menu.configure(state="disabled")
+        self.coarse_adjust_menu.configure(state="disabled")
+        self.fine_adjust_btn_up.configure(state="disabled")
+        self.fine_adjust_btn_down.configure(state="disabled")
+        self.label6.configure(state="disabled")
+        self.sample_size.configure(state="disabled")
+        self.acquire_iv_btn.configure(state="disabled")
+        self.acquire_iz_btn.configure(state="disabled")
+        self.save_home_pos.configure(state="disabled")
+        self.return_to_home_pos.configure(state="disabled")
+        self.start_btn.configure(state="disabled")
+        self.stop_btn.configure(state="normal")
+    
+    def enable_widgets(self):
+        self.vpiezo_adjust_btn_down.configure(state="normal")
+        self.vpiezo_adjust_btn_up.configure(state="normal")
+        self.label10.configure(state="normal")
+        self.label3.configure(state="normal")
+        self.label4.configure(state="normal")
+        self.sample_rate_menu.configure(state="normal")
+        self.coarse_adjust_menu.configure(state="normal")
+        self.fine_adjust_btn_up.configure(state="normal")
+        self.fine_adjust_btn_down.configure(state="normal")
+        self.label6.configure(state="normal")
+        self.sample_size.configure(state="normal")
+        self.acquire_iv_btn.configure(state="normal")
+        self.acquire_iz_btn.configure(state="normal")
+        self.save_home_pos.configure(state="normal")
+        self.return_to_home_pos.configure(state="normal")
+        self.start_btn.configure(state="normal")
+        self.stop_btn.configure(state="disable")
       
     def open_iv_window(self):
         """
         Method to open the I-V Sweep window when the "Acquire I-V" button is clicked.
         """
+        self.acquire_iz_btn["state"] = "disabled"
         port = self.parent.serial_ctrl.serial_port
         new_window = ctk.CTkToplevel(self.root)
         IVWindow(new_window, port)
+        new_window.protocol("WM_DELETE_WINDOW", lambda: self.on_closing(new_window))
+        
+        # Disable main window
+        self.root.attributes("-disabled", True)
 
     def open_iz_window(self):
         """
         Method to open the I-Z Sweep window when the "Acquire I-Z" button is clicked.
         """
+        self.acquire_iv_btn["state"] = "disabled"
         port = self.parent.serial_ctrl.serial_port
         new_window = ctk.CTkToplevel(self.root)
         IZWindow(new_window, port)
-    
+        new_window.protocol("WM_DELETE_WINDOW", lambda: self.on_closing(new_window))
+        
+        # Disable main window
+        self.root.attributes("-disabled", True)
+
+    def on_closing(self, window):
+        """
+        Method to re-enable the main window when the IV or IZ window is closed.
+        """
+        window.destroy()
+        self.root.attributes("-disabled", False)
+        self.acquire_iv_btn["state"] = "normal"
+        self.acquire_iz_btn["state"] = "normal"
+        
     def startup_leds(self):
         """
         Method to change the LEDs upon the user pressing the start button.
@@ -549,16 +613,13 @@ class MeasGUI:
         3. Calls the `startup_leds` method to change the LED status.
         4. Calls the parent's `start_reading` method in the RootGUI class to begin data reading.
         """
+        global STOP_BTN_FLAG
         if self.check_connection():
             return
         else:
             print("ButtonGUI: Start button pressed")
-            
+            STOP_BTN_FLAG = 0
             # will need to move this section so it only runs when we receive a valid response back
-            self.start_btn.configure(state="disabled")
-            self.stop_btn.configure(state="normal")
-            self.startup_leds()
-
             self.parent.start_reading()			  
     
     def stop_reading(self):
@@ -571,16 +632,12 @@ class MeasGUI:
         3. Calls the `stop_leds` method to change the LED status.
         4. Calls the parent's `stop_reading` method in the RootGUI class to stop data reading.
         """
+        global STOP_BTN_FLAG
         if self.check_connection():
             return
         else:
             print("ButtonGUI: Stop button pressed")
-            
-            # will need to move this section so it only runs when we receive a valid response back
-            self.start_btn.configure(state="normal")
-            self.stop_btn.configure(state="disabled")
-            self.stop_leds()
-            
+            STOP_BTN_FLAG = 1
             self.parent.stop_reading()
 
     def publish(self):
@@ -898,6 +955,8 @@ class MeasGUI:
         """
         count = 0
         measure_count = 0
+        global STOP_BTN_FLAG
+        global curr_data
         
         if self.check_connection():
             return
@@ -916,9 +975,13 @@ class MeasGUI:
             
             if enable_data_success:
                 print("Received DONE.")
-                
+                self.startup_leds()
+                self.disable_widgets()
                 while True:
-                    print("HERE.")
+                    if STOP_BTN_FLAG == 1:
+                        plt.ioff()
+                        break
+                    
                     response = self.parent.serial_ctrl.ztmGetMsg(port)
                     if response[2] == ztmSTATUS.STATUS_MEASUREMENTS.value:
                         print("Received MEASUREMENTS response.")
@@ -933,7 +996,7 @@ class MeasGUI:
                     self.adc_curr = curr_data
                     self.update_label()
                     self.parent.graph_gui.update_graph()
-                    
+                STOP_BTN_FLAG = 0
             else:
                 print("Did not receive DONE.")
 
