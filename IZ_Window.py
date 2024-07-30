@@ -33,8 +33,7 @@ class IZWindow:
 
         # check if a serial connection has been established when opening the window
         if self.port == None:
-            InfoMsg = f"No serial connection detected.\nConnect to USB via homepage and try again."
-            messagebox.showerror("INVALID", InfoMsg) 
+            messagebox.showerror("INVALID", f"No serial connection detected.\nConnect to USB via homepage and try again.") 
             self.root.destroy()
 
         self.root.title("Acquire I-Z")
@@ -239,8 +238,7 @@ class IZWindow:
             self.min_voltage = float(self.label4.get())
             print(f"Saved min voltage value: {self.min_voltage}")
         else:
-            InfoMsg = f"Invalid range. Stay within 0 to 10 V."
-            messagebox.showerror("INVALID", InfoMsg)
+            messagebox.showerror("INVALID", f"Invalid range. Stay within 0 to 10 V.")
 
     def saveMaxVoltage(self, event):
         self.root.focus()
@@ -248,8 +246,7 @@ class IZWindow:
             self.max_voltage = float(self.label5.get())
             print(f"Saved min voltage value: {self.max_voltage}")
         else:
-            InfoMsg = f"Invalid range. Stay within 0 to 10 V."
-            messagebox.showerror("INVALID", InfoMsg) 
+            messagebox.showerror("INVALID", f"Invalid range. Stay within 0 to 10 V.") 
 
     def saveNumSetpoints(self, event):
         self.root.focus()
@@ -274,31 +271,26 @@ class IZWindow:
     def check_sweep_params(self):
 
         if self.min_voltage == None or self.min_voltage < 0 or self.min_voltage > 10:
-            InfoMsg = f"Invalid Min Voltage. Please update your paremeters."
-            messagebox.showerror("INVALID", InfoMsg)
+            messagebox.showerror("INVALID", f"Invalid Min Voltage. Please update your paremeters.")
             return False
         
         if self.max_voltage == None or self.max_voltage <= 0 or self.max_voltage > 10:
-            InfoMsg = f"Invalid Max Voltage. Please update your paremeters."
-            messagebox.showerror("INVALID", InfoMsg) 
+            messagebox.showerror("INVALID", f"Invalid Max Voltage. Please update your paremeters.") 
             return False
 
         if self.num_setpoints == None or self.num_setpoints <= 0:
-            InfoMsg = f"Invalid Number of Setpoints. Please update your paremeters."
-            messagebox.showerror("INVALID", InfoMsg) 
+            messagebox.showerror("INVALID", f"Invalid Number of Setpoints. Please update your paremeters.") 
             return False
 
         self.piezo_volt_range = self.max_voltage - self.min_voltage
         self.volt_per_step = self.piezo_volt_range / self.num_setpoints
 
         if self.piezo_volt_range <= 0:
-            InfoMsg = f"Invalid sweep range. Max value must be higher than Min value."
-            messagebox.showerror("INVALID", InfoMsg) 
+            messagebox.showerror("INVALID", f"Invalid sweep range. Max value must be higher than min value.") 
             return False
         
         if self.volt_per_step < 0.0002:
-            InfoMsg = f"Invalid Step Size.\nStep size: {self.volt_per_step:.6f}\nStep size needs to be greater than or equal 0.0002V (0.2 mV)\nDecrease number of points or increase voltage range"
-            messagebox.showerror("INVALID", InfoMsg) 
+            messagebox.showerror("INVALID", f"Invalid Step Size.\nStep size: {self.volt_per_step:.6f}\nStep size needs to be greater than or equal 0.0002V (0.2 mV)\nDecrease number of points or increase voltage range.") 
             return False
         
         return True
@@ -326,16 +318,14 @@ class IZWindow:
             # sending vpiezo to MCU, looking for a DONE status in return
             success = self.send_msg_retry(self.port, MSG_A, ztmCMD.CMD_PIEZO_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, 0, 0, self.vpiezo)
             if not success:
-                InfoMsg = f"Could not verify communication with MCU.\nSweep process aborted."
-                messagebox.showerror("INVALID", InfoMsg) 
+                messagebox.showerror("INVALID", f"Could not verify communication with MCU.\nSweep process aborted.") 
                 self.sweep_finished()
                 return
             
             # sending a REQUEST_FOR_DATA command to MCU to receive current and vpiezo measurements
             dataSuccess = self.send_msg_retry(self.port, MSG_C, ztmCMD.CMD_REQ_DATA.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_MEASUREMENTS.value)
             if not dataSuccess:
-                InfoMsg = f"Did not receive data from MCU.\nSweep process aborted."
-                messagebox.showerror("INVALID", InfoMsg) 
+                messagebox.showerror("INVALID", f"Did not receive data from MCU.\nSweep process aborted.") 
                 self.sweep_finished()
                 return
 
@@ -354,13 +344,11 @@ class IZWindow:
         if self.STOP_BTN_FLAG == 1:
             self.change_LED(RED)
             # display message to user if sweep is aborted
-            InfoMsg = f"The voltage sweep has been STOPPED."
-            messagebox.showerror("STOP BUTTON PRESSED", InfoMsg)
+            messagebox.showerror("STOP BUTTON PRESSED", f"The voltage sweep has been STOPPED.")
         else: 
             self.change_LED(RED)
             # display message to user if sweep completed
-            InfoMsg = f"The voltage sweep has completed."
-            messagebox.showerror("Successful Sweep", InfoMsg)
+            messagebox.showerror("Successful Sweep", f"The voltage sweep has completed.")
 
         self.sweep_finished()
 

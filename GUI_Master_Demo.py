@@ -12,6 +12,7 @@ import time
 import sys
 import csv
 import datetime
+import threading
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -44,6 +45,8 @@ curr_pos_total_steps = None
 tip_app_total_steps = None
 
 startup_flag = 0
+
+START_PRESSED_COUNT = 0
 
 STOP_BTN_FLAG = 0
 
@@ -93,7 +96,7 @@ class RootGUI:
         print("Starting to read data...")
         if self.serial_ctrl:
             print("Serial controller is initialized, starting now...")
-            #self.meas_gui.start_seeking()
+            #self.meas_gui.tip_approach()
             self.meas_gui.enable_periodics()
             self.serial_ctrl.running = True
         else:
@@ -101,20 +104,54 @@ class RootGUI:
     
     def stop_reading(self):
         """
+        Disables the reading of periodic data in a background thread.
+        """
+        global START_PRESSED_COUNT
+        def stop_reading_task():
+            print("Stopped reading data...")
+
+            timeout = 5  # Timeout in seconds
+            start_time = time.time()
+            success = self.meas_gui.send_msg_retry(self.serial_ctrl.serial_port, MSG_C, ztmCMD.CMD_PERIODIC_DATA_DISABLE.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value)
+
+            while not success and (time.time() - start_time) < timeout:
+                success = self.meas_gui.send_msg_retry(self.serial_ctrl.serial_port, MSG_C, ztmCMD.CMD_PERIODIC_DATA_DISABLE.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value)
+            
+            if success:
+                print("Received valid response within timeout period.")
+                START_PRESSED_COUNT = 0
+            else:
+                print("Did not receive valid response within timeout period. Moving on.")
+            self.meas_gui.enable_widgets()
+            self.meas_gui.stop_leds()
+            #self.serial_ctrl.stop()  # Ensure serial reading is stopped regardless of success
+
+        # Run the stop reading task in a separate thread
+        stop_thread = threading.Thread(target=stop_reading_task)
+        stop_thread.start()
+        
+    '''
+    def stop_reading(self):
+        """
         Disables the reading of periodic data.
         """
         print("Stopped reading data...")
-        
+        timeout = 5  # Timeout in seconds
+        start_time = time.time()
         success = self.meas_gui.send_msg_retry(self.serial_ctrl.serial_port, MSG_C, ztmCMD.CMD_PERIODIC_DATA_DISABLE.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value)
-        while success == False:
+
+        while not success and (time.time() - start_time) < timeout:
             success = self.meas_gui.send_msg_retry(self.serial_ctrl.serial_port, MSG_C, ztmCMD.CMD_PERIODIC_DATA_DISABLE.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value)
         
+        if success:
+            print("Received valid response within timeout period.")
+        else:
+            print("Did not receive valid response within timeout period. Moving on.")
+
         # will need to move this section so it only runs when we receive a valid response back
         self.meas_gui.stop_leds()
         self.meas_gui.enable_widgets()
-        #self.serial_ctrl.running = False
-        #self.serial_ctrl.stop()    # used to close the serial read thread- but we do not want that
-        
+    '''    
     def handle_data(self, raw_data):
         """
         Handles the incoming raw data from the serial port and processes it.
@@ -129,7 +166,6 @@ class RootGUI:
         else:
             print("Data decoding failed or data is incomplete")
 
-# Class to setup and create the communication manager with MCU
 class ComGUI:
     def __init__(self, root, parent):
         """
@@ -214,19 +250,10 @@ class ComGUI:
 
                 # If the port is available, proceed with the connection
                 self.parent.serial_ctrl.port = port
-                #self.parent.serial_ctrl.serial_port = serial.Serial(port)  # Open the serial port
-                #self.parent.meas_gui.update_port(self.parent.serial_ctrl.serial_port)  # Update the port in MeasGUI
                 print(f"Connecting to {port}...")
-                self.btn_connect["text"] = "Disconnect"
-                self.btn_refresh["state"] = "disable"
-                self.drop_com["state"] = "disable"
-                InfoMsg = f"Successful UART connection using {self.clicked_com.get()}."
-                messagebox.showinfo("Connected", InfoMsg)
                 
                 serial_response = self.parent.serial_ctrl.start()
-                #self.parent.serial_ctrl.start()
-                
-                
+
                 if serial_response:
                     self.startup_routine()
                 else:
@@ -276,6 +303,11 @@ class ComGUI:
         
         if msg_response:
             print("SUCCESS. Startup routine completed.")
+            self.btn_connect["text"] = "Disconnect"
+            self.btn_refresh["state"] = "disable"
+            self.drop_com["state"] = "disable"
+            InfoMsg = f"Successful UART connection using {self.clicked_com.get()}."
+            messagebox.showinfo("Connected", InfoMsg)
             startup_flag = 1
         else:
             self.btn_connect["text"] = "Connect"
@@ -614,10 +646,12 @@ class MeasGUI:
         4. Calls the parent's `start_reading` method in the RootGUI class to begin data reading.
         """
         global STOP_BTN_FLAG
+        global START_PRESSED_COUNT
         if self.check_connection():
             return
         else:
             print("ButtonGUI: Start button pressed")
+            START_PRESSED_COUNT += 1
             STOP_BTN_FLAG = 0
             # will need to move this section so it only runs when we receive a valid response back
             self.parent.start_reading()			  
@@ -828,7 +862,7 @@ class MeasGUI:
     This function consists of the tip approach algorithm and receiving periodic data
     once the tip approach algorithm successfully finishes
     '''        
-    def start_seeking(self):
+    def tip_approach(self):
         # access global variables
         global curr_setpoint
         global curr_data
@@ -856,7 +890,7 @@ class MeasGUI:
         if tip_app_total_steps == curr_pos_total_steps:
                 self.enable_periodics()
         else:
-            print("\n----------START SEEKING TUNNELING CURRENT----------")
+            print("\n----------BEGINNING TIP APPROACH ALGORITHM----------")
             
             # check for port connection
             port = self.parent.serial_ctrl.serial_port
@@ -869,6 +903,7 @@ class MeasGUI:
             # 3. a) Verify we have DONE msgs received from MCU (vpzo and vbias)
             # 3. b) If DONE msgs not rcvd, MCU will send RESEND status and GUI will resend until we have DONE from MCU
             
+            ''' NOT NEEDED ANYMORE (?)
             # error check current setpoint
             try:
                 curr_setpoint = float(curr_setpoint)
@@ -929,7 +964,7 @@ class MeasGUI:
                 else:
                     sample_size_done_flag = 0
             print(f"Sample size: {sample_size_save}")
-            
+            '''            
             
             # sample_size_save = 10 # for debugging purposes, delete later
             
@@ -953,9 +988,8 @@ class MeasGUI:
         """
         Function to enable and read periodic data from the MCU.
         """
-        count = 0
-        measure_count = 0
         global STOP_BTN_FLAG
+        global START_PRESSED_COUNT
         global curr_data
         
         if self.check_connection():
@@ -963,11 +997,6 @@ class MeasGUI:
         else:
         ########## 
             print("\n********** BEGIN ENABLING PERIODIC DATA **********")
-            
-            # Resets visual graph and data
-            self.parent.graph_gui.reset_graph()
-            # Turns interactive graph on
-            plt.ion()
 
             port = self.parent.serial_ctrl.serial_port
             
@@ -975,28 +1004,51 @@ class MeasGUI:
             
             if enable_data_success:
                 print("Received DONE.")
+                # Resets visual graph and data
+                self.parent.graph_gui.reset_graph() 
+                # Turns interactive graph on
+                plt.ion()
+                
                 self.startup_leds()
                 self.disable_widgets()
+                
                 while True:
                     if STOP_BTN_FLAG == 1:
                         plt.ioff()
                         break
                     
                     response = self.parent.serial_ctrl.ztmGetMsg(port)
-                    if response[2] == ztmSTATUS.STATUS_MEASUREMENTS.value:
-                        print("Received MEASUREMENTS response.")
+                    if START_PRESSED_COUNT == 1:
+                        if response[2] == ztmSTATUS.STATUS_MEASUREMENTS.value or response[2] == ztmSTATUS.STATUS_ACK.value:
+                            print(f"Received correct response response: {response[2]}")
+                            
+                            curr_data = round(struct.unpack('f', bytes(response[3:7]))[0], 3) 
+                            cStr = str(curr_data) 
+                            print("Received values\n\tCurrent: " + cStr + " nA\n")
+                        else:
+                            print(f"Did not receive correct response: {response[2]}")
                         
-                        curr_data = round(struct.unpack('f', bytes(response[3:7]))[0], 3) 
-                        cStr = str(curr_data) 
-                        print("Received values\n\tCurrent: " + cStr + " nA\n")
-                    else:
-                        print("Did not receive MEASUREMENTS response.")
+                        # Use this to call update_graph() everytime a data point is recieved
+                        self.adc_curr = curr_data
+                        self.update_label()
+                        self.parent.graph_gui.update_graph()
+                        
+                    elif START_PRESSED_COUNT > 1:
+                        if response[2] == ztmSTATUS.STATUS_MEASUREMENTS.value or response[2] == ztmSTATUS.STATUS_DONE.value:
+                            print(f"Received correct response response: {response[2]}") 
+                            
+                            curr_data = round(struct.unpack('f', bytes(response[3:7]))[0], 3) 
+                            cStr = str(curr_data) 
+                            print("Received values\n\tCurrent: " + cStr + " nA\n")
+                        else:
+                            print(f"Did not receive correct response: {response[2]}")
+                        
+                        # Use this to call update_graph() everytime a data point is recieved
+                        self.adc_curr = curr_data
+                        self.update_label()
+                        self.parent.graph_gui.update_graph()
                     
-                    # Use this to call update_graph() everytime a data point is recieved
-                    self.adc_curr = curr_data
-                    self.update_label()
-                    self.parent.graph_gui.update_graph()
-                STOP_BTN_FLAG = 0
+                STOP_BTN_FLAG = 0    
             else:
                 print("Did not receive DONE.")
 
@@ -1169,14 +1221,13 @@ class MeasGUI:
                 print("\n----------SENDING SAMPLE BIAS----------")
                 vbias_save = self.get_float_value(self.label6, 1.0, "Voltage Bias")
                 
-                # error checking within range
-                if vbias_save not in range(-10, 10):
-                    if vbias_save < -10:
-                        vbias_save = -9.0
-                    elif vbias_save > 10:
-                        vbias_save = 9.0
-                    messagebox.showerror("Invalid Value", f"Invalid input. Sample size defaulted to {vbias_save}.")
-                    
+                if vbias_save < -10:
+                    vbias_save = -9.0
+                    messagebox.showerror("Invalid Value", f"Invalid input. Sample bias defaulted to {vbias_save}.")
+                elif vbias_save > 10:
+                    vbias_save = 9.0
+                    messagebox.showerror("Invalid Value", f"Invalid input. Sample bias defaulted to {vbias_save}.")
+                
                 self.label6.delete(0, END)
                 self.label6.insert(0, vbias_save)
                     
@@ -1396,11 +1447,11 @@ class MeasGUI:
             
             # If a home position has not been set, error message and return from function
             if home_pos_total_steps == None:
-                InfoMsg = f"No Home Position has been set."
-                messagebox.showerror("INVALID", InfoMsg)
+                messagebox.showerror("INVALID", f"No home position has been set.")
                 return
             elif home_pos_total_steps == curr_pos_total_steps:
                 messagebox.showerror("INVALID", f"Stepper motor is already at home position.")
+                return
             
             if curr_pos_total_steps:
                 
