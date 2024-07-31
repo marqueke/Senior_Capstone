@@ -1,7 +1,7 @@
 import serial
 import threading
 import time
-from ztmSerialCommLibrary import ztmCMD, ztmSTATUS, usbMsgFunctions, MSG_A, MSG_B, MSG_C, MSG_D, MSG_E, MSG_F
+import GLOBALS
 
 class SerialCtrl:
     def __init__(self, port, baudrate, callback):
@@ -24,9 +24,9 @@ class SerialCtrl:
                     self.buffer.extend(raw_data)
                     
                     # Process complete frames (11 bytes each)
-                    while len(self.buffer) >= 11:
-                        frame = self.buffer[:11]
-                        self.buffer = self.buffer[11:]
+                    while len(self.buffer) >= GLOBALS.MSG_BYTES:
+                        frame = self.buffer[:GLOBALS.MSG_BYTES]
+                        self.buffer = self.buffer[GLOBALS.MSG_BYTES:]
                         #print(f"Processing frame: {frame.hex}")
                         self.callback(frame)
                     return raw_data
@@ -40,7 +40,7 @@ class SerialCtrl:
     def read_serial_blocking(self):
         if self.serial_port and self.serial_port.is_open:
             try:
-                raw_data = self.serial_port.read(11)  # Read 11 bytes blocking
+                raw_data = self.serial_port.read(GLOBALS.MSG_BYTES)  # Read 11 bytes blocking
                 if raw_data:
                     print(f"Received data: {raw_data.hex()}")
                     return raw_data
@@ -61,14 +61,14 @@ class SerialCtrl:
         
         attempts = 0
         response = b''  # Initialize an empty byte string to store the response
-        while(attempts < 10):
+        while(attempts < GLOBALS.MAX_ATTEMPTS):
             try:
-                response = port.read(11)
+                response = port.read(GLOBALS.MSG_BYTES)
                 return response
             except serial.SerialException as e:
                 print(f"Read operation failed: {e}")    
                 attempts += 1        
-        if attempts == 10:
+        if attempts == GLOBALS.MAX_ATTEMPTS:
             print(f"Failed to receive complete message.\n")   
             return False
     
@@ -76,16 +76,15 @@ class SerialCtrl:
     # function to read msg of 11 bytes
     def read_bytes(self):
         count = 0
-        max_attempts = 10
         response = None
 
-        while count < max_attempts:
+        while count < GLOBALS.MAX_ATTEMPTS:
             if self.serial_port and self.serial_port.is_open:
                 try:
                     # Attempt to read 11 bytes with a timeout
-                    response = self.serial_port.read(11)
-                    if response and len(response) == 11:
-                        if response[0] not in [MSG_A, MSG_B, MSG_C, MSG_D, MSG_E]:
+                    response = self.serial_port.read(GLOBALS.MSG_BYTES)
+                    if response and len(response) == GLOBALS.MSG_BYTES:
+                        if response[0] not in [GLOBALS.MSG_A, GLOBALS.MSG_B, GLOBALS.MSG_C, GLOBALS.MSG_D, GLOBALS.MSG_E]:
                             print("Message received out of order.\n")
                             return None
                         else:
@@ -94,12 +93,12 @@ class SerialCtrl:
                     else:
                         print("No response received from MCU, retrying...")
                         count += 1
-                        time.sleep(1)
+                        time.sleep(GLOBALS.ONE_SECOND)
                         return None
                 except serial.SerialTimeoutException:
                     print("Read timed out, retrying...")
                     count += 1
-                    time.sleep(1)
+                    time.sleep(GLOBALS.ONE_SECOND)
                     return None
             else:
                 print("Serial port is not open.")
