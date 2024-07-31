@@ -184,7 +184,7 @@ class IZWindow:
         self.label8.grid(row=0, column=2, pady=5, sticky="w")
         
         # Positioning the file drop-down menu
-        self.drop_menu.grid(row=0, column=0, padx=self.padx, pady=self.pady)
+        #self.drop_menu.grid(row=0, column=0, padx=self.padx, pady=self.pady)
 
         self.start_btn.grid(row=1, column=10, padx=5, pady=15, sticky="s")
         self.stop_btn.grid(row=2, column=10, padx=5, sticky="n")
@@ -233,62 +233,36 @@ class IZWindow:
         self.stop_btn.configure(state="disabled")
         
     def saveMinVoltage(self, event):
-        if self.isValidVoltageInput(self.label4.get()):
-            if 0 <= float(self.label4.get()) <= 10:
-                self.min_voltage = float(self.label4.get())
-                print(f"Saved min voltage value: {self.min_voltage}")
-                self.root.focus()
-            else:
-                InfoMsg = f"Invalid range. Stay within 0 - 10 V."
-                messagebox.showerror("INVALID", InfoMsg)
-                self.root.focus()
+        self.root.focus()
+        if 0 <= float(self.label4.get()) <= 10:
+            self.min_voltage = float(self.label4.get())
+            print(f"Saved min voltage value: {self.min_voltage}")
         else:
             messagebox.showerror("INVALID", f"Invalid range. Stay within 0 to 10 V.")
 
     def saveMaxVoltage(self, event):
-        if self.isValidVoltageInput(self.label5.get()):
-            if 0 <= float(self.label5.get()) <= 10:
-                self.max_voltage = float(self.label5.get())
-                print(f"Saved min voltage value: {self.max_voltage}")
-                self.root.focus()
-            else:
-                InfoMsg = f"Invalid range. Stay within 0 - 10 V."
-                messagebox.showerror("INVALID", InfoMsg) 
-                self.root.focus()
+        self.root.focus()
+        if 0 <= float(self.label5.get()) <= 10:
+            self.max_voltage = float(self.label5.get())
+            print(f"Saved min voltage value: {self.max_voltage}")
         else:
-            InfoMsg = f"Invalid input. Stay within 0 - 10 V."
-            messagebox.showerror("INVALID", InfoMsg)
-
-    def isValidVoltageInput(self, text):
-        try:
-            float(text)
-            return True
-        except ValueError:
-            return False
+            messagebox.showerror("INVALID", f"Invalid range. Stay within 0 to 10 V.") 
 
     def saveNumSetpoints(self, event):
-        if self.isValidSetpointInput(self.label9.get()):
-            self.num_setpoints = int(self.label9.get())
-            print(f"Saved number of setpoints value: {self.num_setpoints}")
-            self.root.focus()
-        else:
-            InfoMsg = f"Invalid input. Please enter an integer."
-            messagebox.showerror("INVALID", InfoMsg)
-
-    def isValidSetpointInput(self, text):
-        try:
-            int(text)
-            return True
-        except ValueError:
-            return False
+        self.root.focus()
+        self.num_setpoints = int(self.label9.get())
+        print(f"Saved number of setpoints value: {self.num_setpoints}")
 
     # current and piezo voltage
     def update_label(self):   
-        global curr_data
-        global vp_V     
+        global curr_data     
         self.label2.configure(text=f"{vp_V:.3f} V") # piezo voltage
+        
+        self.random_num = random.uniform(0, 5) 
+        #self.label3.configure(text=f"{self.random_num:.3f} nA")
         self.label3.configure(text=f"{curr_data:.3f} nA") # current
 
+        #self.label2.after(100, self.update_label)
 
     def get_current_label3(self):
         current_value = float(self.label3.cget("text").split()[0])  # assuming label3 text value is "value" nA
@@ -339,7 +313,7 @@ class IZWindow:
         for i in range(0, self.num_setpoints + 1):
 
             if self.STOP_BTN_FLAG == 1:
-                break                        
+                break            
 
             # sending vpiezo to MCU, looking for a DONE status in return
             success = self.send_msg_retry(self.port, MSG_A, ztmCMD.CMD_PIEZO_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, 0, 0, self.vpiezo)
@@ -375,8 +349,6 @@ class IZWindow:
             self.change_LED(RED)
             # display message to user if sweep completed
             messagebox.showerror("Successful Sweep", f"The voltage sweep has completed.")
-
-        self.sweep_finished()
 
         self.sweep_finished()
 
@@ -455,7 +427,7 @@ class IZWindow:
                             vbStr = str(vb_V)   # format as a string
                             print("\tVbias: " + vbStr + " V\n")
                                 # vpiezo
-                            vp_V = round(Convert.get_Vpiezo_float(struct.unpack('H',bytes(testMsg[9:11]))[0]), 4) #unpack bytes & convert
+                            vp_V = round(Convert.get_Vpiezo_float(struct.unpack('H',bytes(testMsg[9:11]))[0]), 3) #unpack bytes & convert
                             vpStr = str(vp_V)   # format as a string
                             print("\tVpiezo: " + vpStr + " V\n")
                             
@@ -611,3 +583,6 @@ class IZWindow:
         self.line, = self.ax.plot([], [], 'r-')
         self.canvas.draw()
         self.canvas.flush_events()
+
+        
+   
