@@ -358,8 +358,9 @@ class IZWindow:
         # # reset button states
         RED = 0
         self.change_LED(RED)
-        self.start_btn.configure(state="normal")
-        self.stop_btn.configure(state="disabled")
+        self.enable_widgets()
+        self.serial_ctrl.stop()
+
         self.STOP_BTN_FLAG = 0
 
     def change_LED(self, color):
