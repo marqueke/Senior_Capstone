@@ -8,31 +8,11 @@ import ztmConsoleFunctions
 import serial
 import time
 
+import GLOBALS
 ###########################################
-# GLOBAL VARIABLES
-MSG_A = 0X0A
-MSG_B = 0X0B
-MSG_C = 0X0C
-MSG_D = 0X0D
-MSG_E = 0X0E
-MSG_F = 0X0F
-MSG_X = 0x58
-
-FULL_STEP       = 0x00
-HALF_STEP       = 0x01
-QUARTER_STEP    = 0x02
-EIGHTH_STEP     = 0x03
-
-DIR_UP          = 0x00
-DIR_DOWN        = 0x01
-
-headerBytes = 3
-payloadBytes = 8
-msgBytes = headerBytes + payloadBytes
-
 adcByteLen = 4
 dacByteLen = 2
-vByteLen = payloadBytes - adcByteLen
+vByteLen = GLOBALS.PAYLOAD_BYTES - adcByteLen
 
 padByte = [0x00]
 
@@ -121,7 +101,7 @@ class usbMsgFunctions:
         #vbiasBytes = struct.pack('H', ztmConvert.get_Vbias_int(vbias))
         #vpzoBytes = struct.pack('H', ztmConvert.get_Vpiezo_int16(vpzo))
 
-        messageA = struct.pack('<BBBfHH', MSG_A, msgCmd, msgStatus, current_nA, Convert.get_Vbias_int(vbias), Convert.get_Vpiezo_int(vpzo))
+        messageA = struct.pack('<BBBfHH', GLOBALS.MSG_A, msgCmd, msgStatus, current_nA, Convert.get_Vbias_int(vbias), Convert.get_Vpiezo_int(vpzo))
         retry = 0
         maxRetries = 10
         while retry < maxRetries:  
@@ -133,7 +113,7 @@ class usbMsgFunctions:
             except serial.SerialException as e:
                 print(f"Write operation failed: {e}")
                 retry += 1
-        print("Failed to send message\n")    
+        print("Failed to send message.\n")    
         return False 
 
     # MSG B
@@ -147,10 +127,10 @@ class usbMsgFunctions:
         #headerB = [MSG_B, msgCmd, msgStatus]
         #padBytes = padByte * (payloadBytes - 2)
 
-        payload = bytes(payloadBytes - 2) 
+        payload = bytes(GLOBALS.PAYLOAD_BYTES - 2) 
         rateHzBytes = struct.pack('H', uint16_rateHz)
         
-        messageB = struct.pack('<BBBHBBBBBB', MSG_B, msgCmd, msgStatus, uint16_rateHz, *payload)
+        messageB = struct.pack('<BBBHBBBBBB', GLOBALS.MSG_B, msgCmd, msgStatus, uint16_rateHz, *payload)
         retry = 0
         maxRetries = 10
         while retry < maxRetries:  
@@ -162,7 +142,7 @@ class usbMsgFunctions:
             except serial.SerialException as e:
                 print(f"Write operation failed: {e}")
                 retry += 1
-        print("Failed to send message\n")    
+        print("Failed to send message.\n")    
         return False        
 
     # MSG C
@@ -175,7 +155,7 @@ class usbMsgFunctions:
         
         #headerC = [MSG_C, msgCmd, msgStatus]
         payload = padByte * 8
-        messageC = struct.pack('BBBBBBBBBBB', MSG_C, msgCmd, msgStatus, *payload)
+        messageC = struct.pack('BBBBBBBBBBB', GLOBALS.MSG_C, msgCmd, msgStatus, *payload)
         retry = 0
         maxRetries = 10
         while retry < maxRetries:
@@ -188,7 +168,7 @@ class usbMsgFunctions:
             except serial.SerialException as e:
                 print(f"Write operation failed: {e}")
                 retry += 1
-        print("Failed to send message\n")    
+        print("Failed to send message.\n")    
         return False  
 
     # MSG D
@@ -203,7 +183,7 @@ class usbMsgFunctions:
             - Function transmits Msg D, returns True if successful, else false. '''        
 
         payload = bytes(2)
-        messageD = struct.pack('<BBBBBiBB', MSG_D, msgCmd, msgStatus, size, dir, count, *payload)
+        messageD = struct.pack('<BBBBBiBB', GLOBALS.MSG_D, msgCmd, msgStatus, size, dir, count, *payload)
 
         retry = 0
         maxRetries = 10
@@ -216,7 +196,7 @@ class usbMsgFunctions:
             except serial.SerialException as e:
                 print(f"Write operation failed: {e}")
                 retry += 1
-        print("Failed to send message\n")    
+        print("Failed to send message.\n")    
         return False   
 
     # MSG E
@@ -226,12 +206,12 @@ class usbMsgFunctions:
         - uint16_rateHz = vbias frequency, units of Hz, max valid freq = 5000 Hz
         - Function transmits Msg E, does not return anything. '''           
         # ONLY VALID CMD IN MSG E IS CMD_VBIAS_SET_SINE
-        headerE = [MSG_E, ztmCMD.CMD_VBIAS_SET_SINE.value, ztmSTATUS.STATUS_CLR.value]
-        sineVbiasBytes = struct.pack('H', ztmConvert.get_Vbias_int(sineVbiasAmp))
+        headerE = [GLOBALS.MSG_E, ztmCMD.CMD_VBIAS_SET_SINE.value, ztmSTATUS.STATUS_CLR.value]
+        sineVbiasBytes = struct.pack('H', Convert.get_Vbias_int(sineVbiasAmp))
         rateHzBytes = struct.pack('H', uint16_rateHz)
-        payloadByteLen = payloadBytes - 4
+        payloadByteLen = GLOBALS.PAYLOAD_BYTES - 4
         payload = bytes(4)
-        messageE = struct.pack('<BBBHHBBBB', MSG_E, ztmCMD.CMD_VBIAS_SET_SINE.value, ztmSTATUS.STATUS_CLR.value, 
+        messageE = struct.pack('<BBBHHBBBB', GLOBALS.MSG_E, ztmCMD.CMD_VBIAS_SET_SINE.value, ztmSTATUS.STATUS_CLR.value, 
                                                 Convert.get_Vbias_int(sineVbiasAmp), uint16_rateHz, *payload)
 
         retry = 0
@@ -245,7 +225,7 @@ class usbMsgFunctions:
             except serial.SerialException as e:
                 print(f"Write operation failed: {e}")
                 retry += 1
-        print("Failed to send message\n")    
+        print("Failed to send message.\n")    
         return False    
         
     ###############################################
@@ -255,14 +235,14 @@ class usbMsgFunctions:
         # DEBUG - PRINT CMD AND STATUS #
         try:
             cmdRx = ztmCMD(rxMsg[cmdByte])
-            print("Received : " + cmdRx.name)
+            #print("Received : " + cmdRx.name)
             statRx = ztmSTATUS(rxMsg[statByte])
-            print("Received : " + statRx.name + "\n")
+            #print("Received : " + statRx.name + "\n")
    
         ################################
         
         # EXTRACT THE DATA FROM RX MSG #
-            if(rxMsg[0] == MSG_A):
+            if(rxMsg[0] == GLOBALS.MSG_A):
                 if(rxMsg[cmdByte] != ztmCMD.CMD_CLR.value):
                     # microcontroller should not send commands
                     return False
@@ -274,11 +254,11 @@ class usbMsgFunctions:
                 else:
                     return False
 
-            elif (rxMsg[0] == MSG_B):
+            elif (rxMsg[0] == GLOBALS.MSG_B):
                 # microcontroller should not send msg B       
                 return False
 
-            elif (rxMsg[0] == MSG_C):
+            elif (rxMsg[0] == GLOBALS.MSG_C):
                 if(rxMsg[cmdByte] != ztmCMD.CMD_CLR.value):
                     # microcontroller should not send commands
                     return False
@@ -287,7 +267,7 @@ class usbMsgFunctions:
                     #print("Received : " + statRx.name + "\n")
                     return rxMsg[statByte]
 
-            elif (rxMsg[0] == MSG_D):
+            elif (rxMsg[0] == GLOBALS.MSG_D):
                 if(rxMsg[cmdByte] != ztmCMD.CMD_CLR.value):
                     # microcontroller should not send commands
                     return False
@@ -296,11 +276,11 @@ class usbMsgFunctions:
                     stepsRx = stepsRx / 8   # return the number of full steps as a float for conversion
                     return stepsRx 
 
-            elif (rxMsg[0] == MSG_E):
+            elif (rxMsg[0] == GLOBALS.MSG_E):
                 # microcontroller should not send msg B       
                 return False 
 
-            elif (rxMsg[0] == MSG_F):
+            elif (rxMsg[0] == GLOBALS.MSG_F):
                 if(rxMsg[cmdByte] != ztmCMD.CMD_CLR.value):
                     # microcontroller should not send commands     
                     return False
@@ -337,7 +317,7 @@ class usbMsgFunctions:
     def startAdcCalMode(ztmComms):
         ''' send data byte by byte'''
 
-        MsgId   = MSG_X
+        MsgId   = GLOBALS.MSG_X
         CmdByte = [ztmCMD.CMD_ADC_CAL_MODE.value]
         #padByte = [0x1]
 
@@ -348,7 +328,7 @@ class usbMsgFunctions:
         ztmComms.write(serial.to_bytes(CmdByte))
         time.sleep(usbDelay)
 
-        for i in range(0, payloadBytes+1):
+        for i in range(0, GLOBALS.PAYLOAD_BYTES+1):
             ztmComms.write(serial.to_bytes(padByte))
             time.sleep(usbDelay)
         # clear buffer    
@@ -357,7 +337,7 @@ class usbMsgFunctions:
     def sendAdcTestCurrent(ztmComms, testCurrent):
         ''' send data byte by byte'''
 
-        MsgId   = MSG_X
+        MsgId   = GLOBALS.MSG_X
         CmdByte = [ztmCMD.CMD_ADC_CAL_LOAD_CURR.value]
         #padByte = [0x0]
       
@@ -400,7 +380,7 @@ class usbMsgFunctions:
     def adcCalCmd_0V(ztmComms):
         ''' send data byte by byte'''
 
-        MsgId   = MSG_X
+        MsgId   = GLOBALS.MSG_X
         CmdByte = [ztmCMD.CMD_ADC_CAL_MEAS_GND.value]
         #padByte = [0x0]
 
@@ -411,7 +391,7 @@ class usbMsgFunctions:
         ztmComms.write(serial.to_bytes(CmdByte))
         time.sleep(usbDelay)
 
-        for i in range(0, payloadBytes+1):
+        for i in range(0, GLOBALS.PAYLOAD_BYTES+1):
             ztmComms.write(serial.to_bytes(padByte))
             time.sleep(usbDelay)
 
@@ -421,7 +401,7 @@ class usbMsgFunctions:
     def adcCalCmd_TestCurr(ztmComms):
         ''' send data byte by byte'''
 
-        MsgId   = MSG_X
+        MsgId   = GLOBALS.MSG_X
         CmdByte = [ztmCMD.CMD_ADC_CAL_MEAS_TEST_CURR.value]
         #padByte = [0x0]
 
@@ -432,7 +412,7 @@ class usbMsgFunctions:
         ztmComms.write(serial.to_bytes(CmdByte))
         time.sleep(usbDelay)
 
-        for i in range(0, payloadBytes+1):
+        for i in range(0, GLOBALS.PAYLOAD_BYTES+1):
             ztmComms.write(serial.to_bytes(padByte))
             time.sleep(usbDelay)
 
@@ -443,7 +423,7 @@ class usbMsgFunctions:
     def adcCalCmd_CalStop(ztmComms):
         ''' send data byte by byte'''
 
-        MsgId   = MSG_X
+        MsgId   = GLOBALS.MSG_X
         CmdByte = [ztmCMD.CMD_ADC_CAL_STOP.value]
         #padByte = [0x0]
 
@@ -454,7 +434,7 @@ class usbMsgFunctions:
         ztmComms.write(serial.to_bytes(CmdByte))
         time.sleep(usbDelay)
 
-        for i in range(0, payloadBytes+1):
+        for i in range(0, GLOBALS.PAYLOAD_BYTES+1):
             ztmComms.write(serial.to_bytes(padByte))
             time.sleep(usbDelay)
 
@@ -465,7 +445,7 @@ class usbMsgFunctions:
     # DAC COMMS #
     def startDacCalMode(ztmComms, dacSel):
         ''' send data byte by byte'''
-        MsgId   = MSG_X
+        MsgId   = GLOBALS.MSG_X
         if(dacSel == "piezo"):
             CmdByte = [ztmCMD.CMD_DAC_CAL_MODE_VPZO.value]
         else:
@@ -479,7 +459,7 @@ class usbMsgFunctions:
         ztmComms.write(serial.to_bytes(CmdByte))
         time.sleep(usbDelay)
 
-        for i in range(0, payloadBytes+1):
+        for i in range(0, GLOBALS.PAYLOAD_BYTES+1):
             ztmComms.write(serial.to_bytes(padByte))
             time.sleep(usbDelay)
         # clear buffer    
@@ -488,7 +468,7 @@ class usbMsgFunctions:
     def dacCalCmd_0V(ztmComms):
         ''' send data byte by byte'''
 
-        MsgId   = MSG_X
+        MsgId   = GLOBALS.MSG_X
         CmdByte = [ztmCMD.CMD_DAC_CAL_SET_0V.value]
         #padByte = [0x0]
 
@@ -499,7 +479,7 @@ class usbMsgFunctions:
         ztmComms.write(serial.to_bytes(CmdByte))
         time.sleep(usbDelay)
 
-        for i in range(0, payloadBytes+1):
+        for i in range(0, GLOBALS.PAYLOAD_BYTES+1):
             ztmComms.write(serial.to_bytes(padByte))
             time.sleep(usbDelay)
 
@@ -509,7 +489,7 @@ class usbMsgFunctions:
     def dacCalCmd_5V(ztmComms):
         ''' send data byte by byte'''
 
-        MsgId   = MSG_X
+        MsgId   = GLOBALS.MSG_X
         CmdByte = [ztmCMD.CMD_DAC_CAL_SET_MID_SCALE.value]
         #padByte = [0x0]
 
@@ -520,7 +500,7 @@ class usbMsgFunctions:
         ztmComms.write(serial.to_bytes(CmdByte))
         time.sleep(usbDelay)
 
-        for i in range(0, payloadBytes+1):
+        for i in range(0, GLOBALS.PAYLOAD_BYTES+1):
             ztmComms.write(serial.to_bytes(padByte))
             time.sleep(usbDelay)
 
@@ -530,7 +510,7 @@ class usbMsgFunctions:
     def dacCalCmd_Check(ztmComms):
         ''' send data byte by byte'''
 
-        MsgId   = MSG_X
+        MsgId   = GLOBALS.MSG_X
         CmdByte = [ztmCMD.CMD_DAC_CAL_CHECK.value]
         #padByte = [0x0]
 
@@ -541,7 +521,7 @@ class usbMsgFunctions:
         ztmComms.write(serial.to_bytes(CmdByte))
         time.sleep(usbDelay)
 
-        for i in range(0, payloadBytes+1):
+        for i in range(0, GLOBALS.PAYLOAD_BYTES+1):
             ztmComms.write(serial.to_bytes(padByte))
             time.sleep(usbDelay)
 
@@ -551,7 +531,7 @@ class usbMsgFunctions:
     def dacCalCmd_CalStop(ztmComms):
         ''' send data byte by byte'''
 
-        MsgId   = MSG_X
+        MsgId   = GLOBALS.MSG_X
         CmdByte = [ztmCMD.CMD_DAC_CAL_STOP.value]
         #padByte = [0x0]
 
@@ -562,7 +542,7 @@ class usbMsgFunctions:
         ztmComms.write(serial.to_bytes(CmdByte))
         time.sleep(usbDelay)
 
-        for i in range(0, payloadBytes+1):
+        for i in range(0, GLOBALS.PAYLOAD_BYTES+1):
             ztmComms.write(serial.to_bytes(padByte))
             time.sleep(usbDelay)
 
@@ -575,7 +555,7 @@ class usbMsgFunctions:
         vbiasBytes = [0x00, 0x00]
         vpzoBytes  = [0x00, 0x00]
 
-        MsgId   = MSG_X
+        MsgId   = GLOBALS.MSG_X
         CmdByte = [ztmCMD.CMD_DAC_CAL_STORE_0V.value]
         #padByte = [0x0]    
 
@@ -627,7 +607,7 @@ class usbMsgFunctions:
         vbiasBytes = [0x00, 0x00]
         vpzoBytes  = [0x00, 0x00]
 
-        MsgId   = MSG_X
+        MsgId   = GLOBALS.MSG_X
         CmdByte = [ztmCMD.CMD_DAC_CAL_STORE_MID_SCALE.value]
         #padByte = [0x0]    
 
@@ -676,7 +656,7 @@ class usbMsgFunctions:
     def dacCalStatus(ztmComms, status):
         ''' send data byte by byte'''
 
-        MsgId   = MSG_X
+        MsgId   = GLOBALS.MSG_X
         CmdByte = [ztmCMD.CMD_CLR.value]
         StatByte = [status]
         #padByte = [0x0]
@@ -692,7 +672,7 @@ class usbMsgFunctions:
         time.sleep(usbDelay)
 
 
-        for i in range(0, payloadBytes):
+        for i in range(0, GLOBALS.PAYLOAD_BYTES):
             ztmComms.write(serial.to_bytes(padByte))
             time.sleep(usbDelay)
 

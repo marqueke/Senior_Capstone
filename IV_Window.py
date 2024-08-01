@@ -12,11 +12,11 @@ import matplotlib.pyplot as plt
 import os, struct, time
 import csv
 
-from Sweep_IV import SweepIV_Window  # import the IV Sweep Window Class
+import GLOBALS
 from SPI_Data_Ctrl import SerialCtrl
 from Data_Com_Ctrl import DataCtrl
 from value_conversion import Convert
-from ztmSerialCommLibrary import ztmCMD, ztmSTATUS, usbMsgFunctions, MSG_A, MSG_B, MSG_C, MSG_D, MSG_E
+from ztmSerialCommLibrary import ztmCMD, ztmSTATUS, usbMsgFunctions
 
 curr_data = 0
 vb_V = 0
@@ -341,10 +341,10 @@ class IVWindow:
         self.label2.config(text=vbias_str)
     '''
         
-    # current and piezo voltage
+    # current and bias voltage
     def update_label(self):   
         global curr_data     
-        self.label2.configure(text=f"{vb_V:.3f} V") # piezo voltage
+        self.label2.configure(text=f"{vb_V:.3f} V") # bias voltage
         self.label1.configure(text=f"{curr_data:.3f} nA") # current
 
     def get_current_label1(self):
@@ -402,14 +402,14 @@ class IVWindow:
                 break            
 
             # sending vbias to MCU, looking for a DONE status in return
-            success = self.send_msg_retry(self.port, MSG_A, ztmCMD.CMD_SET_VBIAS.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, 0, self.vbias, 0)
+            success = self.send_msg_retry(self.port, GLOBALS.MSG_A, ztmCMD.CMD_SET_VBIAS.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, 0, self.vbias, 0)
             if not success:
                 messagebox.showerror("INVALID", f"Could not verify communication with MCU.\nSweep process aborted.") 
                 self.sweep_finished()
                 return
             
-            # sending a REQUEST_FOR_DATA command to MCU to receive current and vpiezo measurements
-            dataSuccess = self.send_msg_retry(self.port, MSG_C, ztmCMD.CMD_REQ_DATA.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_MEASUREMENTS.value)
+            # sending a REQUEST_FOR_DATA command to MCU to receive current and vbias measurements
+            dataSuccess = self.send_msg_retry(self.port, GLOBALS.MSG_C, ztmCMD.CMD_REQ_DATA.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_MEASUREMENTS.value)
             if not dataSuccess:
                 messagebox.showerror("INVALID", f"Did not receive data from MCU.\nSweep process aborted.") 
                 self.sweep_finished()
@@ -454,7 +454,7 @@ class IVWindow:
     Function to send a message to the MCU and retry if we do
     not receive expected response
     '''
-    def send_msg_retry(self, port, msg_type, cmd, status, status_response, *params, max_attempts=1, sleep_time=0.5):
+    def send_msg_retry(self, port, msg_type, cmd, status, status_response, *params, max_attempts=GLOBALS.SWEEP_MAX_ATTEMPTS, sleep_time=GLOBALS.HALF_SECOND):
         global curr_data
         global vb_V
         
@@ -469,15 +469,15 @@ class IVWindow:
         
         while attempt < max_attempts:
             print(f"\n========== ATTEMPT NUMBER: {attempt+1} ==========")
-            if msg_type == MSG_A:
+            if msg_type == GLOBALS.MSG_A:
                 self.ztm_serial.sendMsgA(port, cmd, status, *params)
-            elif msg_type == MSG_B:
+            elif msg_type == GLOBALS.MSG_B:
                 self.ztm_serial.sendMsgB(port, cmd, status, *params)
-            elif msg_type == MSG_C:
+            elif msg_type == GLOBALS.MSG_C:
                 self.ztm_serial.sendMsgC(port, cmd, status, *params)
-            elif msg_type == MSG_D:
+            elif msg_type == GLOBALS.MSG_D:
                 self.ztm_serial.sendMsgD(port, cmd, status, *params)
-            elif msg_type == MSG_E:
+            elif msg_type == GLOBALS.MSG_E:
                 self.ztm_serial.sendMsgE(port, cmd, status, *params)
             else:
                 raise ValueError(f"Unsupported message type: {msg_type}")
@@ -492,7 +492,7 @@ class IVWindow:
             
             ### Unpack data and display on the GUI
             if testMsg:
-                if testMsg_hex[2] == status_response and len(testMsg) == 11:
+                if testMsg_hex[2] == status_response and len(testMsg) == GLOBALS.MSG_BYTES:
                     unpackResponse = self.ztm_serial.unpackRxMsg(testMsg)
                     print(f"Received correct status response from MCU: {testMsg[2]}")
                     
@@ -501,11 +501,13 @@ class IVWindow:
                             curr_data = round(struct.unpack('f', bytes(testMsg[3:7]))[0], 3) #unpack bytes & convert
                             cStr = str(curr_data)  # format as a string
                             print("Received values\n\tCurrent: " + cStr + " nA\n")
-                                
+                            
+                            # vbias    
                             vb_V = round(Convert.get_Vbias_float(struct.unpack('H',bytes(testMsg[7:9]))[0]), 3) #unpack bytes & convert
                             vbStr = str(vb_V)   # format as a string
                             print("\tVbias: " + vbStr + " V\n")
-                                # vpiezo
+                            
+                            # vpiezo
                             vp_V = round(Convert.get_Vpiezo_float(struct.unpack('H',bytes(testMsg[9:11]))[0]), 3) #unpack bytes & convert
                             vpStr = str(vp_V)   # format as a string
                             print("\tVpiezo: " + vpStr + " V\n")
@@ -614,7 +616,7 @@ class IVWindow:
         
     '''
     This will update the visual graph with the data points obtained during
-    the Piezo Voltage Sweep. The data points are appended to the data arrays.
+    the Bias Voltage Sweep. The data points are appended to the data arrays.
     '''
     def update_graph(self, xAxisDataPoint):
         # fetch data from label 1
@@ -645,7 +647,7 @@ class IVWindow:
     def reset_graph(self):
         self.adjusted_x_axis = None
         self.ax.clear()
-        self.ax.set_xlabel('Piezo Voltage (V)')
+        self.ax.set_xlabel('Sample Bias Voltage (V)')
         self.ax.set_ylabel('Tunneling Current (nA)')
         self.y_data = []
         self.x_data = []

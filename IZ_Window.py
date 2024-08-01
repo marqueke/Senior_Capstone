@@ -16,11 +16,11 @@ import csv
 
 import random # for graph - delete later
 
-from Sweep_IZ import SweepIZ_Window  # import the IZ Sweep Window Class
+import GLOBALS
 from SPI_Data_Ctrl import SerialCtrl
 from Data_Com_Ctrl import DataCtrl
 from value_conversion import Convert
-from ztmSerialCommLibrary import ztmCMD, ztmSTATUS, usbMsgFunctions, MSG_A, MSG_B, MSG_C, MSG_D, MSG_E
+from ztmSerialCommLibrary import ztmCMD, ztmSTATUS, usbMsgFunctions
 
 curr_data = 0
 vp_V = 0
@@ -41,8 +41,8 @@ class IZWindow:
         self.root.geometry("750x675")   # (length x width)
 
         # initialize data and serial control
-        self.data_ctrl = DataCtrl(460800, self.handle_data)
-        self.serial_ctrl = SerialCtrl(self.port, 460800, self.data_ctrl.decode_data)
+        self.data_ctrl = DataCtrl(GLOBALS.BAUDRATE, self.handle_data)
+        self.serial_ctrl = SerialCtrl(self.port, GLOBALS.BAUDRATE, self.data_ctrl.decode_data)
         print(f"Connected to {self.port}...")
         
         #self.data_ctrl.set_serial_ctrl(self.serial_ctrl)
@@ -234,7 +234,7 @@ class IZWindow:
         
     def saveMinVoltage(self, event):
         self.root.focus()
-        if 0 <= float(self.label4.get()) <= 10:
+        if GLOBALS.VPIEZO_MIN <= float(self.label4.get()) <= GLOBALS.VPIEZO_MAX:
             self.min_voltage = float(self.label4.get())
             print(f"Saved min voltage value: {self.min_voltage}")
         else:
@@ -242,7 +242,7 @@ class IZWindow:
 
     def saveMaxVoltage(self, event):
         self.root.focus()
-        if 0 <= float(self.label5.get()) <= 10:
+        if GLOBALS.VPIEZO_MIN <= float(self.label5.get()) <= GLOBALS.VPIEZO_MAX:
             self.max_voltage = float(self.label5.get())
             print(f"Saved min voltage value: {self.max_voltage}")
         else:
@@ -257,12 +257,7 @@ class IZWindow:
     def update_label(self):   
         global curr_data     
         self.label2.configure(text=f"{vp_V:.3f} V") # piezo voltage
-        
-        self.random_num = random.uniform(0, 5) 
-        #self.label3.configure(text=f"{self.random_num:.3f} nA")
         self.label3.configure(text=f"{curr_data:.3f} nA") # current
-
-        #self.label2.after(100, self.update_label)
 
     def get_current_label3(self):
         current_value = float(self.label3.cget("text").split()[0])  # assuming label3 text value is "value" nA
@@ -270,15 +265,15 @@ class IZWindow:
 
     def check_sweep_params(self):
 
-        if self.min_voltage == None or self.min_voltage < 0 or self.min_voltage > 10:
+        if self.min_voltage == None or self.min_voltage < GLOBALS.VPIEZO_MIN or self.min_voltage > GLOBALS.VPIEZO_MAX:
             messagebox.showerror("INVALID", f"Invalid Min Voltage. Please update your paremeters.")
             return False
         
-        if self.max_voltage == None or self.max_voltage <= 0 or self.max_voltage > 10:
+        if self.max_voltage == None or self.max_voltage <= GLOBALS.VPIEZO_MIN or self.max_voltage > GLOBALS.VPIEZO_MAX:
             messagebox.showerror("INVALID", f"Invalid Max Voltage. Please update your paremeters.") 
             return False
 
-        if self.num_setpoints == None or self.num_setpoints <= 0:
+        if self.num_setpoints == None or self.num_setpoints <= GLOBALS.NUM_SETPOINTS_MIN:
             messagebox.showerror("INVALID", f"Invalid Number of Setpoints. Please update your paremeters.") 
             return False
 
@@ -289,7 +284,7 @@ class IZWindow:
             messagebox.showerror("INVALID", f"Invalid sweep range. Max value must be higher than min value.") 
             return False
         
-        if self.volt_per_step < 0.0002:
+        if self.volt_per_step < GLOBALS.VOLTS_PER_STEP:
             messagebox.showerror("INVALID", f"Invalid Step Size.\nStep size: {self.volt_per_step:.6f}\nStep size needs to be greater than or equal 0.0002V (0.2 mV)\nDecrease number of points or increase voltage range.") 
             return False
         
@@ -316,14 +311,14 @@ class IZWindow:
                 break            
 
             # sending vpiezo to MCU, looking for a DONE status in return
-            success = self.send_msg_retry(self.port, MSG_A, ztmCMD.CMD_PIEZO_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, 0, 0, self.vpiezo)
+            success = self.send_msg_retry(self.port, GLOBALS.MSG_A, ztmCMD.CMD_PIEZO_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, 0, 0, self.vpiezo)
             if not success:
                 messagebox.showerror("INVALID", f"Could not verify communication with MCU.\nSweep process aborted.") 
                 self.sweep_finished()
                 return
             
             # sending a REQUEST_FOR_DATA command to MCU to receive current and vpiezo measurements
-            dataSuccess = self.send_msg_retry(self.port, MSG_C, ztmCMD.CMD_REQ_DATA.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_MEASUREMENTS.value)
+            dataSuccess = self.send_msg_retry(self.port, GLOBALS.MSG_C, ztmCMD.CMD_REQ_DATA.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_MEASUREMENTS.value)
             if not dataSuccess:
                 messagebox.showerror("INVALID", f"Did not receive data from MCU.\nSweep process aborted.") 
                 self.sweep_finished()
@@ -376,7 +371,7 @@ class IZWindow:
     Function to send a message to the MCU and retry if we do
     not receive expected response
     '''
-    def send_msg_retry(self, port, msg_type, cmd, status, status_response, *params, max_attempts=1, sleep_time=0.5):
+    def send_msg_retry(self, port, msg_type, cmd, status, status_response, *params, max_attempts=GLOBALS.SWEEP_MAX_ATTEMPTS, sleep_time=GLOBALS.HALF_SECOND):
         global curr_data
         global vp_V
         
@@ -391,15 +386,15 @@ class IZWindow:
         
         while attempt < max_attempts:
             print(f"\n========== ATTEMPT NUMBER: {attempt+1} ==========")
-            if msg_type == MSG_A:
+            if msg_type == GLOBALS.MSG_A:
                 self.ztm_serial.sendMsgA(port, cmd, status, *params)
-            elif msg_type == MSG_B:
+            elif msg_type == GLOBALS.MSG_B:
                 self.ztm_serial.sendMsgB(port, cmd, status, *params)
-            elif msg_type == MSG_C:
+            elif msg_type == GLOBALS.MSG_C:
                 self.ztm_serial.sendMsgC(port, cmd, status, *params)
-            elif msg_type == MSG_D:
+            elif msg_type == GLOBALS.MSG_D:
                 self.ztm_serial.sendMsgD(port, cmd, status, *params)
-            elif msg_type == MSG_E:
+            elif msg_type == GLOBALS.MSG_E:
                 self.ztm_serial.sendMsgE(port, cmd, status, *params)
             else:
                 raise ValueError(f"Unsupported message type: {msg_type}")
