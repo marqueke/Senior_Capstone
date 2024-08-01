@@ -1075,6 +1075,13 @@ class MeasGUI:
             self.vpzo_down = 1
             self.vpzo_up = 0
             self.sendPiezoAdjust()
+
+    def isValidPiezoInput(self, text):
+        try:
+            float(text)
+            return True
+        except ValueError:
+            return False
         
     def sendPiezoAdjust(self):
         """
@@ -1088,7 +1095,12 @@ class MeasGUI:
                 
             port = self.parent.serial_ctrl.serial_port
             
-            delta_v_float = self.get_float_value(self.label10, 1.0, "Piezo Voltage")
+            # error checking to make sure a piezo incremental step has been entered by the user
+            if not self.isValidPiezoInput(self.label10.get()):
+                messagebox.showerror("INVALID", "Please enter a valid value for piezo voltage adjustment.")
+                return
+            
+            delta_v_float = self.get_float_value(self.label10, 1.0, "Piezo Voltage")          
             
             print(f"Saved delta V (float): {delta_v_float}")
             
@@ -1408,6 +1420,9 @@ class MeasGUI:
         else:
             port = self.parent.serial_ctrl.serial_port
             
+            if self.coarse_adjust_var.get() == "-":
+                messagebox.showinfo("Invalid", "Did not select a stepper motor Step Size. Please try again.")
+
             # fine adjust direction : direction = 0 for up, 1 for down
             if self.step_up:
                 fine_adjust_dir = 0
@@ -1638,12 +1653,9 @@ class MeasGUI:
             self.parent.graph_gui.fig.savefig(file_path)
             messagebox.showinfo("Save Graph As", f"Graph saved as {file_path}")
     
-    '''
-    Handles the exporting of data collected into a .csv file
-    ''' 
     def export_data(self):
         """
-        [ADD DESCRIPTION HERE.]
+        Handles the exporting of data collected into a .csv file
         """
         file_path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV files", "*.csv"), ("All files", "*.*")])
         if file_path:
@@ -1670,11 +1682,11 @@ class MeasGUI:
 
 class GraphGUI:
     """
-    Function to initialize the data arrays and the graphical display.
+    Class to handle the graph display and associated functions
     """
     def __init__(self, root, meas_gui):
         """
-        [ADD DESCRIPTION HERE.]
+        Function to initialize the data arrays and the graphical display.
 
         Args:
             root (_type_): _description_
@@ -1714,7 +1726,7 @@ class GraphGUI:
         except ValueError:
             curr_offset = 0.0  # Default to 0 if the value is not a valid float
         
-        adjusted_current_data = curr_data + curr_offset
+        adjusted_current_data = current_data + curr_offset
         
         # update data with next data points
         self.y_data.append(adjusted_current_data)
