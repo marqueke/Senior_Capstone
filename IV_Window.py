@@ -23,6 +23,13 @@ vb_V = 0
 
 class IVWindow:
     def __init__(self, root, port):
+        """
+        Initialize the IVWindow class which sets up the GUI for acquiring I-V measurements.
+
+        Args:
+            root (tkinter.Tk): The root window of the application.
+            port (str or None): The serial port to which the device is connected. If None, it indicates no connection.
+        """
         self.root = root
         self.port = port
         
@@ -39,7 +46,6 @@ class IVWindow:
         self.data_ctrl = DataCtrl(460800, self.handle_data)
         self.serial_ctrl = SerialCtrl('COM9', 460800, self.data_ctrl.decode_data)
         
-        #self.data_ctrl.set_serial_ctrl(self.serial_ctrl)
         self.ztm_serial = usbMsgFunctions(self)
         
         # Initialize the widgets
@@ -51,26 +57,30 @@ class IVWindow:
         self.current = 0
     
     def start_reading(self):
+        """
+        Starts reading bias voltage and current from the MCU.
+        """
         print("Starting to read data...")
         if self.serial_ctrl:
             print("Serial controller is initialized, starting now...")
-            #self.serial_ctrl.start()
             checked = self.check_sweep_params()
             if checked:
                 self.disable_widgets()
                 self.run_bias_sweep_process()
             else:
                 print("Sweep Parameters invalid. Process not started.")
-            #self.send_parameters()
         else:
             print("Serial controller is not initialized.")
     
     
     def stop_reading(self):
+        """
+        [ADD DESCRIPTION HERE.]
+        """
         print("Stopped reading data...")
         self.enable_widgets()
         self.STOP_BTN_FLAG = 1
-        self.serial_ctrl.stop() # need to change later
+        self.serial_ctrl.stop()
     
     def handle_data(self, raw_data):
         print(f"Handling raw data: {raw_data.hex()}")
@@ -293,11 +303,15 @@ class IVWindow:
         
     def saveMinVoltage(self, event):
         self.root.focus()
-        if -10 <= float(self.label3.get()) <= 10:
+        try:
             self.min_voltage = float(self.label3.get())
-            print(f"Saved min voltage value: {self.min_voltage}")
-        else:
-            messagebox.showerror("INVALID", f"Invalid range. Stay within -10 to 10 V.")
+            if -10 <= float(self.label3.get()) <= 10:
+                self.min_voltage = float(self.label3.get())
+                print(f"Saved min voltage value: {self.min_voltage}")
+            else:
+                messagebox.showerror("INVALID", f"Invalid range. Stay within -10 to 10 V.")
+        except:
+            messagebox.showerror("INVALID", f"Invalid Min Voltage. Please update your parameters.")
 
     def saveMaxVoltage(self, event):
         self.root.focus()
@@ -338,10 +352,15 @@ class IVWindow:
         return current_value
     
     def check_sweep_params(self):
-        if self.min_voltage == None or self.min_voltage < -10 or self.min_voltage > 10:
-            messagebox.showerror("INVALID", f"Invalid Min Voltage. Please update your paremeters.")
+        try:
+            self.min_voltage = float(self.label3.get())
+            if self.min_voltage == None or self.min_voltage < -10 or self.min_voltage > 10:
+                messagebox.showerror("INVALID", f"Invalid Min Voltage. Please update your parameters.")
+                return False
+        except:
+            messagebox.showerror("INVALID", f"Invalid Min Voltage. Please update your parameters.")
             return False
-        
+            
         if self.max_voltage == None or self.max_voltage <= -10 or self.max_voltage > 10:
             messagebox.showerror("INVALID", f"Invalid Max Voltage. Please update your paremeters.") 
             return False
@@ -425,9 +444,11 @@ class IVWindow:
         # # reset button states
         RED = 0
         self.change_LED(RED)
-        self.start_btn.configure(state="normal")
-        self.stop_btn.configure(state="disabled")
+        self.enable_widgets()
+        self.serial_ctrl.stop()
+
         self.STOP_BTN_FLAG = 0
+
 
     '''
     Function to send a message to the MCU and retry if we do
@@ -496,7 +517,7 @@ class IVWindow:
                     print(f"Length of message received {len(testMsg)}")
                     print(f"\tReceived status: {testMsg[2]}")
                     print(f"\tExpected status: {status_response}")
-                             
+                    
             else:
                 print("ERROR. Failed to receive response from MCU.")
 

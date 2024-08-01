@@ -49,8 +49,6 @@ tip_app_total_steps = None
 
 startup_flag = 0
 
-START_PRESSED_COUNT = 0
-
 STOP_BTN_FLAG = 0
 
 class RootGUI:
@@ -109,11 +107,10 @@ class RootGUI:
         """
         Disables the reading of periodic data in a background thread.
         """
-        global START_PRESSED_COUNT
         def stop_reading_task():
             print("Stopped reading data...")
 
-            timeout = 5  # Timeout in seconds
+            timeout = 10  # Timeout in seconds
             start_time = time.time()
             success = self.meas_gui.send_msg_retry(self.serial_ctrl.serial_port, MSG_C, ztmCMD.CMD_PERIODIC_DATA_DISABLE.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value)
 
@@ -122,7 +119,6 @@ class RootGUI:
             
             if success:
                 print("Received valid response within timeout period.")
-                START_PRESSED_COUNT = 0
             else:
                 print("Did not receive valid response within timeout period. Moving on.")
             self.meas_gui.enable_widgets()
@@ -132,16 +128,15 @@ class RootGUI:
         # Run the stop reading task in a separate thread
         stop_thread = threading.Thread(target=stop_reading_task)
         stop_thread.start()
-        
     
-    def stop_reading(self):
+    def clear_buffer(self):
         """
-        Disables the reading of periodic data.
+        [ADD DESCRIPTION HERE]
         """
-        print("Stopped reading data...")
-        self.meas_gui.send_msg_retry(self.serial_ctrl.serial_port, MSG_C, ztmCMD.CMD_PERIODIC_DATA_DISABLE, ztmSTATUS.STATUS_DONE)
-        #self.serial_ctrl.stop()    # used to close the serial read thread- but we do not want that
-
+        if self.serial_ctrl.serial_port.in_waiting > 0:
+            print(f"{self.serial_ctrl.serial_port.in_waiting} bytes are stuck in the buffer.")
+            self.serial_ctrl.serial_port.read(self.serial_ctrl.serial_port.in_waiting)
+            print(f"{self.serial_ctrl.serial_port.in_waiting} bytes are stuck in the buffer.")
     
     def handle_data(self, raw_data):
         """
@@ -566,16 +561,11 @@ class MeasGUI:
         '''
         Function to disable entry widgets when we start seeking
         Disabling:
-            - vpzo delta
-            - vpzo up
-            - vpzo down
             - current setpoint
-            - current offset
             - sample rate
             - stepper motor step size
             - stepper motor up
             - stepper motor down
-            - vbias
             - iv window
             - iz window
             - reset home
@@ -583,16 +573,16 @@ class MeasGUI:
             - start btn
             - stop btn
         '''
-        self.vpiezo_adjust_btn_down.configure(state="disabled")
-        self.vpiezo_adjust_btn_up.configure(state="disabled")
-        self.label10.configure(state="disabled")
+        #self.vpiezo_adjust_btn_down.configure(state="disabled")
+        #self.vpiezo_adjust_btn_up.configure(state="disabled")
+        #self.label10.configure(state="disabled")
         self.label3.configure(state="disabled")
-        self.label4.configure(state="disabled")
+        #self.label4.configure(state="disabled")
         self.sample_rate_menu.configure(state="disabled")
         self.coarse_adjust_menu.configure(state="disabled")
-        self.fine_adjust_btn_up.configure(state="disabled")
-        self.fine_adjust_btn_down.configure(state="disabled")
-        self.label6.configure(state="disabled")
+        #self.fine_adjust_btn_up.configure(state="disabled")
+        #self.fine_adjust_btn_down.configure(state="disabled")
+        #self.label6.configure(state="disabled")
         self.sample_size.configure(state="disabled")
         self.acquire_iv_btn.configure(state="disabled")
         self.acquire_iz_btn.configure(state="disabled")
@@ -602,16 +592,16 @@ class MeasGUI:
         self.stop_btn.configure(state="normal")
     
     def enable_widgets(self):
-        self.vpiezo_adjust_btn_down.configure(state="normal")
-        self.vpiezo_adjust_btn_up.configure(state="normal")
-        self.label10.configure(state="normal")
+        #self.vpiezo_adjust_btn_down.configure(state="normal")
+        #self.vpiezo_adjust_btn_up.configure(state="normal")
+        #self.label10.configure(state="normal")
         self.label3.configure(state="normal")
-        self.label4.configure(state="normal")
+        #self.label4.configure(state="normal")
         self.sample_rate_menu.configure(state="normal")
         self.coarse_adjust_menu.configure(state="normal")
-        self.fine_adjust_btn_up.configure(state="normal")
-        self.fine_adjust_btn_down.configure(state="normal")
-        self.label6.configure(state="normal")
+        #self.fine_adjust_btn_up.configure(state="normal")
+        #self.fine_adjust_btn_down.configure(state="normal")
+        #self.label6.configure(state="normal")
         self.sample_size.configure(state="normal")
         self.acquire_iv_btn.configure(state="normal")
         self.acquire_iz_btn.configure(state="normal")
@@ -680,12 +670,10 @@ class MeasGUI:
         4. Calls the parent's `start_reading` method in the RootGUI class to begin data reading.
         """
         global STOP_BTN_FLAG
-        global START_PRESSED_COUNT
         if self.check_connection():
             return
         else:
             print("ButtonGUI: Start button pressed")
-            START_PRESSED_COUNT += 1
             STOP_BTN_FLAG = 0
             # will need to move this section so it only runs when we receive a valid response back
             self.parent.start_reading()			  
@@ -709,8 +697,11 @@ class MeasGUI:
             self.stop_btn.configure(state="disabled")
             STOP_BTN_FLAG = 1
             self.stop_leds()            
-            # self.parent.stop_reading()
-            # self.parent.serial_ctrl.stop()
+            if self.parent.serial_ctrl.serial_port.in_waiting > 0:
+                print(f"{self.parent.serial_ctrl.serial_port.in_waiting} bytes are stuck in the buffer.")
+                self.parent.serial_ctrl.serial_port.read(self.parent.serial_ctrl.serial_port.in_waiting)
+                print(f"{self.parent.serial_ctrl.serial_port.in_waiting} bytes are stuck in the buffer.")
+            #self.parent.stop_reading()
 
     '''
     Function to send a message to the MCU and retry if we do
@@ -734,7 +725,7 @@ class MeasGUI:
         Returns:
             _type_: _description_
         """
-        #global curr_data
+        global curr_data
         
         attempt = 0
         
@@ -809,7 +800,17 @@ class MeasGUI:
                     print(f"Length of message received {len(testMsg)}")
                     print(f"\tReceived status: {testMsg[2]}")
                     print(f"\tExpected status: {status_response}")
-                             
+                    
+                    if testMsg_hex[2] == ztmSTATUS.STATUS_MEASUREMENTS.value:
+                        vb_V = round(Convert.get_Vbias_float(struct.unpack('H',bytes(testMsg[7:9]))[0]), 3) #unpack bytes & convert
+                        vbStr = str(vb_V)   # format as a string
+                        print("\tVbias: " + vbStr + " V\n")
+                        
+                        # vpiezo
+                        vp_V = round(Convert.get_Vpiezo_float(struct.unpack('H',bytes(testMsg[9:11]))[0]), 3) #unpack bytes & convert
+                        vpStr = str(vp_V)   # format as a string
+                        print("\tVpiezo: " + vpStr + " V\n")
+                        return vb_V, vp_V
             else:
                 print("ERROR. Failed to receive response from MCU.")
 
@@ -818,28 +819,35 @@ class MeasGUI:
             
         return False
 
-    
-    '''
-    Function to error check user inputs and update widget
-    '''
     def get_float_value(self, label, default_value, value_name):
+        """
+        Method to error check user inputs and update widget.
+
+        Args:
+            label (_type_): _description_
+            default_value (_type_): _description_
+            value_name (_type_): _description_
+
+        Returns:
+            _type_: [ADD DESCRIPTION HERE.]
+        """
         try:
             value = float(label.get())
             #print(value)
         except ValueError:
-            print(f"Invalid input for {value_name}. Using default value of {default_value}.")
+            messagebox.showerror("Invalid Value", f"Invalid input for {value_name}. Using default value of {default_value}.")
             value = default_value
         return value  
-    
-    '''
-    Function to send user-inputted parameters to MCU, sample bias, sample rate, sample
-    size, current setpoint*
-    ### WILL BE CHANGING ###
-    
-    This function consists of the tip approach algorithm and receiving periodic data
-    once the tip approach algorithm successfully finishes
-    '''        
+      
     def tip_approach(self):
+        """
+        Function to send user-inputted parameters to MCU, sample bias, sample rate, sample
+        size, current setpoint*
+        ### WILL BE CHANGING ###
+        
+        This function consists of the tip approach algorithm and receiving periodic data
+        once the tip approach algorithm successfully finishes.
+        """
         # access global variables
         global curr_setpoint
         global curr_data
@@ -966,7 +974,6 @@ class MeasGUI:
         Function to enable and read periodic data from the MCU.
         """
         global STOP_BTN_FLAG
-        global START_PRESSED_COUNT
         global curr_data
         
         if self.check_connection():
@@ -1001,36 +1008,19 @@ class MeasGUI:
                         break
                     
                     response = self.parent.serial_ctrl.ztmGetMsg(port)
-                    if START_PRESSED_COUNT == 1:
-                        if response[2] == ztmSTATUS.STATUS_MEASUREMENTS.value or response[2] == ztmSTATUS.STATUS_ACK.value:
-                            print(f"Received correct response response: {response[2]}")
-                            
-                            curr_data = round(struct.unpack('f', bytes(response[3:7]))[0], 3) 
-                            cStr = str(curr_data) 
-                            print("Received values\n\tCurrent: " + cStr + " nA\n")
-                        else:
-                            print(f"Did not receive correct response: {response[2]}")
+                    if response[2] == ztmSTATUS.STATUS_MEASUREMENTS.value or response[2] == ztmSTATUS.STATUS_ACK.value:
+                        print(f"Received correct response response: {response[2]}")
                         
-                        # Use this to call update_graph() everytime a data point is recieved
-                        self.adc_curr = curr_data
-                        self.update_label()
-                        self.parent.graph_gui.update_graph()
-                        
-                    elif START_PRESSED_COUNT > 1:
-                        if response[2] == ztmSTATUS.STATUS_MEASUREMENTS.value or response[2] == ztmSTATUS.STATUS_DONE.value:
-                            print(f"Received correct response response: {response[2]}") 
-                            
-                            curr_data = round(struct.unpack('f', bytes(response[3:7]))[0], 3) 
-                            cStr = str(curr_data) 
-                            print("Received values\n\tCurrent: " + cStr + " nA\n")
-                        else:
-                            print(f"Did not receive correct response: {response[2]}")
-                        
-                        # Use this to call update_graph() everytime a data point is recieved
-                        self.adc_curr = curr_data
-                        self.update_label()
-                        self.parent.graph_gui.update_graph()
+                        curr_data = round(struct.unpack('f', bytes(response[3:7]))[0], 3) 
+                        cStr = str(curr_data) 
+                        print("Received values\n\tCurrent: " + cStr + " nA\n")
+                    else:
+                        print(f"Did not receive correct response: {response[2]}")
                     
+                    # Use this to call update_graph() everytime a data point is recieved
+                    self.adc_curr = curr_data
+                    self.update_label()
+                    self.parent.graph_gui.update_graph()
                 STOP_BTN_FLAG = 0    
             else:
                 print("Did not receive DONE.")
@@ -1052,7 +1042,7 @@ class MeasGUI:
         else:
             self.root.focus()
             
-            vpzo_value = float(self.label10.get())
+            vpzo_value = self.get_float_value(self.label10, 1.0, "Piezo Voltage")
         
             if vpzo_value < float(0.003):
                 vpzo_value = float(0.003)
@@ -1095,6 +1085,7 @@ class MeasGUI:
             return
         else:
             print("\n----------SENDING PIEZO ADJUST----------")
+                
             port = self.parent.serial_ctrl.serial_port
             
             delta_v_float = self.get_float_value(self.label10, 1.0, "Piezo Voltage")
@@ -1123,16 +1114,30 @@ class MeasGUI:
                 messagebox.showerror("INVALID", "Invalid range. Stay within 0 - 10 V.")
                 return
 
-            print(f"Total voltage sending: {self.total_voltage}")
-            self.label12.configure(text=f"{self.total_voltage:.3f} ")
-            
+            # Clear buffer
+            self.parent.clear_buffer()
+                
+            timeout = 10  # Timeout in seconds
+            start_time = time.time()
             success = self.send_msg_retry(port, MSG_A, ztmCMD.CMD_PIEZO_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, 0, 0, self.total_voltage)
+
+            while not success and (time.time() - start_time) < timeout:
+                success = self.send_msg_retry(port, MSG_A, ztmCMD.CMD_PIEZO_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, 0, 0, self.total_voltage)
             
             if success:
-                print("\nSUCCESS. Received done message.")
+                #print(f"Total voltage sending: {self.total_voltage}")
+                self.label12.configure(text=f"{self.total_voltage:.3f} ")
+                return
+            if isinstance(success, tuple):
+                if len(success) == 2:
+                    _, vpzo = success
+                    if abs(vpzo - self.total_voltage) <= 0.05 * self.total_voltage:
+                        messagebox.showinfo("Information", "SUCCESS. Processed change in value within timeout period.7.")
+                        self.label12.configure(text=f"{self.total_voltage:.3f} ")
+                        return
             else:
-                print("\nERROR. Failed to send piezo voltage.")
-          
+                messagebox.showinfo("Information", "Did not process change in value within timeout period. Please try again.")
+                
     def saveCurrentSetpoint(self, _): 
         """
         Function to save the user inputted value of current setpoint to use for 
@@ -1202,6 +1207,7 @@ class MeasGUI:
             port = self.parent.serial_ctrl.serial_port
             try:
                 print("\n----------SENDING SAMPLE BIAS----------")
+                
                 vbias_save = self.get_float_value(self.label6, 1.0, "Voltage Bias")
                 
                 if vbias_save < -10:
@@ -1214,16 +1220,26 @@ class MeasGUI:
                 self.label6.delete(0, END)
                 self.label6.insert(0, vbias_save)
                     
+                # Clear buffer
+                self.parent.clear_buffer()
+                         
+                timeout = 10  # Timeout in seconds
+                start_time = time.time()
                 success = self.send_msg_retry(port, MSG_A, ztmCMD.CMD_SET_VBIAS.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, 0, vbias_save, 0)
-                
-                print(f"Saved sample bias value (float): {vbias_save}")
+
+                while not success and (time.time() - start_time) < timeout:
+                    success = self.send_msg_retry(port, MSG_A, ztmCMD.CMD_SET_VBIAS.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, 0, vbias_save, 0)
                 
                 if success:
-                    print("Received done message.")
-                    vbias_done_flag = 1
+                    return
+                elif isinstance(success, tuple):
+                    if len(success) == 2:
+                        vbias, _ = success
+                        if abs(vbias - vbias_save) <= 0.05 * vbias_save:
+                            messagebox.showinfo("Information", "SUCCESS. Processed change in value within timeout period.7.")
+                            return
                 else:
-                    print("Failed to send vbias.")
-                    vbias_done_flag = 0
+                    messagebox.showinfo("Information", "Did not process change in value within timeout period. Please try again.")
                     
             except ValueError:
                 self.root.focus()
@@ -1258,14 +1274,22 @@ class MeasGUI:
                 sample_rate_save = 5000
             print(f"Saved sample rate value: {sample_rate_save}")
 
+            # Clear buffer
+            self.parent.clear_buffer()
+                        
+            timeout = 10  # Timeout in seconds
+            start_time = time.time()
             success = self.send_msg_retry(port, MSG_B, ztmCMD.CMD_SET_ADC_SAMPLE_RATE.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, sample_rate_save)
-        
+
+            while not success and (time.time() - start_time) < timeout:
+                success = self.send_msg_retry(port, MSG_B, ztmCMD.CMD_SET_ADC_SAMPLE_RATE.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, sample_rate_save)
+            
             if success:
-                print("Received done message.")
                 sample_rate_done_flag = 1
+                return
             else:
-                print("Failed to send sample rate.")
                 sample_rate_done_flag = 0
+                messagebox.showinfo("Information", "Did not process change in value within timeout period. Please try again.")
                 
     def sendSampleSize(self, _):
         """
@@ -1301,14 +1325,23 @@ class MeasGUI:
                 
                 print(f"Saved sample size value: {sample_size_save}")
 
+                # Clear buffer
+                self.parent.clear_buffer()
+                         
+                timeout = 10  # Timeout in seconds
+                start_time = time.time()
                 success = self.send_msg_retry(port, MSG_B, ztmCMD.CMD_SET_ADC_SAMPLE_SIZE.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, sample_size_save)
-                if success:
-                    print("Received done message.")
-                    sample_size_done_flag = 1
-                else:
-                    print("Failed to send sample size.")
-                    sample_size_done_flag = 0
+
+                while not success and (time.time() - start_time) < timeout:
+                    success = self.send_msg_retry(port, MSG_B, ztmCMD.CMD_SET_ADC_SAMPLE_SIZE.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, sample_size_save)
                 
+                if success:
+                    sample_size_done_flag = 1
+                    return
+                else:
+                    sample_size_done_flag = 0
+                    messagebox.showinfo("Information", "Did not process change in value within timeout period. Please try again.")
+                    
             except ValueError:
                 self.root.focus()
                 self.sample_size.delete(0, END)
@@ -1390,12 +1423,20 @@ class MeasGUI:
             # number of steps, hardcoded = 1, for fine adjust arrows
             num_of_steps = 1
 
-            success = self.send_msg_retry(self.parent.serial_ctrl.serial_port, MSG_D, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, self.fine_adjust_step_size, fine_adjust_dir, num_of_steps)
-        
+            # Clear buffer
+            self.parent.clear_buffer()
+                        
+            timeout = 10  # Timeout in seconds
+            start_time = time.time()
+            success = self.send_msg_retry(port, MSG_D, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, self.fine_adjust_step_size, fine_adjust_dir, num_of_steps)
+
+            while not success and (time.time() - start_time) < timeout:
+                success = self.send_msg_retry(port, MSG_D, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, self.fine_adjust_step_size, fine_adjust_dir, num_of_steps)
+            
             if success:
-                print("Received done message.")
+                return
             else:
-                print("Failed to receive response from MCU.")
+                messagebox.showinfo("Information", "Did not process change in value within timeout period. Please try again.")
               
     def save_home(self):
         """
@@ -1409,15 +1450,23 @@ class MeasGUI:
             return
         else:
             print("\n----------SETTING NEW HOME POSITION----------")
-            # should return total number of steps
-            curr_pos_total_steps = self.send_msg_retry(self.parent.serial_ctrl.serial_port, MSG_C, ztmCMD.CMD_REQ_STEP_COUNT.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_STEP_COUNT.value)
-            if curr_pos_total_steps:
-                print("Received total step count position from MCU and saved new home position.")
+            port = self.parent.serial_ctrl.serial_port
+            
+            # Clear buffer
+            self.parent.clear_buffer()
+            
+            timeout = 10  # Timeout in seconds
+            start_time = time.time()
+            curr_pos_total_steps = self.send_msg_retry(port, MSG_C, ztmCMD.CMD_REQ_STEP_COUNT.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_STEP_COUNT.value)
 
-                # curr_pos_total_steps is set in send_msg_retry(), we then set global variable home_pos_total_steps to save this as new home position
+            while not curr_pos_total_steps and (time.time() - start_time) < timeout:
+                curr_pos_total_steps = self.send_msg_retry(port, MSG_C, ztmCMD.CMD_REQ_STEP_COUNT.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_STEP_COUNT.value)
+            
+            if curr_pos_total_steps:
                 home_pos_total_steps = curr_pos_total_steps
+                return
             else:
-                print("Failed to receive response from MCU.")
+                messagebox.showinfo("Information", "Did not process change in value within timeout period. Please try again.")
 
     def return_home(self):
         """
@@ -1431,8 +1480,18 @@ class MeasGUI:
         else:
             print("\n----------RETURN TO HOME POSITION----------")
             # Request total step for stepper motor from MCU
-            curr_pos_total_steps = self.send_msg_retry(self.parent.serial_ctrl.serial_port, MSG_C, ztmCMD.CMD_REQ_STEP_COUNT.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_STEP_COUNT.value)
+            port = self.parent.serial_ctrl.serial_port
             
+            # Clear buffer
+            self.parent.clear_buffer()
+            
+            timeout = 10  # Timeout in seconds
+            start_time = time.time()
+            curr_pos_total_steps = self.send_msg_retry(port, MSG_C, ztmCMD.CMD_REQ_STEP_COUNT.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_STEP_COUNT.value)
+
+            while not curr_pos_total_steps and (time.time() - start_time) < timeout:
+                curr_pos_total_steps = self.send_msg_retry(port, MSG_C, ztmCMD.CMD_REQ_STEP_COUNT.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_STEP_COUNT.value)
+                
             # If a home position has not been set, error message and return from function
             if home_pos_total_steps == None:
                 messagebox.showerror("INVALID", f"No home position has been set.")
@@ -1472,6 +1531,7 @@ class MeasGUI:
                         print("Failed to receive response from MCU.")
                 curr_pos_total_steps = self.send_msg_retry(self.parent.serial_ctrl.serial_port, MSG_C, ztmCMD.CMD_REQ_STEP_COUNT.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_STEP_COUNT.value)
             else:
+                messagebox.showinfo("Information", "Did not process change in value within timeout period. Please try again.")
                 print("Failed to receive response from MCU.")
 
     
@@ -1508,6 +1568,14 @@ class MeasGUI:
         return current_value
     
     def save_notes(self, _=None):
+        """_summary_
+
+        Args:
+            _ (_type_, optional): [ADD DESCRIPTION HERE.] Defaults to None.
+
+        Returns:
+            _type_: _description_
+        """
         if self.check_connection():
             self.root.focus()
             return
@@ -1518,6 +1586,14 @@ class MeasGUI:
             return note
     
     def save_date(self, _=None):
+        """_summary_
+
+        Args:
+            _ (_type_, optional): [ADD DESCRIPTION HERE.] Defaults to None.
+
+        Returns:
+            _type_: _description_
+        """
         if self.check_connection():
             self.root.focus()
             return
@@ -1566,6 +1642,9 @@ class MeasGUI:
     Handles the exporting of data collected into a .csv file
     ''' 
     def export_data(self):
+        """
+        [ADD DESCRIPTION HERE.]
+        """
         file_path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV files", "*.csv"), ("All files", "*.*")])
         if file_path:
             with open(file_path, 'w', newline='') as file:
@@ -1590,10 +1669,17 @@ class MeasGUI:
             messagebox.showinfo("Export Data", f"Data exported as {file_path}")
 
 class GraphGUI:
-    '''
-    Function to initialize the data arrays and the graphical display
-    ''' 
+    """
+    Function to initialize the data arrays and the graphical display.
+    """
     def __init__(self, root, meas_gui):
+        """
+        [ADD DESCRIPTION HERE.]
+
+        Args:
+            root (_type_): _description_
+            meas_gui (_type_): _description_
+        """
         self.root = root
         self.meas_gui = meas_gui
 
@@ -1613,17 +1699,25 @@ class GraphGUI:
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.root)
         self.canvas.get_tk_widget().grid(row=0, column=3, columnspan=6, rowspan=10, padx=10, pady=5)
     
-    '''
-    This will update the visual graph with the data points obtained during
-    the Piezo Voltage Sweep. The data points are appended to the data arrays.
-    '''
-    #updates every 36ms
     def update_graph(self):
-        # fetch data from label 2
+        """
+        This will update the visual graph with the data points obtained during
+        the Piezo Voltage Sweep. The data points are appended to the data arrays.
+        *Updates every 36ms
+        """
+        # Fetch current data from label 2
         current_data = self.meas_gui.get_current_label2()
         
+        # Get current offset from label 4
+        try:
+            curr_offset = float(self.meas_gui.label4.get())
+        except ValueError:
+            curr_offset = 0.0  # Default to 0 if the value is not a valid float
+        
+        adjusted_current_data = curr_data + curr_offset
+        
         # update data with next data points
-        self.y_data.append(current_data)
+        self.y_data.append(adjusted_current_data)
         time_now = datetime.datetime.now()
         # append current time to x axis on graph
         self.x_data.append(time_now)
@@ -1647,10 +1741,10 @@ class GraphGUI:
         self.canvas.draw()
         self.canvas.flush_events()
 
-    '''
-    Resets the visual graph and clears the data points.
-    '''
     def reset_graph(self):
+        """
+        Resets the visual graph and clears the data points.
+        """
         self.ax.clear()
         self.ax.set_xlabel('Time (s)')
         self.ax.set_ylabel('Tunneling Current (nA)')
