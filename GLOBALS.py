@@ -8,6 +8,20 @@ PAYLOAD_BYTES = 8
 MSG_BYTES = HEADER_BYTES + PAYLOAD_BYTES
 
 """
+TIP APPROACH GLOBAL VARIABLES
+"""
+VPIEZO_APPROACH_MAX = 5.0
+VPIEZO_APPROACH_MIN = 0.0
+PIEZO_EXTN_RATIO    = 20.0  # (nm per volt)
+PIEZO_CODE_RATIO    = 6553.6
+POS_TOLERANCE       = 0.1
+APPROACH_STEP_SIZE_NM   = 0.025 # nm
+FREQ_RES            = 150.0     # Hz
+
+# Cap approach global variables here (if needed)
+
+   
+"""
 VOLTAGE GLOBAL VARIABLES
 """
 # Voltage sample bias valid range
@@ -76,7 +90,7 @@ TENTH_SECOND = 0.1
 
 # Attempts
 MAX_ATTEMPTS = 10
-SWEEP_MAX_ATTEMPTS = 1
+SWEEP_MAX_ATTEMPTS = 10
 
 """
 BAUD RATE

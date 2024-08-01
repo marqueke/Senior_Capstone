@@ -27,12 +27,19 @@ from SPI_Data_Ctrl import SerialCtrl
 
 # global variables
 curr_setpoint = None
-curr_data = 0
+
+# for MCU sent measurements
+curr_data = None
+vb_V = None
+vp_V = None
 
 vpiezo_dist = 0
 
 vbias_save = None
 vbias_done_flag = 0
+
+# used for the tip approach
+vpiezo_tip = None
 
 sample_rate_save = None
 sample_rate_done_flag = 0
@@ -49,6 +56,9 @@ startup_flag = 0
 
 STOP_BTN_FLAG = 0
 
+###################################################################################################################
+#                                                 RootGUI CLASS                                                   #
+###################################################################################################################
 class RootGUI:
     def __init__(self):
         """
@@ -128,7 +138,10 @@ class RootGUI:
             print(f"{self.serial_ctrl.serial_port.in_waiting} bytes are stuck in the buffer.")
             self.serial_ctrl.serial_port.read(self.serial_ctrl.serial_port.in_waiting)
             print(f"{self.serial_ctrl.serial_port.in_waiting} bytes are stuck in the buffer.")
-    
+
+###################################################################################################################
+#                                                 ComGUI CLASS                                                    #
+###################################################################################################################
 class ComGUI:
     def __init__(self, root, parent):
         """
@@ -283,7 +296,10 @@ class ComGUI:
             self.parent.serial_ctrl.running = False
             
             startup_flag = 0
-            
+
+###################################################################################################################
+#                                                 MeasGUI CLASS                                                   #
+###################################################################################################################
 # class for measurements/text box widgets in homepage
 class MeasGUI:
     def __init__(self, root, parent):
@@ -657,6 +673,8 @@ class MeasGUI:
             _type_: _description_
         """
         global curr_data
+        global vb_V
+        global vp_V
         
         attempt = 0
         
@@ -705,6 +723,13 @@ class MeasGUI:
                                     print(f"\tVpiezo: {vp_V} V\n")
                                     
                                     return True
+                                
+                                '''
+                                if cmd == ztmCMD.CMD_REQ_DATA.value:
+                                    curr_data, vb_V, vp_V = unpackResponse
+                                    
+                                    return curr_data, vb_V, vp_V
+                                '''
                         else:
                             if testMsg_hex[2] == ztmSTATUS.STATUS_STEP_COUNT.value:
                                 print(f"Received values:\n\tStepper Position Total (1/8) Steps: {unpackResponse}")
@@ -773,7 +798,144 @@ class MeasGUI:
             messagebox.showerror("Invalid Value", f"Invalid input for {value_name}. Using default value of {default_value}.")
             value = default_value
         return value  
-      
+    
+############################################# TIP APPROACH #################################################
+    def tunneling_approach(self, steps):
+        """
+        @brief: This function looks for a desired tunneling current using the traditional algorithm
+        @param targetCurrent_nA: The desired tunneling current the algorithm is looking for
+        @retval: None
+        """
+        global curr_setpoint
+        global vpiezo_tip
+        global curr_data
+        global vb_V
+        global vp_V
+        
+        
+        reqData = False
+        
+        port = self.parent.serial_ctrl.serial_port
+        
+        # Get a measurement from the MCU, send_msg_retry() will change the val of the global vars
+        success = self.send_msg_retry(port, globals.MSG_C, ztmCMD.CMD_REQ_DATA.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value)
+        
+        if success:
+            # Immediately step back and return if current >= target
+            if(curr_data >= curr_setpoint):
+                adjust_success = self.send_msg_retry(port, globals.MSG_D, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, globals.EIGHTH_STEP, globals.DIR_DOWN, globals.NUM_STEPS)
+                if adjust_success:
+                    # steps -= INC_EIGHT
+                    return 1, curr_data, vb_V, vp_V #, steps
+                else:
+                    print("Did not receive correct response back.")
+                    messagebox.showerror("ERROR", "Error. Unable to adjust the stepper motor.")
+            else:
+                vpiezo_tip, steps = self.auto_move_tip(steps, globals.APPROACH_STEP_SIZE_NM, globals.DIR_DOWN)
+                return 0, curr_data, vb_V, vp_V #, steps
+        else:
+            print("Did not receive correct response back.")
+            messagebox.showerror("ERROR", "Error. Did not receive correct response back.")
+        
+        
+    
+    def auto_move_tip(self, steps, dist, dir):
+        """
+        @brief: This function changes the tip height using either the piezo or stepper motor.
+        Note: If the distance is out of range for the piezo then the stepper motor will step up
+        or down, and the new distance will not be exactly what was desired. This function was 
+        created for the tunneling_approach function
+        @param dist: The desired change in distance in nm
+        @param dir: Direction for tip to move. Send "DOWN" to move tip down and "UP" to move tip up
+        @retval: None
+        """
+        global vpiezo_tip
+        
+        port = self.parent.serial_ctrl.serial_port
+        stepSet = False
+        piezoSet = False
+        delta_V = dist / globals.PIEZO_EXTN_RATIO
+        
+        # MOVING DOWN
+        if(dir == globals.DIR_DOWN):
+            # Piezo is fully extended, so we retract the tip and step the motor down
+            if(vpiezo_tip + delta_V > globals.VPIEZO_APPROACH_MAX):
+                vpiezo_tip = self.piezo_full_retract()
+                # Move stepper motor DOWN an eighth step
+                while(stepSet == False):
+                    stepSet = self.send_msg_retry(port, globals.MSG_D, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, globals.EIGHTH_STEP, globals.DIR_DOWN, globals.NUM_STEPS)
+                # Increment number of steps (?)
+                #steps += INC_EIGHT
+            # Increment the piezo voltage by delta_V to step it down
+            else:
+                vpiezo_tip += delta_V
+                # Send message to update vpiezo
+                while(piezoSet == False):
+                    piezoSet = self.send_msg_retry(port, globals.MSG_A, ztmCMD.CMD_PIEZO_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, 0, 0, vpiezo_tip)
+        ########################################################################
+        # MOVING UP
+        else:
+            if(vpiezo_tip - delta_V < globals.VPIEZO_APPROACH_MIN):
+            # Piezo is fully retracted, so we extend the tip and step the motor up
+            # Place the tip in approximately the same position
+                # Move stepper motor UP an eighth step    
+                while(stepSet == False):
+                    stepSet = self.send_msg_retry(port, globals.MSG_D, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, globals.EIGHTH_STEP, globals.DIR_UP, globals.NUM_STEPS)
+                    # Decrement number of steps (?)
+                    # steps -= INC_EIGHT
+                vpiezo_tip = self.piezo_full_extend()
+            else:
+                vpiezo_tip -= delta_V
+                # Send message to update vpiezo
+                while(piezoSet == False):
+                    piezoSet = self.send_msg_retry(port, globals.MSG_A, ztmCMD.CMD_PIEZO_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, 0, 0, vpiezo_tip)
+        print(f"New vpiezo for tip approach: {vpiezo_tip} V") # "Step Count: {steps}"
+        return vpiezo_tip #, steps
+                
+    def piezo_full_extend(self):
+        """
+        This function adjusts the tip down in increments instead of one total distance.
+
+        Args:
+            vpiezo (_type_): _description_
+        """
+        global vpiezo_tip
+        
+        port = self.parent.serial_ctrl.serial_port
+        piezoSet = False
+        # Extend piezo in small increments
+        piezoStep = vpiezo_tip / 32
+        while (vpiezo_tip != globals.VPIEZO_APPROACH_MAX):
+            if vpiezo_tip < globals.VPIEZO_APPROACH_MAX:
+                vpiezo_tip += piezoStep
+            elif vpiezo_tip > globals.VPIEZO_APPROACH_MAX:
+                vpiezo_tip = globals.VPIEZO_APPROACH_MAX
+            while(piezoSet == False):
+                piezoSet = self.send_msg_retry(port, globals.MSG_A, ztmCMD.CMD_PIEZO_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, 0, 0, vpiezo_tip)
+        return vpiezo_tip
+    
+    def piezo_full_retract(self):
+        """
+        This function adjusts the tip up in increments instead of one total distasnce.
+
+        Args:
+            vpiezo (_type_): _description_
+        """
+        global vpiezo_tip
+        
+        port = self.parent.serial_ctrl.serial_port
+        piezoSet = False
+        # Retract piezo in small increments
+        piezoStep = vpiezo_tip / 32
+        while (vpiezo_tip != globals.VPIEZO_APPROACH_MIN):
+            if vpiezo_tip > globals.VPIEZO_APPROACH_MIN:
+                vpiezo_tip -= piezoStep
+            elif vpiezo_tip < globals.VPIEZO_APPROACH_MIN:
+                vpiezo_tip = globals.VPIEZO_APPROACH_MIN
+            while(piezoSet == False):
+                piezoSet = self.send_msg_retry(port, globals.MSG_A, ztmCMD.CMD_PIEZO_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, 0, 0, vpiezo_tip)
+        return vpiezo_tip
+    
     def tip_approach(self):
         """
         Function to send user-inputted parameters to MCU, sample bias, sample rate, sample
@@ -1615,6 +1777,9 @@ class MeasGUI:
 
             messagebox.showinfo("Export Data", f"Data exported as {file_path}")
 
+###################################################################################################################
+#                                                 GraphGUI CLASS                                                  #
+###################################################################################################################
 class GraphGUI:
     """
     Function to initialize the data arrays and the graphical display.
