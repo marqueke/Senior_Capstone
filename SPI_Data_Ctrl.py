@@ -4,10 +4,10 @@ import time
 import GLOBALS
 
 class SerialCtrl:
-    def __init__(self, port, baudrate, callback):
+    def __init__(self, port, baudrate):
         self.port = port
         self.baudrate = baudrate
-        self.callback = callback
+        #self.callback = callback
         self.serial_port = None
         self.thread = None
         self.running = False
@@ -28,7 +28,7 @@ class SerialCtrl:
                         frame = self.buffer[:GLOBALS.MSG_BYTES]
                         self.buffer = self.buffer[GLOBALS.MSG_BYTES:]
                         #print(f"Processing frame: {frame.hex}")
-                        self.callback(frame)
+                        #self.callback(frame)
                     return raw_data
             except serial.SerialException as e:
                 print(f"Error reading serial port: {e}")

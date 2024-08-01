@@ -41,7 +41,7 @@ class IZWindow:
         self.root.geometry("750x675")   # (length x width)
 
         # initialize data and serial control
-        self.data_ctrl = DataCtrl(GLOBALS.BAUDRATE, self.handle_data)
+        #self.data_ctrl = DataCtrl(GLOBALS.BAUDRATE, self.handle_data)
         self.serial_ctrl = SerialCtrl(self.port, GLOBALS.BAUDRATE, self.data_ctrl.decode_data)
         print(f"Connected to {self.port}...")
         
@@ -154,7 +154,7 @@ class IZWindow:
     
     def publish_meas_widgets(self):
         # piezo extension
-        self.frame1.grid(row=12, column=0, padx=5, pady=5, sticky=SE)
+        self.frame1.grid(row=13, column=0, padx=5, pady=5, sticky=SE)
         self.label1.grid(row=0, column=0, padx=5, pady=5, sticky="s")
         
         # piezo voltage
@@ -162,7 +162,7 @@ class IZWindow:
         self.label2.grid(row=0, column=0, padx=5, pady=5)   
         
         # current
-        self.frame3.grid(row=13, column=0, padx=5, pady=5, sticky=NE)
+        self.frame3.grid(row=12, column=0, padx=5, pady=5, sticky=NE)
         self.label3.grid(row=0, column=0, padx=5, pady=5, sticky="n") 
 
         # min voltage
@@ -232,26 +232,35 @@ class IZWindow:
         self.start_btn.configure(state="normal")
         self.stop_btn.configure(state="disabled")
         
-    def saveMinVoltage(self, event):
+    def saveMinVoltage(self, _):
         self.root.focus()
-        if GLOBALS.VPIEZO_MIN <= float(self.label4.get()) <= GLOBALS.VPIEZO_MAX:
-            self.min_voltage = float(self.label4.get())
-            print(f"Saved min voltage value: {self.min_voltage}")
-        else:
-            messagebox.showerror("INVALID", f"Invalid range. Stay within 0 to 10 V.")
+        try:
+            if GLOBALS.VPIEZO_MIN <= float(self.label4.get()) <= GLOBALS.VPIEZO_MAX:
+                self.min_voltage = float(self.label4.get())
+                print(f"Saved min voltage value: {self.min_voltage}")
+            else:
+                messagebox.showerror("INVALID", f"Invalid range. Stay within {GLOBALS.VPIEZO_MIN} to {GLOBALS.VPIEZO_MAX} V.")
+        except:
+            messagebox.showerror("INVALID", f"Invalid value. Please update your parameters.")
 
     def saveMaxVoltage(self, event):
         self.root.focus()
-        if GLOBALS.VPIEZO_MIN <= float(self.label5.get()) <= GLOBALS.VPIEZO_MAX:
-            self.max_voltage = float(self.label5.get())
-            print(f"Saved min voltage value: {self.max_voltage}")
-        else:
-            messagebox.showerror("INVALID", f"Invalid range. Stay within 0 to 10 V.") 
+        try:
+            if GLOBALS.VPIEZO_MIN <= float(self.label5.get()) <= GLOBALS.VPIEZO_MAX:
+                self.max_voltage = float(self.label5.get())
+                print(f"Saved min voltage value: {self.max_voltage}")
+            else:
+                messagebox.showerror("INVALID", f"Invalid range. Stay within {GLOBALS.VPIEZO_MIN} to {GLOBALS.VPIEZO_MAX} V.") 
+        except:
+            messagebox.showerror("INVALID", f"Invalid value. Please update your parameters.")
 
     def saveNumSetpoints(self, event):
         self.root.focus()
-        self.num_setpoints = int(self.label9.get())
-        print(f"Saved number of setpoints value: {self.num_setpoints}")
+        try:
+            self.num_setpoints = int(self.label9.get())
+            print(f"Saved number of setpoints value: {self.num_setpoints}")
+        except:
+            messagebox.showerror("INVALID", f"Invalid value. Please update your parameters.")
 
     # current and piezo voltage
     def update_label(self):   
@@ -264,7 +273,6 @@ class IZWindow:
         return current_value
 
     def check_sweep_params(self):
-
         if self.min_voltage == None or self.min_voltage < GLOBALS.VPIEZO_MIN or self.min_voltage > GLOBALS.VPIEZO_MAX:
             messagebox.showerror("INVALID", f"Invalid Min Voltage. Please update your paremeters.")
             return False
@@ -285,11 +293,10 @@ class IZWindow:
             return False
         
         if self.volt_per_step < GLOBALS.VOLTS_PER_STEP:
-            messagebox.showerror("INVALID", f"Invalid Step Size.\nStep size: {self.volt_per_step:.6f}\nStep size needs to be greater than or equal 0.0002V (0.2 mV)\nDecrease number of points or increase voltage range.") 
+            messagebox.showerror("INVALID", f"Invalid Step Size.\nStep size: {self.volt_per_step:.6f}\nStep size needs to be greater than or equal {GLOBALS.VOLTS_PER_STEP} ({GLOBALS.VOLTS_PER_STEP*1000} mV)\nDecrease number of points or increase voltage range.") 
             return False
         
         return True
-            
 
     def run_piezo_sweep_process(self):
         global vp_V
@@ -409,7 +416,7 @@ class IZWindow:
             
             ### Unpack data and display on the GUI
             if testMsg:
-                if testMsg_hex[2] == status_response and len(testMsg) == 11:
+                if testMsg_hex[2] == status_response and len(testMsg) == GLOBALS.MSG_BYTES:
                     unpackResponse = self.ztm_serial.unpackRxMsg(testMsg)
                     print(f"Received correct status response from MCU: {testMsg[2]}")
                     

@@ -40,11 +40,11 @@ class IVWindow:
             
         self.root.title("Acquire I-V")
         self.root.config(bg="#b1ddf0")
-        self.root.geometry("755x675")   # (length x width)
+        self.root.geometry("800x650")   # (width x length)
         
         # initialize data and serial control
-        self.data_ctrl = DataCtrl(460800, self.handle_data)
-        self.serial_ctrl = SerialCtrl('COM9', 460800, self.data_ctrl.decode_data)
+        #self.data_ctrl = DataCtrl(GLOBALS.BAUDRATE, self.handle_data)
+        self.serial_ctrl = SerialCtrl(self.port, GLOBALS.BAUDRATE, self.data_ctrl.decode_data)
         
         self.ztm_serial = usbMsgFunctions(self)
         
@@ -87,7 +87,7 @@ class IVWindow:
         decoded_data = self.data_ctrl.decode_data(raw_data)
         if decoded_data:
             print("Data is being decoded...")
-            adc_curr, vbias, vpzo = decoded_data
+            _, vbias, _ = decoded_data
             self.update_vbias(vbias)
         else:
             print("Data decoding failed or data is incomplete")
@@ -203,16 +203,14 @@ class IVWindow:
 
         self.add_btn_image1 = ctk.CTkImage(Image.open("Images/Start_Btn.png"), size=(90,35))
         self.add_btn_image2 = ctk.CTkImage(Image.open("Images/Stop_Btn.png"), size=(90,35))
-        #self.add_btn_image3 = ctk.CTkImage(Image.open("Images/Homepage_Btn.png"), size=(90,35))
         self.add_btn_image4 = ctk.CTkImage(Image.open("Images/Start_LED.png"), size=(35,35))
         self.add_btn_image5 = ctk.CTkImage(Image.open("Images/Stop_LED.png"), size=(35,35))
 																						   
         
         self.start_btn = ctk.CTkButton(self.root, image=self.add_btn_image1, text="", width=90, height=35, fg_color="#b1ddf0", bg_color="#b1ddf0", corner_radius=0, command=self.start_reading)
-        self.stop_btn = ctk.CTkButton(self.root, image=self.add_btn_image2, text="", width=90, height=35, fg_color="#b1ddf0", bg_color="#b1ddf0", corner_radius=0, command=self.stop_reading)
-        #self.home_btn = ctk.CTkButton(self.root, image=self.add_btn_image3, text="", width=90, height=35, fg_color="#b1ddf0", bg_color="#b1ddf0", corner_radius=0, command=self.return_home)																																				   
-        self.green_LED = ctk.CTkLabel(self.root, image=self.add_btn_image4, text="", width=35, height=35, fg_color="#d0cee2", bg_color="#d0cee2", corner_radius=0)
-        self.red_LED = ctk.CTkLabel(self.root, image=self.add_btn_image5, text="", width=35, height=35, fg_color="#d0cee2", bg_color="#d0cee2", corner_radius=0)
+        self.stop_btn = ctk.CTkButton(self.root, image=self.add_btn_image2, text="", width=90, height=35, fg_color="#b1ddf0", bg_color="#b1ddf0", corner_radius=0, command=self.stop_reading)																																	   
+        self.green_LED = ctk.CTkLabel(self.root, image=self.add_btn_image4, text="", width=35, height=35, fg_color="#b1ddf0", bg_color="#b1ddf0", corner_radius=0)
+        self.red_LED = ctk.CTkLabel(self.root, image=self.add_btn_image5, text="", width=35, height=35, fg_color="#b1ddf0", bg_color="#b1ddf0", corner_radius=0)
         
         # setup the drop option menu
         self.DropDownMenu()
@@ -305,26 +303,33 @@ class IVWindow:
         self.root.focus()
         try:
             self.min_voltage = float(self.label3.get())
-            if -10 <= float(self.label3.get()) <= 10:
+            if GLOBALS.VBIAS_MIN <= float(self.label3.get()) <= GLOBALS.VBIAS_MAX:
                 self.min_voltage = float(self.label3.get())
                 print(f"Saved min voltage value: {self.min_voltage}")
             else:
-                messagebox.showerror("INVALID", f"Invalid range. Stay within -10 to 10 V.")
+                messagebox.showerror("INVALID", f"Invalid range. Stay within {GLOBALS.VBIAS_MIN} to {GLOBALS.VBIAS_MAX} V.")
         except:
-            messagebox.showerror("INVALID", f"Invalid Min Voltage. Please update your parameters.")
+            messagebox.showerror("INVALID", f"Invalid value. Please update your parameters.")
 
     def saveMaxVoltage(self, event):
         self.root.focus()
-        if -10 <= float(self.label4.get()) <= 10:
+        try:
             self.max_voltage = float(self.label4.get())
-            print(f"Saved min voltage value: {self.max_voltage}")
-        else:
-            messagebox.showerror("INVALID", f"Invalid range. Stay within -10 t0 10 V.") 
+            if GLOBALS.VBIAS_MIN <= float(self.label4.get()) <= GLOBALS.VBIAS_MAX:
+                self.max_voltage = float(self.label4.get())
+                print(f"Saved min voltage value: {self.max_voltage}")
+            else:
+                messagebox.showerror("INVALID", f"Invalid range. Stay within {GLOBALS.VBIAS_MIN} to {GLOBALS.VBIAS_MAX} V.") 
+        except:
+            messagebox.showerror("INVALID", f"Invalid value. Please update your parameters.")
 
     def saveNumSetpoints(self, event):
         self.root.focus()
-        self.num_setpoints = int(self.label8.get())
-        print(f"Saved number of setpoints value: {self.num_setpoints}")
+        try:
+            self.num_setpoints = int(self.label8.get())
+            print(f"Saved number of setpoints value: {self.num_setpoints}")
+        except:
+            messagebox.showerror("INVALID", f"Invalid value. Please update your parameters.")
         
     def change_LED(self, color):
         if color == 0:
@@ -334,13 +339,6 @@ class IVWindow:
             self.red_LED.grid_remove()
             self.green_LED.grid(row=1, column=11, padx=5, pady=15, sticky="sw")
 
-    '''
-    # update vbias
-    def update_vbias(self, vbias):
-        vbias_str = str(vbias)
-        self.label2.config(text=vbias_str)
-    '''
-        
     # current and bias voltage
     def update_label(self):   
         global curr_data     
@@ -352,21 +350,16 @@ class IVWindow:
         return current_value
     
     def check_sweep_params(self):
-        try:
-            self.min_voltage = float(self.label3.get())
-            if self.min_voltage == None or self.min_voltage < -10 or self.min_voltage > 10:
-                messagebox.showerror("INVALID", f"Invalid Min Voltage. Please update your parameters.")
-                return False
-        except:
-            messagebox.showerror("INVALID", f"Invalid Min Voltage. Please update your parameters.")
+        if self.min_voltage == None or self.min_voltage < GLOBALS.VBIAS_MIN or self.min_voltage > GLOBALS.VBIAS_MAX:
+            messagebox.showerror("INVALID", f"Invalid minimum voltage value. Please update your parameters.")
             return False
             
-        if self.max_voltage == None or self.max_voltage <= -10 or self.max_voltage > 10:
-            messagebox.showerror("INVALID", f"Invalid Max Voltage. Please update your paremeters.") 
+        if self.max_voltage == None or self.max_voltage <= GLOBALS.VBIAS_MIN or self.max_voltage > GLOBALS.VBIAS_MAX:
+            messagebox.showerror("INVALID", f"Invalid maximum voltage value. Please update your paremeters.") 
             return False
 
         if self.num_setpoints == None or self.num_setpoints <= 0:
-            messagebox.showerror("INVALID", f"Invalid Number of Setpoints. Please update your paremeters.") 
+            messagebox.showerror("INVALID", f"Invalid number of setpoints value. Please update your paremeters.") 
             return False
 
         self.bias_volt_range = self.max_voltage - self.min_voltage
@@ -376,8 +369,8 @@ class IVWindow:
             messagebox.showerror("INVALID", f"Invalid sweep range. Max value must be higher than Min value.") 
             return False
         
-        if self.volt_per_step < 0.0002:
-            messagebox.showerror("INVALID", f"Invalid Step Size.\nStep size: {self.volt_per_step:.6f}\nStep size needs to be greater than or equal 0.0002V (0.2 mV)\nDecrease number of points or increase voltage range.") 
+        if self.volt_per_step < GLOBALS.VOLTS_PER_STEP:
+            messagebox.showerror("INVALID", f"Invalid Step Size.\nStep size: {self.volt_per_step:.6f}\nStep size needs to be greater than or equal {GLOBALS.VOLTS_PER_STEP} V ({GLOBALS.VOLTS_PER_STEP*1000} mV)\nDecrease number of points or increase voltage range.") 
             return False
         
         return True
@@ -603,6 +596,8 @@ class IVWindow:
         self.fig, self.ax = plt.subplots()
         self.fig.set_figwidth(7)
         self.fig.set_figheight(4.5)
+        self.ax.set_xlabel('Sample Bias Voltage (V)')
+        self.ax.set_ylabel('Tunneling Current (nA)')
         
         # Create a canvas to embed the figure in Tkinter
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.root)

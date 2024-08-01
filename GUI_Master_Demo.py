@@ -64,9 +64,9 @@ class RootGUI:
         self.root.protocol("WM_DELETE_WINDOW", self.quit_application)
         
         # Initialize data and serial control
-        self.data_ctrl = DataCtrl(460800, self.handle_data)
-        self.serial_ctrl = SerialCtrl(None, 460800, self.data_ctrl.decode_data)
-        self.data_ctrl.set_serial_ctrl(self.serial_ctrl)
+        #self.data_ctrl = DataCtrl(460800, self.handle_data)
+        self.serial_ctrl = SerialCtrl(None, 460800)
+        #self.data_ctrl.set_serial_ctrl(self.serial_ctrl)
         self.ztm_serial = usbMsgFunctions(self)
 					
         # Initialize other components
@@ -136,6 +136,7 @@ class RootGUI:
             self.serial_ctrl.serial_port.read(self.serial_ctrl.serial_port.in_waiting)
             print(f"{self.serial_ctrl.serial_port.in_waiting} bytes are stuck in the buffer.")
     
+    '''
     def handle_data(self, raw_data):
         """
         Handles the incoming raw data from the serial port and processes it.
@@ -149,7 +150,8 @@ class RootGUI:
             print("Data is being decoded...")
         else:
             print("Data decoding failed or data is incomplete")
-
+    '''
+    
 class ComGUI:
     def __init__(self, root, parent):
         """
@@ -332,7 +334,7 @@ class MeasGUI:
         self.step_up    = 0
         self.step_down  = 0
         
-        
+        '''
         # Create a frame to hold the label and text box
         self.console_frame = ctk.CTkFrame(self.root, width=500, height=250)
         self.console_frame.grid(row=2, column=11, padx=20, pady=10, rowspan=13, sticky="nsew")
@@ -352,7 +354,7 @@ class MeasGUI:
         # Redirect stdout to the console text widget
         sys.stdout = self
         sys.stderr = self
-        
+        '''
         
         # Initialize measurement widgets
         self.initialize_widgets()
@@ -480,7 +482,7 @@ class MeasGUI:
         self.return_to_home_frame = LabelFrame(self.root, text="Return Home", labelanchor= "s", padx=10, pady=5, bg="#eeeeee")
         self.return_to_home_pos = ctk.CTkButton(self.return_to_home_frame, image=self.add_btn_image11, text="", width=30, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.return_home)
         
-        self.vpiezo_btn_frame = LabelFrame(self.root, text="Fine Adjust Tip", padx=10, pady=5, bg="#eeeeee")
+        self.vpiezo_btn_frame = LabelFrame(self.root, text="Piezo Tip Adjust", padx=10, pady=5, bg="#eeeeee")
         self.vpiezo_adjust_btn_up = ctk.CTkButton(master=self.vpiezo_btn_frame, image=self.add_btn_image0, text = "", width=40, height=40, compound="bottom", fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.piezo_inc)
         self.vpiezo_adjust_btn_down = ctk.CTkButton(master=self.vpiezo_btn_frame, image=self.add_btn_image1, text="", width=40, height=40, compound="bottom", fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.piezo_dec)
         
