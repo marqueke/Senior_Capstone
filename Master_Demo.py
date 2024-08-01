@@ -1,38 +1,21 @@
-from GUI_Master_Demo import RootGUI, MeasGUI, GraphGUI, ButtonGUI, ComGUI
-from Data_Com_Ctrl import SerialController
-from SPI_Data_Ctrl import SerialCtrl
-
-MySerial = SerialCtrl()
+from GUI_Master_Demo import RootGUI, MeasGUI, GraphGUI, ComGUI
 
 # Initialize the root GUI
 RootMaster = RootGUI()
 
 # Initialize other GUI components
-GUIMeas = MeasGUI(RootMaster.root)
-GUIGraph = GraphGUI(RootMaster.root)
-GUIButton = ButtonGUI(RootMaster.root)
-GUICom = ComGUI(RootMaster.root, MySerial)
+GUIMeas = MeasGUI(RootMaster.root, RootMaster)
+GUIGraph = GraphGUI(RootMaster.root, GUIMeas)
+GUICom = ComGUI(RootMaster.root, RootMaster)
 
-'''
-# Initialize serial communication and start reading
-MySerial = SerialController(
-    port='COM7',         # Update with your COM port
-    baudrate=9600,
-    callback=GUIMeas.update_distance
-)
-MySerial.start(RootMaster.root)
+# Link the initialized components to RootMaster
+RootMaster.meas_gui = GUIMeas
+RootMaster.graph_gui = GUIGraph
+RootMaster.com_gui = GUICom
 
-# Initialize ComGUI with the serial controller
-ComMaster = ComGUI(RootMaster.root, MySerial)
-
-# Ensure the serial communication stops when the application quits
-def on_closing():
-    MySerial.stop()
-    RootMaster.root.quit()
-
-RootMaster.root.protocol("WM_DELETE_WINDOW", on_closing)
-'''
-
+# Ensure MeasGUI has a reference to RootMaster's graph_gui
+GUIMeas.parent.graph_gui = GUIGraph
 
 # Start the Tkinter event loop
 RootMaster.root.mainloop()
+

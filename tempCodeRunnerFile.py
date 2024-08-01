@@ -1,1 +1,1 @@
-from SPI_Data_Ctrl import SerialCtrl
+self.curr_setpoint

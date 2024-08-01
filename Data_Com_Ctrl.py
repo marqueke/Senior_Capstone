@@ -1,69 +1,46 @@
-import serial
-import threading
-import queue
-import serial.tools.list_ports
-from tkinter import messagebox
+import GLOBALS
 
-class SerialController:
-    def __init__(self, port, baudrate, callback):
-        self.port = port
+'''
+MSG A used to set voltage outputs and transmit standard measurements
+MSG B used for data and sampling rates
+MSG C used for CMDs and STATUSes
+MSG D used by PC to command the MCU to step the stepper motor at a defined step size
+        - used by MCU to transmit total # of stepper motor steps (in 1/8 steps)
+MSG E used by PC to CMD the MCU to set a sinusoidal vbias
+MSG F used by MCU to transmit FFT results - amplitude and frequency
+'''
+
+class DataCtrl:
+    def __init__(self, baudrate, callback):
+        """
+        Initializes the DataCtrl class with the specified baudrate and callback function.
+        
+        :param baudrate: The baud rate for the serial communication.
+        :param callback: The callback function to handle decoded data.
+        """
         self.baudrate = baudrate
         self.callback = callback
-        self.serial_connection = None
-        self.running = False
-        self.thread = None
-        self.queue = queue.Queue()
+        self.serial_ctrl = None
 
-    def start(self, root):
-        try:
-            self.serial_connection = serial.Serial(self.port, self.baudrate, timeout=1)
-            self.running = True
-            self.thread = threading.Thread(target=self.read_data)
-            self.thread.start()
-            self.process_queue(root)
-        except serial.SerialException as e:
-            print(f"Error opening serial port: {e}")
-            messagebox.showerror("Serial Error", f"Error opening serial port: {e}")
+    def set_serial_ctrl(self, serial_ctrl):
+        self.serial_ctrl = serial_ctrl
+        
+    def decode_data(self, raw_data):
+        """
+        Decodes the received raw data into meaningful values.
+        
+        :param raw_data: The raw data received from the serial port.
+        :return: Decoded data or None if the frame is incomplete.
+        """
+        #print(f"Raw data received (length {len(raw_data)}): {raw_data.hex()}")
+        if len(raw_data) < GLOBALS.MSG_BYTES:
+            print("Incomplete data frame received.")
+            return None
 
-    def read_data(self):
-        while self.running:
-            try:
-                data = self.serial_connection.readline().decode(errors='replace').strip()
-                if data:
-                    self.queue.put(data)
-            except serial.SerialException as e:
-                print(f"Serial read error: {e}")
-                self.stop()
-
-    def process_queue(self, root):
-        while not self.queue.empty():
-            data = self.queue.get()
-            self.callback(data)
-        if self.running:
-            root.after(100, self.process_queue, root)
-
-    def stop(self):
-        self.running = False
-        if self.thread:
-            self.thread.join()
-        if self.serial_connection:
-            self.serial_connection.close()
-
-    def SerialOpen(self, com_gui):
-        try:
-            self.serial_connection = serial.Serial(self.port, self.baudrate)
-            self.running = True
-            self.thread = threading.Thread(target=self.read_data)
-            self.thread.start()
-            return True
-        except Exception as e:
-            print(f"Failed to open serial port: {e}")
-            return False
-
-    def SerialClose(self, com_gui):
-        self.stop()
-
-    def getCOMList(self):
-        self.com_list = [port.device for port in serial.tools.list_ports.comports()]
-        if not self.com_list:
-            self.com_list = ['No COM ports found']
+    '''
+    def send_command(self, msg, cmd, status, payload):
+        data = struct.pack('BBB', msg, cmd, status) + payload
+        print(f"Sending command: {data.hex()}")
+        self.serial_ctrl.write_serial(data) 
+    '''
+        
