@@ -1,7 +1,7 @@
 import serial
 import threading
 import time
-import GLOBALS
+import globals
 
 class SerialCtrl:
     def __init__(self, port, baudrate):
@@ -13,6 +13,7 @@ class SerialCtrl:
         self.running = False
         self.buffer = bytearray()
 
+    
     # used to continuously read data from port
     # useful for data acquisition and background processing
     def read_serial(self):
@@ -20,27 +21,26 @@ class SerialCtrl:
             try:
                 if self.serial_port.in_waiting > 0:
                     raw_data = self.serial_port.read(self.serial_port.in_waiting)
-                    #print(f"Raw data received (length {len(raw_data)}): {raw_data.hex}")
                     self.buffer.extend(raw_data)
                     
                     # Process complete frames (11 bytes each)
-                    while len(self.buffer) >= GLOBALS.MSG_BYTES:
-                        frame = self.buffer[:GLOBALS.MSG_BYTES]
-                        self.buffer = self.buffer[GLOBALS.MSG_BYTES:]
-                        #print(f"Processing frame: {frame.hex}")
-                        #self.callback(frame)
+                    while len(self.buffer) >= globals.MSG_BYTES:
+                        frame = self.buffer[:globals.MSG_BYTES]
+                        self.buffer = self.buffer[globals.MSG_BYTES:]
                     return raw_data
             except serial.SerialException as e:
                 print(f"Error reading serial port: {e}")
                 self.running = False
     
+    
+    '''
     # Blocking read method- reads specified 11 bytes from port
     # useful for waiting for a specific response from MCU immediately after
     # sending a command
     def read_serial_blocking(self):
         if self.serial_port and self.serial_port.is_open:
             try:
-                raw_data = self.serial_port.read(GLOBALS.MSG_BYTES)  # Read 11 bytes blocking
+                raw_data = self.serial_port.read(globals.MSG_BYTES)  # Read 11 bytes blocking
                 if raw_data:
                     print(f"Received data: {raw_data.hex()}")
                     return raw_data
@@ -53,7 +53,7 @@ class SerialCtrl:
         else:
             print("Serial port is not open. Call start() first.")
             return None
-
+    '''
 
     
     def ztmGetMsg(self, port):
@@ -61,18 +61,19 @@ class SerialCtrl:
         
         attempts = 0
         response = b''  # Initialize an empty byte string to store the response
-        while(attempts < GLOBALS.MAX_ATTEMPTS):
+        while(attempts < globals.MAX_ATTEMPTS):
             try:
-                response = port.read(GLOBALS.MSG_BYTES)
+                response = port.read(globals.MSG_BYTES)
                 return response
             except serial.SerialException as e:
                 print(f"Read operation failed: {e}")    
                 attempts += 1        
-        if attempts == GLOBALS.MAX_ATTEMPTS:
+        if attempts == globals.MAX_ATTEMPTS:
             print(f"Failed to receive complete message.\n")   
             return False
     
 
+    '''
     # function to read msg of 11 bytes
     def read_bytes(self):
         count = 0
@@ -106,7 +107,7 @@ class SerialCtrl:
         if not response:
             print("Failed to receive response from MCU after multiple attempts.")
             return None
-                
+    '''    
                 
     # WRITE FUNCTION TO SEND DATA BACK TO MCU
     def write_serial(self, data):

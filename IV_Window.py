@@ -7,16 +7,17 @@ import customtkinter as ctk
 import tkinter as tk
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-import matplotlib.animation as animation
 import matplotlib.pyplot as plt
-import os, struct, time
+import os
+import struct
+import time
 import csv
 
-import GLOBALS
+import globals
 from SPI_Data_Ctrl import SerialCtrl
-from Data_Com_Ctrl import DataCtrl
-from value_conversion import Convert
 from ztmSerialCommLibrary import ztmCMD, ztmSTATUS, usbMsgFunctions
+from value_conversion import Convert
+
 
 curr_data = 0
 vb_V = 0
@@ -42,19 +43,15 @@ class IVWindow:
         self.root.config(bg="#b1ddf0")
         self.root.geometry("800x650")   # (width x length)
         
-        # initialize data and serial control
-        #self.data_ctrl = DataCtrl(GLOBALS.BAUDRATE, self.handle_data)
-        self.serial_ctrl = SerialCtrl(self.port, GLOBALS.BAUDRATE, self.data_ctrl.decode_data)
-        
+        # initialize serial control
+        self.serial_ctrl = SerialCtrl(self.port, globals.BAUDRATE)
         self.ztm_serial = usbMsgFunctions(self)
         
         # Initialize the widgets
         self.init_meas_widgets()
         self.init_parameters()
         self.init_graph_widgets()
-        
-        self.vbias = 0
-        self.current = 0
+        self.update_label()
     
     def start_reading(self):
         """
@@ -82,16 +79,6 @@ class IVWindow:
         self.STOP_BTN_FLAG = 1
         self.serial_ctrl.stop()
     
-    def handle_data(self, raw_data):
-        print(f"Handling raw data: {raw_data.hex()}")
-        decoded_data = self.data_ctrl.decode_data(raw_data)
-        if decoded_data:
-            print("Data is being decoded...")
-            _, vbias, _ = decoded_data
-            self.update_vbias(vbias)
-        else:
-            print("Data decoding failed or data is incomplete")
-    
     '''
     Function to error check user inputs
     '''
@@ -102,72 +89,7 @@ class IVWindow:
             print(f"Invalid input for {value_name}. Using default value of {default_value}.")
             value = default_value
         return value  
-
-    def send_parameters(self, port):
-        # get vbias min/max and num setpoints from user input
-        vbias_min = self.get_float_value(self.label3, 0.0, "Voltage Bias Minimum")
-        vbias_max = self.get_float_value(self.label4, 0.0, "Voltage Bias Maximum")
-        num_setpoints = self.get_float_value(self.label8, 10.0, "Number of Setpoints")
-        
-        # convert vbias and setpoints to int
-        vbias_min_int = Convert.get_Vbias_int(vbias_min)
-        vbias_max_int = Convert.get_Vbias_int(vbias_max)
-        num_setpoints_int = int(num_setpoints)
-        
-        # calculate delta
-        delta = (vbias_max_int - vbias_min_int) / num_setpoints_int
-        
-        # set to minimum vbias
-        tempVbias = vbias_min_int
-        i = 0
-        
-        # BACK AND FORTH
-        while num_setpoints >= i:
-            pass
-            #self.parent.ztm_serial.sendMsgA(port, ztmCMD.CMD_SET_VBIAS.value, ztmSTATUS.STATUS_MEASUREMENTS.value, 0, tempVbias, 0)
-        
-        # send msg to MCU
-        
-        
-        self.label2.configure(text=f"{self.vbias:.3f} V")
-        self.label1.configure(text=f"{self.current:.3f} nA")
-        #time.sleep(1)
-        #self.label2.configure(text=f"{self.vbias:.3f} V")
-        
-        '''
-        print(f"Vbias min int: {vbias_min_int}, Vbias max int: {vbias_max_int}")
-        
-        # convert values to bytes
-        vbias_min_bytes = struct.pack('>H', vbias_min_int)
-        vbias_max_bytes = struct.pack('>H', vbias_max_int)
-        
-        
-        # Construct the payload with vpzo in the correct position
-        payload_min = vbias_min_bytes
-        payload_max = vbias_max_bytes
-        
-        print(f"Payload Vbias Minimum: {payload_min.hex()}")
-        print(f"Payload Vbias Maximum: {payload_max.hex()}")
-        
     
-        # SAVING BC UNSURE ABOUT VBIAS
-        self.data_ctrl.send_command(MSG_A, ztmCMD.CMD_PIEZO_ADJ.value, ztmSTATUS.STATUS_DONE.value, payload_min)
-        
-        response = self.serial_ctrl.read_serial_blocking()
-        if response:
-            print(f"MCU Response: {response.hex()}")
-        else:
-            print("No response received from MCU")
-        '''
-        
-        '''
-        ##### WRITE TO DISPLAY DATA AFTER RECEIVING A RESPONSE #####
-        vb_V = round(self.get_Vbias_float_V(struct.unpack('H',bytes(testMsg[7:9]))[0]), 3) #unpack bytes & convert
-        vbStr = str(vb_V)   # format as a string
-        print("\tVbias: " + vbStr + " V\n")
-        '''
-
-            
     def init_meas_widgets(self):
         # current
         self.frame1 = LabelFrame(self.root, text="Current (nA)", padx=10, pady=2, bg="gray")
@@ -303,11 +225,11 @@ class IVWindow:
         self.root.focus()
         try:
             self.min_voltage = float(self.label3.get())
-            if GLOBALS.VBIAS_MIN <= float(self.label3.get()) <= GLOBALS.VBIAS_MAX:
+            if globals.VBIAS_MIN <= float(self.label3.get()) <= globals.VBIAS_MAX:
                 self.min_voltage = float(self.label3.get())
-                print(f"Saved min voltage value: {self.min_voltage}")
+                print(f"Saved minimum voltage value: {self.min_voltage}")
             else:
-                messagebox.showerror("INVALID", f"Invalid range. Stay within {GLOBALS.VBIAS_MIN} to {GLOBALS.VBIAS_MAX} V.")
+                messagebox.showerror("INVALID", f"Invalid range. Stay within {globals.VBIAS_MIN} to {globals.VBIAS_MAX} V.")
         except:
             messagebox.showerror("INVALID", f"Invalid value. Please update your parameters.")
 
@@ -315,11 +237,11 @@ class IVWindow:
         self.root.focus()
         try:
             self.max_voltage = float(self.label4.get())
-            if GLOBALS.VBIAS_MIN <= float(self.label4.get()) <= GLOBALS.VBIAS_MAX:
+            if globals.VBIAS_MIN <= float(self.label4.get()) <= globals.VBIAS_MAX:
                 self.max_voltage = float(self.label4.get())
-                print(f"Saved min voltage value: {self.max_voltage}")
+                print(f"Saved maximum voltage value: {self.max_voltage}")
             else:
-                messagebox.showerror("INVALID", f"Invalid range. Stay within {GLOBALS.VBIAS_MIN} to {GLOBALS.VBIAS_MAX} V.") 
+                messagebox.showerror("INVALID", f"Invalid range. Stay within {globals.VBIAS_MIN} to {globals.VBIAS_MAX} V.") 
         except:
             messagebox.showerror("INVALID", f"Invalid value. Please update your parameters.")
 
@@ -341,7 +263,6 @@ class IVWindow:
 
     # current and bias voltage
     def update_label(self):   
-        global curr_data     
         self.label2.configure(text=f"{vb_V:.3f} V") # bias voltage
         self.label1.configure(text=f"{curr_data:.3f} nA") # current
 
@@ -350,11 +271,11 @@ class IVWindow:
         return current_value
     
     def check_sweep_params(self):
-        if self.min_voltage == None or self.min_voltage < GLOBALS.VBIAS_MIN or self.min_voltage > GLOBALS.VBIAS_MAX:
+        if self.min_voltage == None or self.min_voltage < globals.VBIAS_MIN or self.min_voltage > globals.VBIAS_MAX:
             messagebox.showerror("INVALID", f"Invalid minimum voltage value. Please update your parameters.")
             return False
             
-        if self.max_voltage == None or self.max_voltage <= GLOBALS.VBIAS_MIN or self.max_voltage > GLOBALS.VBIAS_MAX:
+        if self.max_voltage == None or self.max_voltage <= globals.VBIAS_MIN or self.max_voltage > globals.VBIAS_MAX:
             messagebox.showerror("INVALID", f"Invalid maximum voltage value. Please update your paremeters.") 
             return False
 
@@ -369,8 +290,8 @@ class IVWindow:
             messagebox.showerror("INVALID", f"Invalid sweep range. Max value must be higher than Min value.") 
             return False
         
-        if self.volt_per_step < GLOBALS.VOLTS_PER_STEP:
-            messagebox.showerror("INVALID", f"Invalid Step Size.\nStep size: {self.volt_per_step:.6f}\nStep size needs to be greater than or equal {GLOBALS.VOLTS_PER_STEP} V ({GLOBALS.VOLTS_PER_STEP*1000} mV)\nDecrease number of points or increase voltage range.") 
+        if self.volt_per_step < globals.IV_VOLTS_PER_STEP_MIN:
+            messagebox.showerror("INVALID", f"Invalid Step Size.\nStep size: {self.volt_per_step:.6f}\nStep size needs to be greater than or equal {globals.IV_VOLTS_PER_STEP_MIN} V ({globals.IV_VOLTS_PER_STEP_MIN*1000} mV)\nDecrease number of points or increase voltage range.") 
             return False
         
         return True
@@ -388,21 +309,20 @@ class IVWindow:
         self.reset_graph()
         plt.ion()
 
-        # while self.STOP_BTN_FLAG == 0:
         for i in range(0, self.num_setpoints + 1):
 
             if self.STOP_BTN_FLAG == 1:
                 break            
 
             # sending vbias to MCU, looking for a DONE status in return
-            success = self.send_msg_retry(self.port, GLOBALS.MSG_A, ztmCMD.CMD_SET_VBIAS.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, 0, self.vbias, 0)
+            success = self.send_msg_retry(self.port, globals.MSG_A, ztmCMD.CMD_SET_VBIAS.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, 0, self.vbias, 0)
             if not success:
                 messagebox.showerror("INVALID", f"Could not verify communication with MCU.\nSweep process aborted.") 
                 self.sweep_finished()
                 return
             
             # sending a REQUEST_FOR_DATA command to MCU to receive current and vbias measurements
-            dataSuccess = self.send_msg_retry(self.port, GLOBALS.MSG_C, ztmCMD.CMD_REQ_DATA.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_MEASUREMENTS.value)
+            dataSuccess = self.send_msg_retry(self.port, globals.MSG_C, ztmCMD.CMD_REQ_DATA.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_MEASUREMENTS.value)
             if not dataSuccess:
                 messagebox.showerror("INVALID", f"Did not receive data from MCU.\nSweep process aborted.") 
                 self.sweep_finished()
@@ -423,11 +343,11 @@ class IVWindow:
         if self.STOP_BTN_FLAG == 1:
             self.change_LED(RED)
             # display message to user if sweep is aborted
-            messagebox.showerror("STOP BUTTON PRESSED", f"The voltage sweep has been STOPPED.")
+            messagebox.showwarning("STOP BUTTON PRESSED", f"The voltage sweep has been STOPPED.")
         else: 
             self.change_LED(RED)
             # display message to user if sweep completed
-            messagebox.showerror("Successful Sweep", f"The voltage sweep has completed.")
+            messagebox.showinfo("Successful Sweep", f"The voltage sweep has completed.")
 
         self.sweep_finished()
 
@@ -447,7 +367,7 @@ class IVWindow:
     Function to send a message to the MCU and retry if we do
     not receive expected response
     '''
-    def send_msg_retry(self, port, msg_type, cmd, status, status_response, *params, max_attempts=GLOBALS.SWEEP_MAX_ATTEMPTS, sleep_time=GLOBALS.HALF_SECOND):
+    def send_msg_retry(self, port, msg_type, cmd, status, status_response, *params, max_attempts=globals.SWEEP_MAX_ATTEMPTS, sleep_time=globals.HALF_SECOND):
         global curr_data
         global vb_V
         
@@ -462,22 +382,21 @@ class IVWindow:
         
         while attempt < max_attempts:
             print(f"\n========== ATTEMPT NUMBER: {attempt+1} ==========")
-            if msg_type == GLOBALS.MSG_A:
+            if msg_type == globals.MSG_A:
                 self.ztm_serial.sendMsgA(port, cmd, status, *params)
-            elif msg_type == GLOBALS.MSG_B:
+            elif msg_type == globals.MSG_B:
                 self.ztm_serial.sendMsgB(port, cmd, status, *params)
-            elif msg_type == GLOBALS.MSG_C:
+            elif msg_type == globals.MSG_C:
                 self.ztm_serial.sendMsgC(port, cmd, status, *params)
-            elif msg_type == GLOBALS.MSG_D:
+            elif msg_type == globals.MSG_D:
                 self.ztm_serial.sendMsgD(port, cmd, status, *params)
-            elif msg_type == GLOBALS.MSG_E:
+            elif msg_type == globals.MSG_E:
                 self.ztm_serial.sendMsgE(port, cmd, status, *params)
             else:
                 raise ValueError(f"Unsupported message type: {msg_type}")
             
             # returns 11 bytes of payload FALSE or byte response
             testMsg = self.serial_ctrl.ztmGetMsg(port)
-            #testMsg = self.parent.serial_ctrl.read_bytes()
             
             testMsg_hex = [b for b in testMsg]
             
@@ -485,7 +404,7 @@ class IVWindow:
             
             ### Unpack data and display on the GUI
             if testMsg:
-                if testMsg_hex[2] == status_response and len(testMsg) == GLOBALS.MSG_BYTES:
+                if testMsg_hex[2] == status_response and len(testMsg) == globals.MSG_BYTES:
                     unpackResponse = self.ztm_serial.unpackRxMsg(testMsg)
                     print(f"Received correct status response from MCU: {testMsg[2]}")
                     
@@ -533,9 +452,7 @@ class IVWindow:
     # file drop-down menu
     def DropDownMenu(self):
         self.menubar = tk.Menu(self.root)
-        
-        #self.custom_font = tkFont.Font(size=8)
-        
+
         self.filemenu = tk.Menu(self.menubar, tearoff=0)
         self.filemenu.add_command(label="Save", command=self.save_graph)
         self.filemenu.add_command(label="Save As", command=self.save_graph_as)
@@ -603,9 +520,6 @@ class IVWindow:
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.root)
         self.canvas.get_tk_widget().grid(row=1, column=0, columnspan=10, rowspan=8, padx=10, pady=10)
 
-        # Start animation
-        #self.ani = animation.FuncAnimation(self.fig, self.animate, interval=1000, cache_frame_data=False)
-        
         # number of points displayed on the graph at a time, may change as desired
         self.x_axis_display_max_number_of_points = 200
         
