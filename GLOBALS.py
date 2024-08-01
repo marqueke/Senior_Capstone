@@ -18,11 +18,13 @@ VBIAS_MAX   = 10.0
 VPIEZO_MIN  = 0.0
 VPIEZO_MAX  = 10.0
 
-# Volts per step for voltage piezo
-VOLTS_PER_STEP = 0.0002
+# Volts per step for voltage piezo (minimum step size)
+IZ_VOLTS_PER_STEP_MIN = 0.0002
+
+IV_VOLTS_PER_STEP_MIN = 0.0004
 
 # Voltage piezo delta
-VPIEZO_DELTA = 0.003
+VPIEZO_DELTA = 0.0002
 
 """
 NUMBER OF SETPOINTS AND SAMPLE SIZE GLOBAL VARIABLES

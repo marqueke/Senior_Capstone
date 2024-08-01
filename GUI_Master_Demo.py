@@ -1568,7 +1568,7 @@ class MeasGUI:
         """
         Method to update the value of ADC current in label 2.
         """
-        self.label2.configure(text=f"{self.adc_curr:.3f} nA")
+        self.label2.configure(text=f"{self.adc_curr:.4f} nA")
 
     def get_current_label2(self):
         """
@@ -1744,7 +1744,7 @@ class GraphGUI:
         self.ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M:%S'))
         self.ax.xaxis.set_major_locator(mdates.SecondLocator(interval=2))
         # controls how much time is shown within the graph, currently displays the most recent 10 seconds
-        self.ax.set_xlim(datetime.datetime.now() - datetime.timedelta(seconds=10), datetime.datetime.now())
+        self.ax.set_xlim(datetime.datetime.now() - datetime.timedelta(seconds=GLOBALS.HOMEPAGE_GRAPH_DISPLAY_TIME_INTERVAL), datetime.datetime.now())
         self.ax.autoscale_view()
         
         # redraw canvas
