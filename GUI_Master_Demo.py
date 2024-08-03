@@ -10,7 +10,7 @@ import os
 import struct
 import time
 import csv
-#import sys
+import sys
 import datetime
 import threading
 import matplotlib.dates as mdates
@@ -26,12 +26,12 @@ from ztmSerialCommLibrary import usbMsgFunctions, ztmCMD, ztmSTATUS
 from SPI_Data_Ctrl import SerialCtrl
 
 # global variables
-curr_setpoint = None
+curr_setpoint = 0.0
 
 # for MCU sent measurements
-curr_data = None
-vb_V = None
-vp_V = None
+curr_data = 0.0
+vb_V = 0.0
+vp_V = 0.0
 
 vpiezo_dist = 0
 
@@ -39,7 +39,8 @@ vbias_save = None
 vbias_done_flag = 0
 
 # used for the tip approach
-vpiezo_tip = None
+vpiezo_tip = 0.0
+tunneling_steps = 0
 
 sample_rate_save = None
 sample_rate_done_flag = 0
@@ -99,8 +100,8 @@ class RootGUI:
         print("Starting to read data...")
         if self.serial_ctrl:
             print("Serial controller is initialized, starting now...")
-            #self.meas_gui.tip_approach()
-            self.meas_gui.enable_periodics()
+            self.meas_gui.tunneling_approach()
+            #self.meas_gui.enable_periodics()
             self.serial_ctrl.running = True
         else:
             print("Serial controller is not initialized.")
@@ -132,7 +133,7 @@ class RootGUI:
     
     def clear_buffer(self):
         """
-        [ADD DESCRIPTION HERE]
+        Clears the serial buffer to make room for other messages.
         """
         if self.serial_ctrl.serial_port.in_waiting > 0:
             print(f"{self.serial_ctrl.serial_port.in_waiting} bytes are stuck in the buffer.")
@@ -260,7 +261,6 @@ class ComGUI:
             print("\nDisconnected.")
             
             startup_flag = 0
-            
 
     def startup_routine(self):
         """
@@ -325,10 +325,42 @@ class MeasGUI:
         # Local variables for stepper motor adjusting
         self.step_up    = 0
         self.step_down  = 0
+
+        # Create a frame to hold the label and text box
+        self.console_frame = ctk.CTkFrame(self.root, width=500, height=250)
+        self.console_frame.grid(row=2, column=11, padx=20, pady=10, rowspan=13, sticky="nsew")
+
+        # Create a label for the console panel
+        self.console_label = ctk.CTkLabel(self.console_frame, text="Console Window", anchor="w", text_color="black", bg_color="#eeeeee")
+        self.console_label.pack(fill="x", pady=(0, 5))
+
+        # Create a text widget to serve as the console panel
+        self.console_text = ctk.CTkTextbox(self.console_frame, height=500, width=250)
+        self.console_text.pack(fill="both", expand=True)
+        self.console_text.configure(state='disabled')
+
+        # Set font size for the console text
+        self.console_text.configure(font=("Helvetica", 10))  # Change font size as needed
+
+        # Redirect stdout to the console text widget
+        sys.stdout = self
+        sys.stderr = self
         
         # Initialize measurement widgets
         self.initialize_widgets()
         self.update_label()
+
+    def write(self, message):
+        """
+        Writes a message to the console text widget.
+
+        Args:
+            message (str): The message to be written to the console text widget.
+        """
+        self.console_text.configure(state='normal')
+        self.console_text.insert(tk.END, message)
+        self.console_text.see(tk.END)  # Scroll to the end
+        self.console_text.configure(state='disabled')
         
     def initialize_widgets(self):
         """
@@ -800,44 +832,77 @@ class MeasGUI:
         return value  
     
 ############################################# TIP APPROACH #################################################
-    def tunneling_approach(self, steps):
+    def tunneling_approach(self):
         """
         @brief: This function looks for a desired tunneling current using the traditional algorithm
         @param targetCurrent_nA: The desired tunneling current the algorithm is looking for
         @retval: None
         """
+        global STOP_BTN_FLAG
         global curr_setpoint
         global vpiezo_tip
+        global tunneling_steps
         global curr_data
         global vb_V
         global vp_V
         
-        
-        reqData = False
-        
-        port = self.parent.serial_ctrl.serial_port
-        
-        # Get a measurement from the MCU, send_msg_retry() will change the val of the global vars
-        success = self.send_msg_retry(port, globals.MSG_C, ztmCMD.CMD_REQ_DATA.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value)
-        
-        if success:
-            # Immediately step back and return if current >= target
-            if(curr_data >= curr_setpoint):
-                adjust_success = self.send_msg_retry(port, globals.MSG_D, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, globals.EIGHTH_STEP, globals.DIR_DOWN, globals.NUM_STEPS)
-                if adjust_success:
-                    # steps -= INC_EIGHT
-                    return 1, curr_data, vb_V, vp_V #, steps
-                else:
-                    print("Did not receive correct response back.")
-                    messagebox.showerror("ERROR", "Error. Unable to adjust the stepper motor.")
-            else:
-                vpiezo_tip, steps = self.auto_move_tip(steps, globals.APPROACH_STEP_SIZE_NM, globals.DIR_DOWN)
-                return 0, curr_data, vb_V, vp_V #, steps
+        if self.check_connection():
+            return
         else:
-            print("Did not receive correct response back.")
-            messagebox.showerror("ERROR", "Error. Did not receive correct response back.")
-        
-        
+        ##########    
+            port = self.parent.serial_ctrl.serial_port
+            
+            if not self.saveCurrentSetpoint():
+                return 
+            
+            # Set sample size to 24
+            self.send_msg_retry(port, globals.MSG_B, ztmCMD.CMD_SET_ADC_SAMPLE_SIZE.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, globals.TUNNELING_SAMPLE_SIZE)
+
+            # Get a measurement from the MCU, send_msg_retry() will change the val of the global vars curr, vbias, vpzo
+            success = self.send_msg_retry(port, globals.MSG_C, ztmCMD.CMD_REQ_DATA.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_MEASUREMENTS.value)
+            
+            if success:
+                print("\n----------BEGINNING TIP APPROACH ALGORITHM----------")
+                # Resets visual graph and data
+                self.parent.graph_gui.reset_graph()
+                
+                # Turns interactive graph on
+                plt.ion()
+                
+                self.startup_leds()
+                self.disable_widgets()
+                
+                while True:
+                    if STOP_BTN_FLAG == 1:
+                        plt.ioff()
+                        break
+                    
+                    # Immediately step back and return if current >= target
+                    if(curr_data >= curr_setpoint):
+                        adjust_success = self.send_msg_retry(port, globals.MSG_D, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, globals.EIGHTH_STEP, globals.DIR_DOWN, globals.NUM_STEPS)
+                        if adjust_success:
+                            tunneling_steps -= globals.INC_EIGHT
+                            plt.ioff()
+                            return 1, curr_data, vb_V, vp_V, tunneling_steps
+                        else:
+                            print("Did not receive correct response back.")
+                            messagebox.showerror("ERROR", "Error. Unable to adjust the stepper motor.")
+                    else:
+                        # Update the graph with new data
+                        self.parent.graph_gui.update_graph()
+                        
+                        vpiezo_tip, tunneling_steps = self.auto_move_tip(tunneling_steps, globals.APPROACH_STEP_SIZE_NM, globals.DIR_DOWN)
+                        #plt.ioff()
+                        
+                        #return 0, curr_data, vb_V, vp_V, tunneling_steps
+                STOP_BTN_FLAG = 0
+            else:
+                print("Did not receive correct response back.")
+                messagebox.showerror("ERROR", "Error. Did not receive correct response back.")
+            
+                # Turns interactive graph off
+                plt.ioff()
+            
     
     def auto_move_tip(self, steps, dist, dir):
         """
@@ -864,8 +929,8 @@ class MeasGUI:
                 # Move stepper motor DOWN an eighth step
                 while(stepSet == False):
                     stepSet = self.send_msg_retry(port, globals.MSG_D, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, globals.EIGHTH_STEP, globals.DIR_DOWN, globals.NUM_STEPS)
-                # Increment number of steps (?)
-                #steps += INC_EIGHT
+                # Increment number of steps 
+                steps += globals.INC_EIGHT
             # Increment the piezo voltage by delta_V to step it down
             else:
                 vpiezo_tip += delta_V
@@ -881,16 +946,16 @@ class MeasGUI:
                 # Move stepper motor UP an eighth step    
                 while(stepSet == False):
                     stepSet = self.send_msg_retry(port, globals.MSG_D, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, globals.EIGHTH_STEP, globals.DIR_UP, globals.NUM_STEPS)
-                    # Decrement number of steps (?)
-                    # steps -= INC_EIGHT
+                    # Decrement number of steps 
+                steps -= globals.INC_EIGHT
                 vpiezo_tip = self.piezo_full_extend()
             else:
                 vpiezo_tip -= delta_V
                 # Send message to update vpiezo
                 while(piezoSet == False):
                     piezoSet = self.send_msg_retry(port, globals.MSG_A, ztmCMD.CMD_PIEZO_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, 0, 0, vpiezo_tip)
-        print(f"New vpiezo for tip approach: {vpiezo_tip} V") # "Step Count: {steps}"
-        return vpiezo_tip #, steps
+        print(f"\nNew vpiezo for tip approach: {vpiezo_tip} V\nStep Count: {steps}")
+        return vpiezo_tip, steps
                 
     def piezo_full_extend(self):
         """
@@ -900,6 +965,8 @@ class MeasGUI:
             vpiezo (_type_): _description_
         """
         global vpiezo_tip
+
+        print("Piezo is extending...")
         
         port = self.parent.serial_ctrl.serial_port
         piezoSet = False
@@ -923,6 +990,8 @@ class MeasGUI:
         """
         global vpiezo_tip
         
+        print("Piezo is retracting...")
+        
         port = self.parent.serial_ctrl.serial_port
         piezoSet = False
         # Retract piezo in small increments
@@ -935,7 +1004,8 @@ class MeasGUI:
             while(piezoSet == False):
                 piezoSet = self.send_msg_retry(port, globals.MSG_A, ztmCMD.CMD_PIEZO_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, 0, 0, vpiezo_tip)
         return vpiezo_tip
-    
+
+    '''
     def tip_approach(self):
         """
         Function to send user-inputted parameters to MCU, sample bias, sample rate, sample
@@ -985,7 +1055,7 @@ class MeasGUI:
             # 3. a) Verify we have DONE msgs received from MCU (vpzo and vbias)
             # 3. b) If DONE msgs not rcvd, MCU will send RESEND status and GUI will resend until we have DONE from MCU
             
-            ''' NOT NEEDED ANYMORE (?)
+            # NOT NEEDED ANYMORE(?)
             # error check current setpoint
             try:
                 curr_setpoint = float(curr_setpoint)
@@ -1045,8 +1115,7 @@ class MeasGUI:
                     sample_size_done_flag = 1
                 else:
                     sample_size_done_flag = 0
-            print(f"Sample size: {sample_size_save}")
-            '''            
+            print(f"Sample size: {sample_size_save}") 
             
             # sample_size_save = 10 # for debugging purposes, delete later
             
@@ -1065,10 +1134,12 @@ class MeasGUI:
                 
                 tip_app_total_steps = self.send_msg_retry(self.parent.serial_ctrl.serial_port, globals.MSG_C, ztmCMD.CMD_REQ_STEP_COUNT.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value)
                 self.enable_periodics()
-
+    '''
+    
     def enable_periodics(self):
         """
         Function to enable and read periodic data from the MCU.
+        NOTE: need to add a flag for checking tunneling approach
         """
         global STOP_BTN_FLAG
         global curr_data
@@ -1239,7 +1310,7 @@ class MeasGUI:
                     messagebox.showinfo("Information", f"Did not process change in value within {globals.TIMEOUT} period. Please try again.")
                     print("Not received.")
                 
-    def saveCurrentSetpoint(self, _): 
+    def saveCurrentSetpoint(self, _=None): 
         """
         Function to save the user inputted value of current setpoint to use for 
         the tip approach algorithm.
@@ -1250,22 +1321,27 @@ class MeasGUI:
         """
         global curr_setpoint 
         
+        self.root.focus()
         if self.check_connection():
-            self.root.focus()
             return
         else:
             try:
                 curr_setpoint = float(self.label3.get())
-                print(f"\nSaved current setpoint value: {curr_setpoint} nA")
-            
-                self.root.focus()
+                if 0.1 <= curr_setpoint <= 10:
+                    print(f"\nSaved current setpoint value: {curr_setpoint} nA")
+                    return True
+                else:
+                    self.label3.delete(0,END)
+                    self.label3.insert(0,0.000)
+                    messagebox.showerror("Invalid Value", "Error. Please enter a valid input.")
+                    return False
             except ValueError:
-                self.root.focus()
                 self.label3.delete(0,END)
                 self.label3.insert(0,0.000)
                 messagebox.showerror("Invalid Value", "Error. Please enter a valid input.")
+                return False
 
-    def saveCurrentOffset(self, event): 
+    def saveCurrentOffset(self, _=None): 
         """
         Save current offset and uses to offset the graph.
         QUESTION: Range for current offset?
@@ -1817,8 +1893,11 @@ class GraphGUI:
         the Piezo Voltage Sweep. The data points are appended to the data arrays.
         *Updates every 36ms
         """
+        global curr_data
+        
         # Fetch current data from label 2
-        current_data = self.meas_gui.get_current_label2()
+        #current_data = self.meas_gui.get_current_label2()
+        current_data = curr_data
         
         # update data with next data points
         self.y_data.append(current_data)
@@ -1838,7 +1917,7 @@ class GraphGUI:
         self.ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M:%S'))
         self.ax.xaxis.set_major_locator(mdates.SecondLocator(interval=2))
         # controls how much time is shown within the graph, currently displays the most recent 10 seconds
-        self.ax.set_xlim(datetime.datetime.now() - datetime.timedelta(seconds=10), datetime.datetime.now())
+        self.ax.set_xlim(datetime.datetime.now() - datetime.timedelta(seconds=globals.ROLLOVER_GRAPH_TIME), datetime.datetime.now())
         self.ax.autoscale_view()
         
         # redraw canvas

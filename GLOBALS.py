@@ -17,6 +17,7 @@ PIEZO_CODE_RATIO    = 6553.6
 POS_TOLERANCE       = 0.1
 APPROACH_STEP_SIZE_NM   = 0.025 # nm
 FREQ_RES            = 150.0     # Hz
+TUNNELING_SAMPLE_SIZE = 24
 
 # Cap approach global variables here (if needed)
 
@@ -72,6 +73,12 @@ HALF_STEP_DISTANCE = 0.004
 QUARTER_STEP_DISTANCE = 0.002
 EIGHTH_STEP_DISTANCE = 0.001
 
+# Amount to increase the step size by
+INC_FULL  = 1
+INC_HALF  = 0.5
+INC_QUART = 0.25
+INC_EIGHT = 0.125
+
 # Direction the stepper motor is moving
 DIR_UP          = 0x00
 DIR_DOWN        = 0x01
@@ -91,6 +98,9 @@ TENTH_SECOND = 0.1
 # Attempts
 MAX_ATTEMPTS = 10
 SWEEP_MAX_ATTEMPTS = 10
+
+# Graph rollover
+ROLLOVER_GRAPH_TIME = 10.0
 
 """
 BAUD RATE
