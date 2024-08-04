@@ -18,13 +18,12 @@ VBIAS_MAX   = 10.0
 VPIEZO_MIN  = 0.0
 VPIEZO_MAX  = 10.0
 
-# Volts per step for voltage piezo (minimum step size)
+# Volts per step for voltage piezo
 IZ_VOLTS_PER_STEP_MIN = 0.0002
-
 IV_VOLTS_PER_STEP_MIN = 0.0004
 
 # Voltage piezo delta
-VPIEZO_DELTA = 0.0002
+VPIEZO_DELTA_MIN = 0.0002
 
 """
 NUMBER OF SETPOINTS AND SAMPLE SIZE GLOBAL VARIABLES
@@ -32,7 +31,7 @@ NUMBER OF SETPOINTS AND SAMPLE SIZE GLOBAL VARIABLES
 SAMPLE_SIZE_MIN = 1
 SAMPLE_SIZE_MAX = 1024
 
-NUM_SETPOINTS_MIN = 0
+NUM_SETPOINTS_MIN = 1
 
 
 """
@@ -53,11 +52,11 @@ HALF_STEP       = 0x01
 QUARTER_STEP    = 0x02
 EIGHTH_STEP     = 0x03
 
-# The distance in nanometers of the step sizes
-FULL_STEP_DISTANCE = 0.008
-HALF_STEP_DISTANCE = 0.004
-QUARTER_STEP_DISTANCE = 0.002
-EIGHTH_STEP_DISTANCE = 0.001
+# The distance in nanometers of the step sizes (rough estimate)
+FULL_STEP_DISTANCE = 400
+HALF_STEP_DISTANCE = 200
+QUARTER_STEP_DISTANCE = 100
+EIGHTH_STEP_DISTANCE = 50
 
 # Direction the stepper motor is moving
 DIR_UP          = 0x00
@@ -83,3 +82,15 @@ SWEEP_MAX_ATTEMPTS = 1
 BAUD RATE
 """
 BAUDRATE = 460800
+
+"""
+GRAPHICAL DISPLAY PARAMETERS
+"""
+# these parameters will make the graphical displays readable (to avoid cluttered graphs)
+
+# homepage graph will display this interval (in seconds) 
+# i.e. the graph will display the most recent (X) second interval
+HOMEPAGE_GRAPH_DISPLAY_TIME_INTERVAL = 10
+
+# sweep windows will display this number of points at a time, may change as desired
+SWEEP_GRAPH_DISPLAY_NUMBER_OF_POINTS = 200

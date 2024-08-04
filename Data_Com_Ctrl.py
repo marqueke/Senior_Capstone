@@ -1,6 +1,5 @@
 import GLOBALS
 
-from SPI_Data_Ctrl import SerialCtrl
 '''
 MSG A used to set voltage outputs and transmit standard measurements
 MSG B used for data and sampling rates

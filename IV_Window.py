@@ -1,5 +1,6 @@
 # iv_window.py
 
+# imported python packages
 from tkinter import *
 from tkinter import messagebox, filedialog
 from PIL import Image
@@ -7,16 +8,14 @@ import customtkinter as ctk
 import tkinter as tk
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-import matplotlib.animation as animation
 import matplotlib.pyplot as plt
-import os, struct, time
-import csv
+import os, struct, time, csv
 
-import GLOBALS
+# imported custom classes
+import globals
 from SPI_Data_Ctrl import SerialCtrl
-from Data_Com_Ctrl import DataCtrl
-from value_conversion import Convert
 from ztmSerialCommLibrary import ztmCMD, ztmSTATUS, usbMsgFunctions
+from value_conversion import Convert
 
 curr_data = 0
 vb_V = 0
@@ -40,23 +39,19 @@ class IVWindow:
             
         self.root.title("Acquire I-V")
         self.root.config(bg="#b1ddf0")
-        self.root.geometry("750x675")   # (length x width)
+        self.root.geometry("800x650")   # (width x length)
         
-        # initialize data and serial control
-        self.serial_ctrl = SerialCtrl(self.port, GLOBALS.BAUDRATE, self.data_ctrl.decode_data)
+        # initialize serial control
+        self.serial_ctrl = SerialCtrl(self.port, globals.BAUDRATE)
         self.ztm_serial = usbMsgFunctions(self)
-        print(f"Connected to {self.port}...")
         
         # Initialize the widgets
         self.init_meas_widgets()
         self.init_parameters()
         self.init_graph_widgets()
-        self.label2.after(1, self.update_label)
-
-        ###############
-        self.vbias = 0
-        self.current = 0
+        self.update_label()
     
+
     def start_reading(self):
         """
         Starts reading bias voltage and current from the MCU.
@@ -76,26 +71,18 @@ class IVWindow:
     
     def stop_reading(self):
         """
-        [ADD DESCRIPTION HERE.]
+        Disables the reading of data through the serial port.
         """
         print("Stopped reading data...")
         self.enable_widgets()
         self.STOP_BTN_FLAG = 1
-        self.serial_ctrl.stop()
+        self.serial_ctrl.stop() 
     
 
-    def get_float_value(self, label, default_value, value_name):
-        '''
-        Function to error check user inputs
-        ''' 
-        try:
-            value = float(label.get())
-        except ValueError:
-            print(f"Invalid input for {value_name}. Using default value of {default_value}.")
-            value = default_value
-        return value  
-            
     def init_meas_widgets(self):
+        """
+        Initializes widgets needed.
+        """
         # current
         self.frame1 = LabelFrame(self.root, text="Current (nA)", padx=10, pady=2, bg="gray")
         self.label1 = Label(self.frame1, bg="white", width=25)
@@ -106,17 +93,17 @@ class IVWindow:
         
         # IV sweep voltage parameters
         # min voltage
-        self.frame3 = LabelFrame(self.root, text="Minimum Voltage (V)", padx=10, pady=2, bg="#A7C7E7")
+        self.frame3 = LabelFrame(self.root, text="Minimum Voltage (V)", padx=10, pady=2, bg="#ADD8E6")
         self.label3 = Entry(self.frame3, bg="white", width=30)
         self.label3.bind("<Return>", self.saveMinVoltage)
         
         # max voltage
-        self.frame4 = LabelFrame(self.root, text="Maximum Voltage (V)", padx=10, pady=2, bg="#A7C7E7")
+        self.frame4 = LabelFrame(self.root, text="Maximum Voltage (V)", padx=10, pady=2, bg="#ADD8E6")
         self.label4 = Entry(self.frame4, bg="white", width=30)
         self.label4.bind("<Return>", self.saveMaxVoltage)
         
         # number of setpoints
-        self.frame6 = LabelFrame(self.root, text="Number of Setpoints", padx=10, pady=2, bg="#A7C7E7")
+        self.frame6 = LabelFrame(self.root, text="Number of Setpoints", padx=10, pady=2, bg="#ADD8E6")
         self.label8 = Entry(self.frame6, bg="white", width=30)
         self.label8.bind("<Return>", self.saveNumSetpoints)
         
@@ -135,9 +122,9 @@ class IVWindow:
         self.add_btn_image5 = ctk.CTkImage(Image.open("Images/Stop_LED.png"), size=(35,35))
 																						   
         self.start_btn = ctk.CTkButton(self.root, image=self.add_btn_image1, text="", width=90, height=35, fg_color="#b1ddf0", bg_color="#b1ddf0", corner_radius=0, command=self.start_reading)
-        self.stop_btn = ctk.CTkButton(self.root, image=self.add_btn_image2, text="", width=90, height=35, fg_color="#b1ddf0", bg_color="#b1ddf0", corner_radius=0, command=self.stop_reading)
-        self.green_LED = ctk.CTkLabel(self.root, image=self.add_btn_image4, text="", width=35, height=35, fg_color="#d0cee2", bg_color="#d0cee2", corner_radius=0)
-        self.red_LED = ctk.CTkLabel(self.root, image=self.add_btn_image5, text="", width=35, height=35, fg_color="#d0cee2", bg_color="#d0cee2", corner_radius=0)
+        self.stop_btn = ctk.CTkButton(self.root, image=self.add_btn_image2, text="", width=90, height=35, fg_color="#b1ddf0", bg_color="#b1ddf0", corner_radius=0, command=self.stop_reading)																																	   
+        self.green_LED = ctk.CTkLabel(self.root, image=self.add_btn_image4, text="", width=35, height=35, fg_color="#b1ddf0", bg_color="#b1ddf0", corner_radius=0)
+        self.red_LED = ctk.CTkLabel(self.root, image=self.add_btn_image5, text="", width=35, height=35, fg_color="#b1ddf0", bg_color="#b1ddf0", corner_radius=0)
         
         # setup the drop option menu
         self.DropDownMenu()
@@ -149,7 +136,11 @@ class IVWindow:
         # put on the grid all the elements
         self.publish_meas_widgets()
     
+
     def publish_meas_widgets(self):
+        """
+        Method to publish needed widgets.
+        """
         # current
         self.frame1.grid(row=12, column=0, padx=5, pady=5, sticky="e")
         self.label1.grid(row=0, column=0, padx=5, pady=5)
@@ -176,12 +167,16 @@ class IVWindow:
         self.label6.grid(row=0, column=2, pady=5, sticky="e")
         self.label7.grid(row=0, column=2, pady=5, sticky="w")
         
+        # positioning of the start/stop buttons and LED indicator
         self.start_btn.grid(row=1, column=10, padx=5, pady=15, sticky="s")
         self.stop_btn.grid(row=2, column=10, padx=5, sticky="n")
-        #self.home_btn.grid(row=15, column=10, sticky="n")
         self.red_LED.grid(row=1, column=11, padx=5, pady=15, sticky="s")
         
+
     def init_parameters(self):
+        """
+        This initializes all class variables.
+        """
         self.min_voltage = None
         self.max_voltage = None
         self.num_setpoints = None
@@ -189,6 +184,7 @@ class IVWindow:
         self.volt_per_step = None
         self.adjusted_x_axis = None
         self.STOP_BTN_FLAG = 0
+
 
     def disable_widgets(self):
         """
@@ -206,6 +202,7 @@ class IVWindow:
         self.start_btn.configure(state="disabled")
         self.stop_btn.configure(state="normal")
 
+
     def enable_widgets(self):
         """
         Function to enable entry widgets when the process is stopped.
@@ -222,21 +219,29 @@ class IVWindow:
         self.start_btn.configure(state="normal")
         self.stop_btn.configure(state="disabled")
         
+
     def saveMinVoltage(self, event):
+        """
+        Function to save the user input minimum voltage parameter for voltage sweep
+        """
         self.root.focus()
         if self.isValidBiasInput(self.label3.get()):
-            if GLOBALS.VBIAS_MIN <= float(self.label3.get()) <= GLOBALS.VBIAS_MAX:
+            if globals.VBIAS_MIN <= float(self.label3.get()) <= globals.VBIAS_MAX:
                 self.min_voltage = float(self.label3.get())
                 print(f"Saved min voltage value: {self.min_voltage}")
             else:
                 messagebox.showerror("INVALID", f"Invalid range. Stay within -10 to 10 V.")
         else:
-            messagebox.showerror("INVALID", f"Invalid Min Voltage. Please update your parameters.")
+            messagebox.showerror("INVALID", f"Invalid Min Voltage. Please update your parameters.")    
+
 
     def saveMaxVoltage(self, event):
+        """
+        Function to save the user input maximum voltage parameter for voltage sweep
+        """
         self.root.focus()
         if self.isValidBiasInput(self.label4.get()):
-            if GLOBALS.VBIAS_MIN <= float(self.label4.get()) <= GLOBALS.VBIAS_MAX:
+            if globals.VBIAS_MIN <= float(self.label4.get()) <= globals.VBIAS_MAX:
                 self.max_voltage = float(self.label4.get())
                 print(f"Saved max voltage value: {self.max_voltage}")
             else:
@@ -244,15 +249,21 @@ class IVWindow:
         else:
             messagebox.showerror("INVALID", f"Invalid Max Voltage. Please update your parameters.")
     
+
     def isValidBiasInput(self, text):
+        """
+        Function to validate the user input for min and max voltage values
+        """
         try:
             float(text)
             return True
         except ValueError:
             return False
-        
+    
+
     def saveNumSetpoints(self, event):
         """
+        Function to save the user input number of data points in the voltage sweep
         """
         self.root.focus()
         if self.isValidSetpointInput(self.label8.get()):
@@ -262,8 +273,10 @@ class IVWindow:
         else:
             messagebox.showerror("INVALID", "Invalid input. Please enter an integer.")
     
+
     def isValidSetpointInput(self, text):
         """
+        Function to validate the user input for number of setpoints
         """
         try:
             int(text)
@@ -271,29 +284,39 @@ class IVWindow:
         except ValueError:
             return False
 
-    # current and bias voltage
+
     def update_label(self):   
+        """
+        Function to update the display labels with values obtained from the microscope/microcontroller
+        """ 
         global curr_data    
         global vb_V 
         self.label2.configure(text=f"{vb_V:.3f} V") # bias voltage
         self.label1.configure(text=f"{curr_data:.3f} nA") # current
 
+
     def get_current_label1(self):
+        """
+        Function to gather the current value, used to display data on graph and save into data array, to be exported
+        """
         current_value = float(self.label1.cget("text").split()[0])  # assuming label1 text value is "value" nA
         return current_value
     
-    def check_sweep_params(self):
 
-        if self.min_voltage == None or self.min_voltage < GLOBALS.VBIAS_MIN or self.min_voltage > GLOBALS.VBIAS_MAX:
-            messagebox.showerror("INVALID", f"Invalid Min Voltage. Please update your parameters.")
+    def check_sweep_params(self):
+        """
+        Function to validate all user inputs before the sweep process begins
+        """
+        if self.min_voltage == None or self.min_voltage < globals.VBIAS_MIN or self.min_voltage > globals.VBIAS_MAX:
+            messagebox.showerror("INVALID", f"Invalid minimum voltage value. Please update your parameters.")
             return False
             
-        if self.max_voltage == None or self.max_voltage <= GLOBALS.VBIAS_MIN or self.max_voltage > GLOBALS.VBIAS_MAX:
-            messagebox.showerror("INVALID", f"Invalid Max Voltage. Please update your paremeters.") 
+        if self.max_voltage == None or self.max_voltage < globals.VBIAS_MIN or self.max_voltage > globals.VBIAS_MAX:
+            messagebox.showerror("INVALID", f"Invalid maximum voltage value. Please update your paremeters.") 
             return False
 
-        if self.num_setpoints == None or self.num_setpoints <= GLOBALS.NUM_SETPOINTS_MIN:
-            messagebox.showerror("INVALID", f"Invalid Number of Setpoints. Please update your paremeters.") 
+        if self.num_setpoints == None or self.num_setpoints < globals.NUM_SETPOINTS_MIN:
+            messagebox.showerror("INVALID", f"Invalid number of setpoints value. Please update your paremeters.") 
             return False
 
         self.bias_volt_range = self.max_voltage - self.min_voltage
@@ -303,13 +326,17 @@ class IVWindow:
             messagebox.showerror("INVALID", f"Invalid sweep range. Max value must be higher than Min value.") 
             return False
         
-        if self.volt_per_step < GLOBALS.IV_VOLTS_PER_STEP_MIN:
-            messagebox.showerror("INVALID", f"Invalid Step Size.\nStep size: {self.volt_per_step:.6f}\nStep size needs to be greater than or equal 0.0002V (0.2 mV)\nDecrease number of points or increase voltage range.") 
+        if self.volt_per_step < globals.IV_VOLTS_PER_STEP_MIN:
+            messagebox.showerror("INVALID", f"Invalid Step Size.\nStep size: {self.volt_per_step:.6f}\nStep size needs to be greater than or equal {globals.IV_VOLTS_PER_STEP_MIN} V ({globals.IV_VOLTS_PER_STEP_MIN*1000} mV)\nDecrease number of points or increase voltage range.") 
             return False
         
         return True
 
+
     def run_bias_sweep_process(self):
+        """
+        Function to run a piezo voltage sweep from the user input minimum to maximum voltages, with the number of setpoints evenly spaced in the voltage range
+        """
         global vb_V
         GREEN = 1
         RED = 0
@@ -322,21 +349,20 @@ class IVWindow:
         self.reset_graph()
         plt.ion()
 
-        # while self.STOP_BTN_FLAG == 0:
         for i in range(0, self.num_setpoints + 1):
 
             if self.STOP_BTN_FLAG == 1:
                 break            
 
             # sending vbias to MCU, looking for a DONE status in return
-            success = self.send_msg_retry(self.port, GLOBALS.MSG_A, ztmCMD.CMD_SET_VBIAS.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, 0, self.vbias, 0)
+            success = self.send_msg_retry(self.port, globals.MSG_A, ztmCMD.CMD_SET_VBIAS.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, 0, self.vbias, 0)
             if not success:
                 messagebox.showerror("INVALID", f"Could not verify communication with MCU.\nSweep process aborted.") 
                 self.sweep_finished()
                 return
             
             # sending a REQUEST_FOR_DATA command to MCU to receive current and vbias measurements
-            dataSuccess = self.send_msg_retry(self.port, GLOBALS.MSG_C, ztmCMD.CMD_REQ_DATA.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_MEASUREMENTS.value)
+            dataSuccess = self.send_msg_retry(self.port, globals.MSG_C, ztmCMD.CMD_REQ_DATA.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_MEASUREMENTS.value)
             if not dataSuccess:
                 messagebox.showerror("INVALID", f"Did not receive data from MCU.\nSweep process aborted.") 
                 self.sweep_finished()
@@ -345,8 +371,8 @@ class IVWindow:
             # updates labels with measurements received from MCU
             self.update_label()
 
-            if i > GLOBALS.SWEEP_GRAPH_X_AXIS_DISPLAY_NUMBER_OF_POINTS:
-                self.adjusted_x_axis = vb_V - (GLOBALS.SWEEP_GRAPH_X_AXIS_DISPLAY_NUMBER_OF_POINTS * self.volt_per_step)
+            if i > globals.SWEEP_GRAPH_X_AXIS_DISPLAY_NUMBER_OF_POINTS:
+                self.adjusted_x_axis = vb_V - (globals.SWEEP_GRAPH_X_AXIS_DISPLAY_NUMBER_OF_POINTS * self.volt_per_step)
 
             # updates graph display
             self.update_graph(vb_V)
@@ -356,15 +382,19 @@ class IVWindow:
 
         self.sweep_finished()
 
+
     def sweep_finished(self):
+        """
+        Function to tidy up the conclusion of the sweep function and re-enables all widgets.
+        """
         if self.STOP_BTN_FLAG == 1:
             self.change_LED(RED)
             # display message to user if sweep is aborted
-            messagebox.showerror("STOP BUTTON PRESSED", f"The voltage sweep has been STOPPED.")
+            messagebox.showwarning("STOP BUTTON PRESSED", f"The voltage sweep has been STOPPED.")
         else: 
             self.change_LED(RED)
             # display message to user if sweep completed
-            messagebox.showerror("Successful Sweep", f"The voltage sweep has completed.")
+            messagebox.showinfo("Successful Sweep", f"The voltage sweep has completed.")
 
         # disable plot interative mode
         plt.ioff()
@@ -373,18 +403,10 @@ class IVWindow:
         self.change_LED(RED)
         self.enable_widgets()
         self.serial_ctrl.stop()
-
         self.STOP_BTN_FLAG = 0
 
-    def change_LED(self, color):
-        if color == 0:
-            self.green_LED.grid_remove()
-            self.red_LED.grid(row=1, column=11, padx=5, pady=15, sticky="sw")
-        elif color == 1:
-            self.red_LED.grid_remove()
-            self.green_LED.grid(row=1, column=11, padx=5, pady=15, sticky="sw")
 
-    def send_msg_retry(self, port, msg_type, cmd, status, status_response, *params, max_attempts=GLOBALS.SWEEP_MAX_ATTEMPTS, sleep_time=GLOBALS.HALF_SECOND):
+    def send_msg_retry(self, port, msg_type, cmd, status, status_response, *params, max_attempts=globals.SWEEP_MAX_ATTEMPTS, sleep_time=globals.HALF_SECOND):
         '''
         Function to send a message to the MCU and retry if we do
         not receive expected response
@@ -403,22 +425,21 @@ class IVWindow:
         
         while attempt < max_attempts:
             print(f"\n========== ATTEMPT NUMBER: {attempt+1} ==========")
-            if msg_type == GLOBALS.MSG_A:
+            if msg_type == globals.MSG_A:
                 self.ztm_serial.sendMsgA(port, cmd, status, *params)
-            elif msg_type == GLOBALS.MSG_B:
+            elif msg_type == globals.MSG_B:
                 self.ztm_serial.sendMsgB(port, cmd, status, *params)
-            elif msg_type == GLOBALS.MSG_C:
+            elif msg_type == globals.MSG_C:
                 self.ztm_serial.sendMsgC(port, cmd, status, *params)
-            elif msg_type == GLOBALS.MSG_D:
+            elif msg_type == globals.MSG_D:
                 self.ztm_serial.sendMsgD(port, cmd, status, *params)
-            elif msg_type == GLOBALS.MSG_E:
+            elif msg_type == globals.MSG_E:
                 self.ztm_serial.sendMsgE(port, cmd, status, *params)
             else:
                 raise ValueError(f"Unsupported message type: {msg_type}")
             
             # returns 11 bytes of payload FALSE or byte response
             testMsg = self.serial_ctrl.ztmGetMsg(port)
-            #testMsg = self.parent.serial_ctrl.read_bytes()
             
             testMsg_hex = [b for b in testMsg]
             
@@ -426,7 +447,7 @@ class IVWindow:
             
             ### Unpack data and display on the GUI
             if testMsg:
-                if testMsg_hex[2] == status_response and len(testMsg) == GLOBALS.MSG_BYTES:
+                if testMsg_hex[2] == status_response and len(testMsg) == globals.MSG_BYTES:
                     unpackResponse = self.ztm_serial.unpackRxMsg(testMsg)
                     print(f"Received correct status response from MCU: {testMsg[2]}")
                     
@@ -460,20 +481,34 @@ class IVWindow:
             time.sleep(sleep_time)
             attempt += 1
             
+
     def save_notes(self, _=None):
+            """
+            Function to save the optional user input notes box to be attached to the .csv file when exporting data
+            """
             self.root.focus()
             note = self.label5.get(1.0, ctk.END)
             note = note.strip()
             return note
     
+
     def save_date(self, _=None):
+            """
+            Function to save the optional user input date box to be attached to the .csv file when exporting data
+            """
             self.root.focus()
             date = self.label6.get()
             return date
                 
-    # file drop-down menu
+
     def DropDownMenu(self):
+        """
+        Method to list all the File menu options in a drop menu.
+        """
+        # Create menu bar
         self.menubar = tk.Menu(self.root)
+
+        # Create drop-down menu
         self.filemenu = tk.Menu(self.menubar, tearoff=0)
         self.filemenu.add_command(label="Save", command=self.save_graph)
         self.filemenu.add_command(label="Save As", command=self.save_graph_as)
@@ -481,21 +516,34 @@ class IVWindow:
         self.filemenu.add_separator()
         self.filemenu.add_command(label="Exit", command=self.exit_application)
         self.menubar.add_cascade(label="File", menu=self.filemenu)
+
         self.root.config(menu=self.menubar)
     
+
     def save_graph(self):
+        """
+        Function to handle the saving of the graph display into a .png file
+        """
         downloads_folder = os.path.join(os.path.expanduser("~"), "Downloads")
         default_filename = os.path.join(downloads_folder, "iv_graph.png")
         self.fig.savefig(default_filename)
         messagebox.showinfo("Save Graph", f"Graph saved in Downloads as {default_filename}")
         
+
     def save_graph_as(self):
+        """
+        Function to handle the saving of the graph display into a .png file
+        """
         file_path = filedialog.asksaveasfilename(defaultextension=".png", filetypes=[("PNG files", "*.png"), ("All files", "*.*")])
         if file_path:
             self.fig.savefig(file_path)
             messagebox.showinfo("Save Graph As", f"Graph saved as {file_path}")
     
+
     def export_data(self):
+        '''
+        Handles the exporting of data collected into a .csv file
+        ''' 
         file_path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV files", "*.csv"), ("All files", "*.*")])
         if file_path:
             with open(file_path, 'w', newline='') as file:
@@ -519,6 +567,7 @@ class IVWindow:
 
             messagebox.showinfo("Export Data", f"Data exported as {file_path}")
     
+
     def exit_application(self):
         """
         Method to handle the exit command from the drop-down menu.
@@ -528,15 +577,22 @@ class IVWindow:
         parent_window = self.root.master
         parent_window.attributes("-disabled", False)
             
+
     def init_graph_widgets(self):
+        '''
+        Function to initialize the data arrays and the graphical display
+        ''' 
         self.fig, self.ax = plt.subplots()
         self.fig.set_figwidth(7)
         self.fig.set_figheight(4.5)
+        self.ax.set_xlabel('Sample Bias Voltage (V)')
+        self.ax.set_ylabel('Tunneling Current (nA)')
         
         # Create a canvas to embed the figure in Tkinter
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.root)
         self.canvas.get_tk_widget().grid(row=1, column=0, columnspan=10, rowspan=8, padx=10, pady=10)
         
+
     def update_graph(self, xAxisDataPoint):
         '''
         This will update the visual graph with the data points obtained during
@@ -564,10 +620,11 @@ class IVWindow:
         self.canvas.draw()
         self.canvas.flush_events()
 
-    '''
-    Resets the visual graph and clears the data points.
-    '''
+
     def reset_graph(self):
+        '''
+        Resets the visual graph and clears the data points.
+        '''
         self.adjusted_x_axis = None
         self.ax.clear()
         self.ax.set_xlabel('Sample Bias Voltage (V)')

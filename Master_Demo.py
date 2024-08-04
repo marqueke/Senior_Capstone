@@ -18,4 +18,3 @@ GUIMeas.parent.graph_gui = GUIGraph
 
 # Start the Tkinter event loop
 RootMaster.root.mainloop()
-
