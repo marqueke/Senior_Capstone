@@ -964,6 +964,7 @@ class MeasGUI:
         @param targetCurrent_nA: The desired tunneling current the algorithm is looking for
         @retval: None
         """
+        global TIP_APPR_FLAG
         global STOP_BTN_FLAG
         global curr_setpoint
         global vpiezo_tip
@@ -1022,10 +1023,12 @@ class MeasGUI:
                         
                         #return 0, curr_data, vb_V, vp_V, tunneling_steps
                 STOP_BTN_FLAG = 0
+                TIP_APPR_FLAG = 0
             else:
                 print("Did not receive correct response back.")
                 messagebox.showerror("ERROR", "Error. Did not receive correct response back.")
             
+                TIP_APPR_FLAG = 0
                 # Turns interactive graph off
                 plt.ioff()
             
@@ -1196,6 +1199,7 @@ class MeasGUI:
         """
         Function to enable and read periodic data from the MCU.
         """
+        global PERIODICS_FLAG
         global STOP_BTN_FLAG
         global curr_data
         
@@ -1238,10 +1242,12 @@ class MeasGUI:
                     self.update_label()
                     self.parent.graph_gui.update_graph()
                 STOP_BTN_FLAG = 0    
+                PERIODICS_FLAG = 0
             else:
                 print("Did not receive DONE.")
                 messagebox.showerror("ERROR.", "Failed to enable periodic data. Try again.")
 
+            PERIODICS_FLAG = 0
             # Turns interactive graph off
             plt.ioff()      
              
@@ -1892,7 +1898,7 @@ class MeasGUI:
                 header_date = self.save_date()
 
                 # conjoining and formatting data
-                headers = ["Time", "Tunneling Current (nA)"]
+                headers = ["Time", "Current (nA)"]
                 data_to_export = [headers]
                 data_to_export.extend(zip(self.parent.graph_gui.time_data, self.parent.graph_gui.y_data))
 
@@ -1925,7 +1931,7 @@ class GraphGUI:
         #configures plot
         self.fig, self.ax = plt.subplots()
         self.ax.set_xlabel('Time (s)')
-        self.ax.set_ylabel('Tunneling Current (nA)')
+        self.ax.set_ylabel('Current (nA)')
        
         # initializes graphical data
         self.y_data = []
@@ -1978,7 +1984,7 @@ class GraphGUI:
         """
         self.ax.clear()
         self.ax.set_xlabel('Time (s)')
-        self.ax.set_ylabel('Tunneling Current (nA)')
+        self.ax.set_ylabel('Current (nA)')
         self.y_data = []
         self.x_data = []
         self.time_data = []
