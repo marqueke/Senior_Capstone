@@ -3,25 +3,34 @@
 """
 LENGTH OF MESSAGE
 """
-HEADER_BYTES = 3
-PAYLOAD_BYTES = 8
+HEADER_BYTES    = 3
+PAYLOAD_BYTES   = 8
 MSG_BYTES = HEADER_BYTES + PAYLOAD_BYTES
 
 """
 TIP APPROACH GLOBAL VARIABLES
 """
-VPIEZO_APPROACH_MAX = 5.0
-VPIEZO_APPROACH_MIN = 0.0
-PIEZO_EXTN_RATIO    = 20.0  # (nm per volt)
-PIEZO_CODE_RATIO    = 6553.6
-POS_TOLERANCE       = 0.1
+VPIEZO_APPROACH_MAX     = 5.0
+VPIEZO_APPROACH_MIN     = 0.0
+PIEZO_EXTN_RATIO        = 20.0  # (nm per volt)
+PIEZO_CODE_RATIO        = 6553.6
+POS_TOLERANCE           = 0.1
 APPROACH_STEP_SIZE_NM   = 0.025 # nm
-FREQ_RES            = 150.0     # Hz
-TUNNELING_SAMPLE_SIZE = 24
+FREQ_RES                = 150.0     # Hz
+TUNNELING_SAMPLE_SIZE   = 24
 
-# Cap approach global variables here (if needed)
+"""
+CAP APPROACH GLOBAL VARIABLES
+"""
+REGION_1_CAP		    = 90.0 # fF
+STP_SZ_R1			    = 10000.0 
+CAP_APPROACH_AMPL       = 1
+CAP_APPROACH_FREQ       = 1000
+DELAY_LINE_LEN          = 250
+CRIT_CAP_SLOPE          = 0.025
+CAP_APPROACH_NUM_STEPS  = 10
+FFT_AVG_LENGTH          = 12
 
-   
 """
 VOLTAGE GLOBAL VARIABLES
 """
@@ -68,10 +77,10 @@ QUARTER_STEP    = 0x02
 EIGHTH_STEP     = 0x03
 
 # The distance in nanometers of the step sizes
-FULL_STEP_DISTANCE = 0.008
-HALF_STEP_DISTANCE = 0.004
-QUARTER_STEP_DISTANCE = 0.002
-EIGHTH_STEP_DISTANCE = 0.001
+FULL_STEP_DISTANCE      = 0.008
+HALF_STEP_DISTANCE      = 0.004
+QUARTER_STEP_DISTANCE   = 0.002
+EIGHTH_STEP_DISTANCE    = 0.001
 
 # Amount to increase the step size by
 INC_FULL  = 1
@@ -80,8 +89,8 @@ INC_QUART = 0.25
 INC_EIGHT = 0.125
 
 # Direction the stepper motor is moving
-DIR_UP          = 0x00
-DIR_DOWN        = 0x01
+DIR_UP      = 0x00
+DIR_DOWN    = 0x01
 
 # Number of steps to move the stepper motor by with user adjustment
 NUM_STEPS = 1
@@ -90,14 +99,14 @@ NUM_STEPS = 1
 TIMING AND MESSAGE CHECKING
 """
 # Time
-TIMEOUT = 10.0
-ONE_SECOND = 1.0
-HALF_SECOND = 0.5
-TENTH_SECOND = 0.1
+TIMEOUT         = 10.0
+ONE_SECOND      = 1.0
+HALF_SECOND     = 0.5
+TENTH_SECOND    = 0.1
 
 # Attempts
-MAX_ATTEMPTS = 10
-SWEEP_MAX_ATTEMPTS = 10
+MAX_ATTEMPTS    = 10
+SWEEP_MAX_ATTEMPTS  = 10
 
 # Graph rollover
 ROLLOVER_GRAPH_TIME = 10.0

@@ -102,6 +102,7 @@ class RootGUI:
             print("Serial controller is initialized, starting now...")
             self.meas_gui.tunneling_approach()
             #self.meas_gui.enable_periodics()
+            #self.meas_gui.cap_approach()
             self.serial_ctrl.running = True
         else:
             print("Serial controller is not initialized.")
@@ -111,6 +112,8 @@ class RootGUI:
         Disables the reading of periodic data in a background thread.
         """
         def stop_reading_task():
+            global STOP_BTN_FLAG
+            
             # Clear buffer
             self.clear_buffer()
             
@@ -326,6 +329,8 @@ class MeasGUI:
         self.step_up    = 0
         self.step_down  = 0
 
+
+        '''    
         # Create a frame to hold the label and text box
         self.console_frame = ctk.CTkFrame(self.root, width=500, height=250)
         self.console_frame.grid(row=2, column=11, padx=20, pady=10, rowspan=13, sticky="nsew")
@@ -345,6 +350,7 @@ class MeasGUI:
         # Redirect stdout to the console text widget
         sys.stdout = self
         sys.stderr = self
+        '''
         
         # Initialize measurement widgets
         self.initialize_widgets()
@@ -707,6 +713,7 @@ class MeasGUI:
         global curr_data
         global vb_V
         global vp_V
+        global vpiezo_tip
         
         attempt = 0
         
@@ -715,10 +722,10 @@ class MeasGUI:
         # Convert each element in msg_print to a hex string
         msg_print_hex = ' '.join(format(x, '02X') for x in msg_print)
         
-        print(f"\nMESSAGE BEING SENT: {msg_print_hex}")
+        #print(f"\nMESSAGE BEING SENT: {msg_print_hex}")
         
         while attempt < max_attempts:
-            print(f"\n========== ATTEMPT NUMBER: {attempt+1} ==========")
+            #print(f"\n========== ATTEMPT NUMBER: {attempt+1} ==========")
             if msg_type == globals.MSG_A:
                 msg_response = self.parent.ztm_serial.sendMsgA(port, cmd, status, *params)
             elif msg_type == globals.MSG_B:
@@ -728,7 +735,7 @@ class MeasGUI:
             elif msg_type == globals.MSG_D:
                 msg_response = self.parent.ztm_serial.sendMsgD(port, cmd, status, *params)
             elif msg_type == globals.MSG_E:
-                msg_response = self.parent.ztm_serial.sendMsgE(port, cmd, status, *params)
+                msg_response = self.parent.ztm_serial.sendMsgE(port, *params)
             else:
                 messagebox.showerror("ERROR", "Internal error. Please try again.")
             
@@ -739,35 +746,44 @@ class MeasGUI:
                 ### Unpack data and display on the GUI
                 if testMsg:
                     testMsg_hex = [b for b in testMsg]
-                    print(f"Serial response: {testMsg_hex}")
+                    #print(f"Serial response: {testMsg_hex}")
                     
                     # checks if status byte read is the same as status byte expected AND that the response is 11 bytes long
                     if testMsg_hex[2] == status_response and len(testMsg) == 11:
                         unpackResponse = self.parent.ztm_serial.unpackRxMsg(testMsg)
-                        print(f"Received correct status response from MCU: {testMsg[2]}")
+                        #print(f"Received correct status response from MCU: {testMsg[2]}")
                         
                         if isinstance(unpackResponse, tuple):
-                            if len(unpackResponse) == 3:
-                                if testMsg_hex[2] == ztmSTATUS.STATUS_MEASUREMENTS.value:
+                            if len(unpackResponse) == 2:
+                                if testMsg_hex[2] == ztmSTATUS.STATUS_FFT_DATA.value:
+                                    fft_amp, fft_freq = unpackResponse
+                                    print(f"Received values\n\tFFT Amplitude: {fft_amp} nA")
+                                    print(f"\tFFT Frequency: {fft_freq} Hz\n")
+                                    
+                                    curr_data = fft_amp
+                                    
+                                    return fft_amp, fft_freq
+                            elif len(unpackResponse) == 3:
+                                if testMsg_hex[2] == ztmSTATUS.STATUS_MEASUREMENTS.value: #and testMsg_hex[1] == ztmCMD.CMD_PERIODIC_DATA_ENABLE.value:
                                     curr_data, vb_V, vp_V = unpackResponse
-                                    print(f"Received values\n\tCurrent: {curr_data} nA")
+                                    
+                                    print(f"Received values\n\tCurrent: {curr_data} nA\n")
                                     print(f"\tVbias: {vb_V} V\n")
                                     print(f"\tVpiezo: {vp_V} V\n")
                                     
-                                    return True
-                                
-                                '''
-                                if cmd == ztmCMD.CMD_REQ_DATA.value:
-                                    curr_data, vb_V, vp_V = unpackResponse
+                                    vpiezo_tip = vp_V
                                     
-                                    return curr_data, vb_V, vp_V
-                                '''
+                                    return True
+                                #elif testMsg_hex[2] == ztmSTATUS.STATUS_MEASUREMENTS.value and testMsg_hex[1] == ztmCMD.CMD_REQ_DATA.value:
+                                #    pass
+                            else:
+                                print("Unknown tuple response.")
                         else:
                             if testMsg_hex[2] == ztmSTATUS.STATUS_STEP_COUNT.value:
                                 print(f"Received values:\n\tStepper Position Total (1/8) Steps: {unpackResponse}")
-                                return unpackResponse
-                                
+                                return unpackResponse  
                         return True
+                    
                     elif testMsg_hex[2] == ztmSTATUS.STATUS_NACK.value:
                         print("NACK received.")
                         return
@@ -877,6 +893,8 @@ class MeasGUI:
                         plt.ioff()
                         break
                     
+                    self.send_msg_retry(port, globals.MSG_C, ztmCMD.CMD_REQ_DATA.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_MEASUREMENTS.value)
+                    
                     # Immediately step back and return if current >= target
                     if(curr_data >= curr_setpoint):
                         adjust_success = self.send_msg_retry(port, globals.MSG_D, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, globals.EIGHTH_STEP, globals.DIR_DOWN, globals.NUM_STEPS)
@@ -895,7 +913,9 @@ class MeasGUI:
                         #plt.ioff()
                         
                         #return 0, curr_data, vb_V, vp_V, tunneling_steps
-                STOP_BTN_FLAG = 0
+                    self.update_label()
+                    self.parent.graph_gui.update_graph()
+                #STOP_BTN_FLAG = 0
             else:
                 print("Did not receive correct response back.")
                 messagebox.showerror("ERROR", "Error. Did not receive correct response back.")
@@ -946,7 +966,7 @@ class MeasGUI:
                 # Move stepper motor UP an eighth step    
                 while(stepSet == False):
                     stepSet = self.send_msg_retry(port, globals.MSG_D, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, globals.EIGHTH_STEP, globals.DIR_UP, globals.NUM_STEPS)
-                    # Decrement number of steps 
+                # Decrement number of steps 
                 steps -= globals.INC_EIGHT
                 vpiezo_tip = self.piezo_full_extend()
             else:
@@ -1014,52 +1034,98 @@ class MeasGUI:
 
         @retval: None
         """
-        delay_line = []
+        delay_line = [0] * (globals.DELAY_LINE_LEN + 1) # Initialize delay_line with zeros
         port = self.parent.serial_ctrl.serial_port
+        
         # Start Sinusoidal Vbias
-        self.send_msg_retry(port, globals.MSG_E, ztmCMD.CMD_VBIAS_SET_SINE.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, globals.cap_approach_ampl, globals.cap_approach_freq)
+        success = self.send_msg_retry(port, globals.MSG_E, ztmCMD.CMD_VBIAS_SET_SINE.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, globals.CAP_APPROACH_AMPL, globals.CAP_APPROACH_FREQ)
 
-        # Get first fft measurement
-        fft_meas = self.get_fft_peak()
-        for i in range(globals.delay_line_len+1): delay_line[i] = fft_meas
-        notDone = 1
-        fft_count = 0
-        peaks = []
-        detector_count = 0
-        while(notDone):
-            # Measure fft peak
-            peaks[fft_count] = self.get_fft_peak()
+        if success:
+            print("\n----------BEGINNING CAP APPROACH ALGORITHM----------")
+            # Resets visual graph and data
+            self.parent.graph_gui.reset_graph()
+            
+            # Turns interactive graph on
+            plt.ion()
+            self.startup_leds()
+            self.disable_widgets()
+            
+            # Get first fft measurement
+            fft_meas = self.get_fft_peak()
+            for i in range(globals.DELAY_LINE_LEN+1): delay_line[i] = fft_meas
+            notDone = 1
+            fft_count = 0
+            peaks = [0] * globals.FFT_AVG_LENGTH # Initialize peaks list
+            detector_count = 0
+            delay_index = 0
+            
+            while(notDone):
+                if STOP_BTN_FLAG == 1:
+                    plt.ioff()
+                    break
+                
+                # Measure fft peak
+                peaks[fft_count] = self.get_fft_peak()
 
-            if(fft_count >= globals.fft_avg_len):
-                fft_meas = self.get_avg_meas(peaks)
-                delay_line[delay_index] = fft_meas # Store the new displacement current
+                if(fft_count >= globals.FFT_AVG_LENGTH-1):
+                    fft_meas = self.get_avg_meas(peaks)
+                    delay_line[delay_index] = fft_meas # Store the new displacement current
 
-                # Increments index of circular buffer
-                delay_index = (delay_index + 1) % (globals.delay_line_len + 1) 
+                    # Increments index of circular buffer
+                    delay_index = (delay_index + 1) % (globals.DELAY_LINE_LEN+1) 
 
-                # takes difference between the new current and the current 
-                diff = fft_meas - delay_line[delay_index] 
-                if(diff > globals.crit_cap_slope):
-                    detector_count += 1
-                    if(detector_count >= 3):
-                        notDone = 0
+                    # takes difference between the new current and the current 
+                    diff = fft_meas - delay_line[delay_index] 
+                    if(diff > globals.CRIT_CAP_SLOPE):
+                        detector_count += 1
+                        if(detector_count >= 3):
+                            notDone = 0
+                        else:
+                            notDone = 1
                     else:
+                        detector_count = 0
                         notDone = 1
+                        success_move = self.send_msg_retry(port, globals.MSG_D, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, globals.EIGHTH_STEP, globals.DIR_DOWN, globals.CAP_APPROACH_NUM_STEPS)
+                        if success_move:
+                            print("SUCCESS. Stepper motor moved in cap approach.")
+                        else:
+                            print("ERROR. Stepper motor failed to move in capacitance approach.")
+                    self.update_label()
+                    self.parent.graph_gui.update_graph()
                 else:
-                    detector_count = 0
-                    notDone = 1
-                    self.send_msg_retry(port, globals.MSG_D, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, globals.EIGHTH_STEP, globals.DIR_DOWN, globals.cap_approach_num_steps)
+                    fft_count = fft_count + 1
+            
+            plt.ioff()
+            self.stop_leds()
+            self.enable_widgets()
+            self.parent.clear_buffer()
+            success_stop_vbias = self.send_msg_retry(port, globals.MSG_C, ztmCMD.CMD_VBIAS_STOP_SINE.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value)
+            if success_stop_vbias:
+                print("SUCCESS. Sinusoidal vbias has stopped.")
             else:
-                fft_count = fft_count + 1
-            
-        self.send_msg_retry(port, globals.MSG_C, ztmCMD.CMD_VBIAS_STOP_SINE.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value)
-            
+                print("ERROR. Sinusoidal vbias failed to stop.")
+                
     def get_fft_peak(self):
+        """
+        [ADD DESCRIPTION HERE.]
+
+        Returns:
+            _type_: _description_
+        """
         port = self.parent.serial_ctrl.serial_port
         peak, _ = self.send_msg_retry(port, globals.MSG_C, ztmCMD.CMD_REQ_FFT_DATA.value, ztmSTATUS.STATUS_MEASUREMENTS.value, ztmSTATUS.STATUS_FFT_DATA.value)
         return peak
     
     def get_avg_meas(self, measurements):
+        """
+        [ADD DESCRIPTION HERE.]
+
+        Args:
+            measurements (_type_): _description_
+
+        Returns:
+            _type_: _description_
+        """
         sum = 0
         for i in range(len(measurements)): sum += measurements[i]
         sum /= len(measurements)
@@ -1393,12 +1459,12 @@ class MeasGUI:
                 else:
                     self.label3.delete(0,END)
                     self.label3.insert(0,0.000)
-                    messagebox.showerror("Invalid Value", "Error. Please enter a valid input.")
+                    messagebox.showerror("Invalid Value", "Error. Please enter a valid current setpoint value.")
                     return False
             except ValueError:
                 self.label3.delete(0,END)
                 self.label3.insert(0,0.000)
-                messagebox.showerror("Invalid Value", "Error. Please enter a valid input.")
+                messagebox.showerror("Invalid Value", "Error. Please enter a valid current setpoint value.")
                 return False
 
     def saveCurrentOffset(self, _=None): 
@@ -1802,8 +1868,8 @@ class MeasGUI:
         except ValueError:
             self.curr_offset = 0.0  # Default to 0 if the value is not a valid float
         curr_data += self.curr_offset
-        self.label2.configure(text=f"{curr_data:.3f} nA")
-        self.label11.configure(text=f"{vpiezo_dist:.3f}")
+        self.label2.configure(text=f"{curr_data:.4f} nA")
+        self.label11.configure(text=f"{vpiezo_dist:.4f}")
 
     def get_current_label2(self):
         """
