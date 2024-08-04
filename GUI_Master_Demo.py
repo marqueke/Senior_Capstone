@@ -1005,6 +1005,66 @@ class MeasGUI:
                 piezoSet = self.send_msg_retry(port, globals.MSG_A, ztmCMD.CMD_PIEZO_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, 0, 0, vpiezo_tip)
         return vpiezo_tip
 
+    def cap_approach(self):
+        """
+        @brief: This function gets the tip close to the sample by using the displacement current
+        between the tip and the sample. It looks at the difference between the present displacement
+        current and a previous displacement current. It uses a circular buffer to store the delayed
+        displacement currents.
+
+        @retval: None
+        """
+        delay_line = []
+        port = self.parent.serial_ctrl.serial_port
+        # Start Sinusoidal Vbias
+        self.send_msg_retry(port, globals.MSG_E, ztmCMD.CMD_VBIAS_SET_SINE.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, globals.cap_approach_ampl, globals.cap_approach_freq)
+
+        # Get first fft measurement
+        fft_meas = self.get_fft_peak()
+        for i in range(globals.delay_line_len+1): delay_line[i] = fft_meas
+        notDone = 1
+        fft_count = 0
+        peaks = []
+        detector_count = 0
+        while(notDone):
+            # Measure fft peak
+            peaks[fft_count] = self.get_fft_peak()
+
+            if(fft_count >= globals.fft_avg_len):
+                fft_meas = self.get_avg_meas(peaks)
+                delay_line[delay_index] = fft_meas # Store the new displacement current
+
+                # Increments index of circular buffer
+                delay_index = (delay_index + 1) % (globals.delay_line_len + 1) 
+
+                # takes difference between the new current and the current 
+                diff = fft_meas - delay_line[delay_index] 
+                if(diff > globals.crit_cap_slope):
+                    detector_count += 1
+                    if(detector_count >= 3):
+                        notDone = 0
+                    else:
+                        notDone = 1
+                else:
+                    detector_count = 0
+                    notDone = 1
+                    self.send_msg_retry(port, globals.MSG_D, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, globals.EIGHTH_STEP, globals.DIR_DOWN, globals.cap_approach_num_steps)
+            else:
+                fft_count = fft_count + 1
+            
+        self.send_msg_retry(port, globals.MSG_C, ztmCMD.CMD_VBIAS_STOP_SINE.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value)
+            
+    def get_fft_peak(self):
+        port = self.parent.serial_ctrl.serial_port
+        peak, _ = self.send_msg_retry(port, globals.MSG_C, ztmCMD.CMD_REQ_FFT_DATA.value, ztmSTATUS.STATUS_MEASUREMENTS.value, ztmSTATUS.STATUS_FFT_DATA.value)
+        return peak
+    
+    def get_avg_meas(self, measurements):
+        sum = 0
+        for i in range(len(measurements)): sum += measurements[i]
+        sum /= len(measurements)
+        return sum
+
     '''
     def tip_approach(self):
         """
