@@ -221,7 +221,7 @@ class IVWindow:
         self.start_btn.configure(state="normal")
         self.stop_btn.configure(state="disabled")
         
-    def saveMinVoltage(self, event):
+    def saveMinVoltage(self, _=None):
         self.root.focus()
         try:
             self.min_voltage = float(self.label3.get())
@@ -233,7 +233,7 @@ class IVWindow:
         except:
             messagebox.showerror("INVALID", f"Invalid value. Please update your parameters.")
 
-    def saveMaxVoltage(self, event):
+    def saveMaxVoltage(self, _=None):
         self.root.focus()
         try:
             self.max_voltage = float(self.label4.get())
@@ -245,7 +245,7 @@ class IVWindow:
         except:
             messagebox.showerror("INVALID", f"Invalid value. Please update your parameters.")
 
-    def saveNumSetpoints(self, event):
+    def saveNumSetpoints(self, _=None):
         self.root.focus()
         try:
             self.num_setpoints = int(self.label8.get())

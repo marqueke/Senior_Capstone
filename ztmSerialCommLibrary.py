@@ -155,7 +155,7 @@ class usbMsgFunctions:
             try:   
                 port.write(serial.to_bytes(messageC))
                 # clear buffer    
-                time.sleep(0.001)
+                #time.sleep(0.001)
                 port.flush()  
                 return True
             except serial.SerialException as e:
@@ -230,9 +230,9 @@ class usbMsgFunctions:
         # DEBUG - PRINT CMD AND STATUS #
         try:
             cmdRx = ztmCMD(rxMsg[cmdByte])
-            #print("Received : " + cmdRx.name)
+            print("Received : " + cmdRx.name)
             statRx = ztmSTATUS(rxMsg[statByte])
-            #print("Received : " + statRx.name + "\n")
+            print("Received : " + statRx.name + "\n")
    
         ################################
         

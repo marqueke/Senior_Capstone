@@ -65,14 +65,6 @@ class IZWindow:
         self.STOP_BTN_FLAG = 1
         self.serial_ctrl.stop()
     
-    def handle_data(self, raw_data):
-        print(f"Handling raw data: {raw_data.hex()}")
-        decoded_data = self.data_ctrl.decode_data(raw_data)
-        if decoded_data:
-            print("Data is being decoded...")
-        else:
-            print("Data decoding failed or data is incomplete")
-    
     '''
     Function to error check user inputs
     '''
@@ -221,7 +213,7 @@ class IZWindow:
         self.start_btn.configure(state="normal")
         self.stop_btn.configure(state="disabled")
         
-    def saveMinVoltage(self, _):
+    def saveMinVoltage(self, _=None):
         self.root.focus()
         try:
             if globals.VPIEZO_MIN <= float(self.label4.get()) <= globals.VPIEZO_MAX:
@@ -232,7 +224,7 @@ class IZWindow:
         except:
             messagebox.showerror("INVALID", f"Invalid value. Please update your parameters.")
 
-    def saveMaxVoltage(self, event):
+    def saveMaxVoltage(self, _=None):
         self.root.focus()
         try:
             if globals.VPIEZO_MIN <= float(self.label5.get()) <= globals.VPIEZO_MAX:
@@ -243,7 +235,7 @@ class IZWindow:
         except:
             messagebox.showerror("INVALID", f"Invalid value. Please update your parameters.")
 
-    def saveNumSetpoints(self, event):
+    def saveNumSetpoints(self, _=None):
         self.root.focus()
         try:
             self.num_setpoints = int(self.label9.get())

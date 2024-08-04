@@ -15,6 +15,7 @@ import datetime
 import threading
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 # import other files
@@ -55,6 +56,9 @@ tip_app_total_steps = None
 
 startup_flag = 0
 
+TUNN_APPR_FLAG = 0
+CAP_APPR_FLAG = 0
+PERIODICS_FLAG = 0
 STOP_BTN_FLAG = 0
 
 ###################################################################################################################
@@ -100,9 +104,12 @@ class RootGUI:
         print("Starting to read data...")
         if self.serial_ctrl:
             print("Serial controller is initialized, starting now...")
-            self.meas_gui.tunneling_approach()
-            #self.meas_gui.enable_periodics()
-            #self.meas_gui.cap_approach()
+            if(TUNN_APPR_FLAG):
+                self.meas_gui.tunneling_approach()
+            elif(CAP_APPR_FLAG):
+                self.meas_gui.cap_approach()
+            elif(PERIODICS_FLAG):
+                self.meas_gui.enable_periodics()
             self.serial_ctrl.running = True
         else:
             print("Serial controller is not initialized.")
@@ -142,6 +149,8 @@ class RootGUI:
             print(f"{self.serial_ctrl.serial_port.in_waiting} bytes are stuck in the buffer.")
             self.serial_ctrl.serial_port.read(self.serial_ctrl.serial_port.in_waiting)
             print(f"{self.serial_ctrl.serial_port.in_waiting} bytes are stuck in the buffer.")
+        else:
+            print("No bytes stuck in the buffer.")
 
 ###################################################################################################################
 #                                                 ComGUI CLASS                                                    #
@@ -391,7 +400,7 @@ class MeasGUI:
         # Sample size user entry
         self.sample_size = Entry(self.frame8, width=13)
         self.sample_size_label = Label(self.frame8, text="Sample Size: ", bg="#ADD8E6", width=11, anchor="w")
-        self.sample_size.bind("<Return>", self.sendSampleSize)
+        self.sample_size.bind("<Return>", self.saveSampleSize)
         
         self.sample_size.grid(column=2, row=2, pady=5)
         self.sample_size_label.grid(column=1, row=2)
@@ -469,8 +478,8 @@ class MeasGUI:
         self.add_btn_image1 = ctk.CTkImage(Image.open("Images/Vpzo_Down_Btn.png"), size=(40,40))
         self.add_btn_image2 = ctk.CTkImage(Image.open("Images/Fine_Adjust_Btn_Up.png"), size=(40,40))
         self.add_btn_image3 = ctk.CTkImage(Image.open("Images/Fine_Adjust_Btn_Down.png"), size=(40,40))
-        self.add_btn_image4 = ctk.CTkImage(Image.open("Images/Start_Btn.png"), size=(90,35))
-        self.add_btn_image5 = ctk.CTkImage(Image.open("Images/Stop_Btn.png"), size=(90,35))
+        #self.add_btn_image4 = ctk.CTkImage(Image.open("Images/Start_Btn.png"), size=(90,35))
+        #self.add_btn_image5 = ctk.CTkImage(Image.open("Images/Stop_Btn.png"), size=(90,35))
         self.add_btn_image6 = ctk.CTkImage(Image.open("Images/Acquire_IV.png"), size=(90,35))
         self.add_btn_image7 = ctk.CTkImage(Image.open("Images/Acquire_IZ.png"), size=(90,35))
     
@@ -481,22 +490,30 @@ class MeasGUI:
         self.add_btn_image11 = ctk.CTkImage(Image.open("Images/Return_Home_Btn.png"), size=(35,35))
         
         # create buttons with proper sizes															   
-        self.start_btn = ctk.CTkButton(self.root, image=self.add_btn_image4, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.start_reading)
-        self.stop_btn = ctk.CTkButton(self.root, image=self.add_btn_image5, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.stop_reading)
-        self.acquire_iv_btn = ctk.CTkButton(self.root, image=self.add_btn_image6, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.open_iv_window)
-        self.acquire_iz_btn = ctk.CTkButton(self.root, image=self.add_btn_image7, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.open_iz_window)
+        self.start_stop_frame = LabelFrame(self.root, text="Start/Stop Processes", labelanchor="s", padx=10, pady=10, bg="#eeeeee")
+        self.tip_approach_btn = ctk.CTkButton(self.start_stop_frame,text="Start Tip Approach", width=180, height=45, fg_color="#ff8000", text_color="black", bg_color="#eeeeee", corner_radius=10, command=self.start_tip_appr)
+        self.cap_approach_btn = ctk.CTkButton(self.start_stop_frame,text="Start Capacitance Approach", width=90, height=45, fg_color="#ffff00", text_color="black", bg_color="#eeeeee", corner_radius=10, command=self.start_cap_appr)
+        self.enable_periodics_btn = ctk.CTkButton(self.start_stop_frame, text="Start Periodic Data Transfer", width=90, height=45, fg_color="#00cc00", text_color="black", bg_color="#eeeeee", corner_radius=10, command=self.start_periodics)
+        self.stop_btn = ctk.CTkButton(self.start_stop_frame, text="STOP", width=90, height=75, fg_color="#D51717", text_color="black", bg_color="#eeeeee", corner_radius=10, command=self.stop_reading)
+        self.stop_led_btn = ctk.CTkLabel(self.start_stop_frame, image=self.add_btn_image8, text="", width=35, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0)
+        self.start_led_btn = ctk.CTkLabel(self.start_stop_frame, image=self.add_btn_image9, text="", width=30, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0)
+        
+        # sweep windows frame and buttons
+        self.sweep_windows_frame = LabelFrame(self.root, text="Sweep Windows", labelanchor="s", padx=10, pady=10, bg="#eeeeee")
+        self.acquire_iv_btn = ctk.CTkButton(self.sweep_windows_frame, image=self.add_btn_image6, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.open_iv_window)
+        self.acquire_iz_btn = ctk.CTkButton(self.sweep_windows_frame, image=self.add_btn_image7, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.open_iz_window)
         self.save_home_pos = ctk.CTkButton(self.root, image=self.add_btn_image10, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.save_home)
         
-        self.stop_led_btn = ctk.CTkLabel(self.root, image=self.add_btn_image8, text="", width=30, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0)
-        self.start_led_btn = ctk.CTkLabel(self.root, image=self.add_btn_image9, text="", width=30, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0)
-        
+        # Return/save home position buttons
         self.return_to_home_frame = LabelFrame(self.root, text="Return Home", labelanchor= "s", padx=10, pady=5, bg="#eeeeee")
         self.return_to_home_pos = ctk.CTkButton(self.return_to_home_frame, image=self.add_btn_image11, text="", width=30, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.return_home)
         
+        # Piezo adjust frame and buttons
         self.vpiezo_btn_frame = LabelFrame(self.root, text="Piezo Tip Adjust", padx=10, pady=5, bg="#eeeeee")
         self.vpiezo_adjust_btn_up = ctk.CTkButton(master=self.vpiezo_btn_frame, image=self.add_btn_image0, text = "", width=40, height=40, compound="bottom", fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.piezo_inc)
         self.vpiezo_adjust_btn_down = ctk.CTkButton(master=self.vpiezo_btn_frame, image=self.add_btn_image1, text="", width=40, height=40, compound="bottom", fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.piezo_dec)
         
+        # Stepper motor adjust frame and buttons
         self.fine_adjust_frame = LabelFrame(self.root, text="Stepper Motor", padx=10, pady=5, bg="#eeeeee")
         self.fine_adjust_btn_up = ctk.CTkButton(master=self.fine_adjust_frame, image=self.add_btn_image2, text = "", width=40, height=40, compound="bottom", fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.stepper_motor_up)
         self.fine_adjust_btn_down = ctk.CTkButton(master=self.fine_adjust_frame, image=self.add_btn_image3, text="", width=40, height=40, compound="bottom", fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.stepper_motor_down)
@@ -531,7 +548,9 @@ class MeasGUI:
         self.acquire_iz_btn.configure(state="disabled")
         self.save_home_pos.configure(state="disabled")
         self.return_to_home_pos.configure(state="disabled")
-        self.start_btn.configure(state="disabled")
+        self.tip_approach_btn.configure(state="disabled")
+        self.cap_approach_btn.configure(state="disabled")
+        self.enable_periodics_btn.configure(state="disabled")
         self.stop_btn.configure(state="normal")
     
     def enable_widgets(self):
@@ -543,7 +562,9 @@ class MeasGUI:
         self.acquire_iz_btn.configure(state="normal")
         self.save_home_pos.configure(state="normal")
         self.return_to_home_pos.configure(state="normal")
-        self.start_btn.configure(state="normal")
+        self.tip_approach_btn.configure(state="normal")
+        self.cap_approach_btn.configure(state="normal")
+        self.enable_periodics_btn.configure(state="normal")
         self.stop_btn.configure(state="disable")
       
     def open_iv_window(self):
@@ -594,7 +615,40 @@ class MeasGUI:
         """
         self.stop_led_btn.grid()
         self.start_led_btn.grid_remove()
-       
+
+    def start_tip_appr(self):
+        global TUNN_APPR_FLAG
+        global CAP_APPR_FLAG
+        global PERIODICS_FLAG
+
+        TUNN_APPR_FLAG = 1
+        CAP_APPR_FLAG = 0
+        PERIODICS_FLAG = 0
+
+        self.start_reading()
+
+    def start_cap_appr(self):
+        global TUNN_APPR_FLAG
+        global CAP_APPR_FLAG
+        global PERIODICS_FLAG
+
+        TUNN_APPR_FLAG = 0
+        CAP_APPR_FLAG = 1
+        PERIODICS_FLAG = 0
+        
+        self.start_reading()
+
+    def start_periodics(self):
+        global TUNN_APPR_FLAG
+        global CAP_APPR_FLAG
+        global PERIODICS_FLAG
+
+        TUNN_APPR_FLAG = 0
+        CAP_APPR_FLAG = 0
+        PERIODICS_FLAG = 1
+        
+        self.start_reading()
+
     def start_reading(self):
         """
         Initializes the data reading process when the start button is pressed.
@@ -673,15 +727,19 @@ class MeasGUI:
         self.fine_adjust_btn_down.grid(row=1, column=0)
         
         # start/stop buttons
-        self.start_btn.grid(row=3, column=9, sticky="e")
-        self.stop_btn.grid(row=4, column=9, sticky="ne")
-        
-        # sweep windows buttons
-        self.acquire_iv_btn.grid(row=5, column=9, sticky="ne")
-        self.acquire_iz_btn.grid(row=6, column=9, sticky="ne")
-        
+        self.start_stop_frame.grid(row=3, column=9, columnspan=4)
+        self.tip_approach_btn.grid(row=0, column=0, sticky="e")
+        self.cap_approach_btn.grid(row=1, column=0, sticky="e")
+
+        self.enable_periodics_btn.grid(row=2, column=0, sticky="e")
+        self.stop_btn.grid(row=1, column=1, sticky="ne", padx=20, pady=10)
         # led
-        self.stop_led_btn.grid(row=3, column=10, sticky="e")
+        self.stop_led_btn.grid(row=0, column=1, sticky="")
+
+        # sweep windows buttons
+        self.sweep_windows_frame.grid(row=8, column=10, rowspan=2)
+        self.acquire_iv_btn.grid(row=0, column=0, sticky="")
+        self.acquire_iz_btn.grid(row=1, column=0, sticky="")
 
         # save home position
         self.save_home_pos.grid(row=8, column=9)
@@ -690,6 +748,7 @@ class MeasGUI:
         self.return_to_home_frame.grid(row=9, column=9)
         self.return_to_home_pos.grid(row=0, column=0)
 
+    
     def send_msg_retry(self, port, msg_type, cmd, status, status_response, *params, max_attempts=globals.MAX_ATTEMPTS, sleep_time=globals.TENTH_SECOND):
         """
         Function to send a message to the MCU and retry if we do
@@ -722,10 +781,10 @@ class MeasGUI:
         # Convert each element in msg_print to a hex string
         msg_print_hex = ' '.join(format(x, '02X') for x in msg_print)
         
-        #print(f"\nMESSAGE BEING SENT: {msg_print_hex}")
+        print(f"\nMESSAGE BEING SENT: {msg_print_hex}")
         
         while attempt < max_attempts:
-            #print(f"\n========== ATTEMPT NUMBER: {attempt+1} ==========")
+            print(f"\n========== ATTEMPT NUMBER: {attempt+1} ==========")
             if msg_type == globals.MSG_A:
                 msg_response = self.parent.ztm_serial.sendMsgA(port, cmd, status, *params)
             elif msg_type == globals.MSG_B:
@@ -742,28 +801,21 @@ class MeasGUI:
             if msg_response:
                 # returns 11 bytes of payload FALSE or byte response
                 testMsg = self.parent.serial_ctrl.ztmGetMsg(port)
+                #testMsg = self.parent.serial_ctrl.read_serial()
+                print(f"Test msg: {testMsg}")
                 
                 ### Unpack data and display on the GUI
                 if testMsg:
                     testMsg_hex = [b for b in testMsg]
-                    #print(f"Serial response: {testMsg_hex}")
+                    print(f"Serial response: {testMsg_hex}")
                     
                     # checks if status byte read is the same as status byte expected AND that the response is 11 bytes long
                     if testMsg_hex[2] == status_response and len(testMsg) == 11:
                         unpackResponse = self.parent.ztm_serial.unpackRxMsg(testMsg)
-                        #print(f"Received correct status response from MCU: {testMsg[2]}")
+                        print(f"Received correct status response from MCU: {testMsg[2]}")
                         
                         if isinstance(unpackResponse, tuple):
-                            if len(unpackResponse) == 2:
-                                if testMsg_hex[2] == ztmSTATUS.STATUS_FFT_DATA.value:
-                                    fft_amp, fft_freq = unpackResponse
-                                    print(f"Received values\n\tFFT Amplitude: {fft_amp} nA")
-                                    print(f"\tFFT Frequency: {fft_freq} Hz\n")
-                                    
-                                    curr_data = fft_amp
-                                    
-                                    return fft_amp, fft_freq
-                            elif len(unpackResponse) == 3:
+                            if len(unpackResponse) == 3:
                                 if testMsg_hex[2] == ztmSTATUS.STATUS_MEASUREMENTS.value: #and testMsg_hex[1] == ztmCMD.CMD_PERIODIC_DATA_ENABLE.value:
                                     curr_data, vb_V, vp_V = unpackResponse
                                     
@@ -820,13 +872,105 @@ class MeasGUI:
                                 return vp_V
                 elif attempt == globals.MAX_ATTEMPTS:
                     print("ERROR. Failed to receive a response from MCU.")
-
-                time.sleep(sleep_time)
+                #time.sleep(sleep_time)
                 attempt += 1
                 
             else:
                 return False
+    
+    def sendMsgCapApproach(self, port, msg_type, cmd, status, status_response, *params, max_attempts=globals.MAX_ATTEMPTS, timeout=globals.TIMEOUT):
+        """
+        Function to send a message to the MCU and retry if we do
+        not receive the expected response, using a timeout instead of a fixed sleep.
 
+        Args:
+            port (_type_): _description_
+            msg_type (_type_): _description_
+            cmd (_type_): _description_
+            status (_type_): _description_
+            status_response (_type_): _description_
+            max_attempts (int, optional): _description_. Defaults to 10.
+            timeout (float, optional): Timeout period for each attempt in seconds.
+
+        Raises:
+            ValueError: _description_
+
+        Returns:
+            _type_: _description_
+        """
+        global curr_data
+        global vb_V
+        global vp_V
+        global vpiezo_tip
+        
+        attempt = 0
+        
+        msg_print = [msg_type, cmd, status]
+        
+        # Convert each element in msg_print to a hex string
+        msg_print_hex = ' '.join(format(x, '02X') for x in msg_print)
+        
+        print(f"\nMESSAGE BEING SENT: {msg_print_hex}")
+        
+        while attempt < max_attempts:
+            print(f"\n========== ATTEMPT NUMBER: {attempt + 1} ==========")
+
+            msg_response = self.parent.ztm_serial.sendMsgC(port, cmd, status)
+            
+            if msg_response:
+                start_time = time.time()
+                while (time.time() - start_time) < timeout:
+                    # Check if data is available in the serial buffer
+                    if self.parent.serial_ctrl.serial_port.in_waiting == 11:
+                        testMsg = self.parent.serial_ctrl.ztmGetMsg(port)
+                        print(f"Test msg: {testMsg}")
+                        
+                        if testMsg:
+                            testMsg_hex = [b for b in testMsg]
+                            print(f"Serial response: {testMsg_hex}")
+                            
+                            if testMsg_hex[2] == status_response and len(testMsg) == 11:
+                                unpackResponse = self.parent.ztm_serial.unpackRxMsg(testMsg)
+                                print(f"Received correct status response from MCU: {testMsg[2]}")
+                                
+                                if isinstance(unpackResponse, tuple):
+                                    if len(unpackResponse) == 2 and testMsg_hex[2] == ztmSTATUS.STATUS_FFT_DATA.value:
+                                        fft_amp, fft_freq = unpackResponse
+                                        print(f"Received values\n\tFFT Amplitude: {fft_amp} nA")
+                                        print(f"\tFFT Frequency: {fft_freq} Hz\n")
+                                        
+                                        curr_data = fft_amp
+                                        return fft_amp, fft_freq
+                            else:
+                                print(f"ERROR. Wrong response received: {testMsg}")
+                                print(f"Length of message received {len(testMsg)}")
+                                print(f"\tReceived status: {testMsg[2]}")
+                                print(f"\tExpected status: {status_response}")
+                        
+                        # Handle specific statuses
+                        if testMsg_hex[2] == ztmSTATUS.STATUS_NACK.value:
+                            print("NACK received.")
+                            return
+                        elif testMsg_hex[2] == ztmSTATUS.STATUS_FAIL.value:
+                            print("FAIL received.")
+                            return
+                        elif testMsg_hex[2] == ztmSTATUS.STATUS_RESEND.value:
+                            print("RESEND received. Resending message.")
+                            return
+                        elif testMsg_hex[2] == ztmSTATUS.STATUS_BUSY.value:
+                            print("BUSY received. Try again.")
+                            return
+                        elif testMsg_hex[2] == ztmSTATUS.STATUS_ERROR.value:
+                            print(f"Wrong message was sent.")
+                            return 
+                
+                # If no valid response within the timeout period
+                print("ERROR. Failed to receive a response within the timeout period.")
+                attempt += 1
+            else:
+                return False
+        return False
+    
     def get_float_value(self, label, default_value, value_name):
         """
         Method to error check user inputs and update widget.
@@ -899,6 +1043,7 @@ class MeasGUI:
                     if(curr_data >= curr_setpoint):
                         adjust_success = self.send_msg_retry(port, globals.MSG_D, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, globals.EIGHTH_STEP, globals.DIR_DOWN, globals.NUM_STEPS)
                         if adjust_success:
+                            print("ADJUST SUCCESS.")
                             tunneling_steps -= globals.INC_EIGHT
                             plt.ioff()
                             return 1, curr_data, vb_V, vp_V, tunneling_steps
@@ -910,12 +1055,10 @@ class MeasGUI:
                         self.parent.graph_gui.update_graph()
                         
                         vpiezo_tip, tunneling_steps = self.auto_move_tip(tunneling_steps, globals.APPROACH_STEP_SIZE_NM, globals.DIR_DOWN)
-                        #plt.ioff()
-                        
-                        #return 0, curr_data, vb_V, vp_V, tunneling_steps
+
                     self.update_label()
                     self.parent.graph_gui.update_graph()
-                #STOP_BTN_FLAG = 0
+                STOP_BTN_FLAG = 0
             else:
                 print("Did not receive correct response back.")
                 messagebox.showerror("ERROR", "Error. Did not receive correct response back.")
@@ -1034,12 +1177,14 @@ class MeasGUI:
 
         @retval: None
         """
+        global STOP_BTN_FLAG
+        
         delay_line = [0] * (globals.DELAY_LINE_LEN + 1) # Initialize delay_line with zeros
         port = self.parent.serial_ctrl.serial_port
         
         # Start Sinusoidal Vbias
         success = self.send_msg_retry(port, globals.MSG_E, ztmCMD.CMD_VBIAS_SET_SINE.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, globals.CAP_APPROACH_AMPL, globals.CAP_APPROACH_FREQ)
-
+        
         if success:
             print("\n----------BEGINNING CAP APPROACH ALGORITHM----------")
             # Resets visual graph and data
@@ -1052,7 +1197,11 @@ class MeasGUI:
             
             # Get first fft measurement
             fft_meas = self.get_fft_peak()
-            for i in range(globals.DELAY_LINE_LEN+1): delay_line[i] = fft_meas
+            if fft_meas is None:
+                print("ERROR. Unable to start cap approach due to invalid FFT measurements.")
+                return
+            
+            for i in range(globals.DELAY_LINE_LEN + 1): delay_line[i] = fft_meas
             notDone = 1
             fft_count = 0
             peaks = [0] * globals.FFT_AVG_LENGTH # Initialize peaks list
@@ -1094,7 +1243,7 @@ class MeasGUI:
                     self.parent.graph_gui.update_graph()
                 else:
                     fft_count = fft_count + 1
-            
+            STOP_BTN_FLAG = 0    
             plt.ioff()
             self.stop_leds()
             self.enable_widgets()
@@ -1113,8 +1262,14 @@ class MeasGUI:
             _type_: _description_
         """
         port = self.parent.serial_ctrl.serial_port
-        peak, _ = self.send_msg_retry(port, globals.MSG_C, ztmCMD.CMD_REQ_FFT_DATA.value, ztmSTATUS.STATUS_MEASUREMENTS.value, ztmSTATUS.STATUS_FFT_DATA.value)
-        return peak
+        
+        result = self.sendMsgCapApproach(port, globals.MSG_C, ztmCMD.CMD_REQ_FFT_DATA.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_FFT_DATA.value)
+        if result is None:
+            print("ERROR. Failed to retrieve FFT data.")
+            return None
+        else:
+            peak, _ = result
+            return peak
     
     def get_avg_meas(self, measurements):
         """
@@ -1126,10 +1281,26 @@ class MeasGUI:
         Returns:
             _type_: _description_
         """
+        
+        total = 0
+        count = 0
+
+        for measurement in measurements:
+            if measurement is not None:
+                total += measurement # Sum the first element of each tuple
+                count += 1
+
+        if count == 0:
+            return None  # Return None if no valid measurements were found
+
+        avg = total / count
+        return avg
+        '''
         sum = 0
         for i in range(len(measurements)): sum += measurements[i]
         sum /= len(measurements)
         return sum
+        '''
 
     '''
     def tip_approach(self):
@@ -1316,7 +1487,7 @@ class MeasGUI:
             # Turns interactive graph off
             plt.ioff()      
              
-    def savePiezoValue(self, event):         
+    def savePiezoValue(self, _=None):         
         """
         Method to save the piezo voltage delta value; the
         value cannot be less than 3 mV.
@@ -1489,7 +1660,7 @@ class MeasGUI:
                 self.label4.insert(0,0.000)
                 messagebox.showerror("Invalid Value", "Error. Please enter a valid input.")
 
-    def saveSampleBias(self, event): 
+    def saveSampleBias(self, _=None): 
         """
         Function to send vbias msg to the MCU and waits for a DONE response, 
         witha  valid range of -10 V to 10 V.
@@ -1562,7 +1733,7 @@ class MeasGUI:
                 messagebox.showerror("Invalid Value", "Please enter a number from -10 to 10.")
             
             
-    def saveSampleRate(self, _):
+    def saveSampleRate(self, _=None):
         """
         Saves sample rate as an integer and sends that to the MCU.
 
@@ -1605,7 +1776,7 @@ class MeasGUI:
                 sample_rate_done_flag = 0
                 messagebox.showinfo("Information", "Did not process change in value within timeout period. Please try again.")
                 
-    def sendSampleSize(self, _):
+    def saveSampleSize(self, _=None):
         """
         Send sample size as an integer and sends that to the MCU with a
         valid range of 1 to 1024.
@@ -1660,7 +1831,7 @@ class MeasGUI:
                 self.sample_size.delete(0, END)
                 messagebox.showerror("Invalid Value", "Please enter a whole number from 1 to 1024.")
                         
-    def saveStepperMotorAdjust(self, _):
+    def saveStepperMotorAdjust(self, _=None):
         """
         Saves adjust stepper motor step size as an integer 'fine_adjust_step_size' .
 
@@ -1871,6 +2042,7 @@ class MeasGUI:
         self.label2.configure(text=f"{curr_data:.4f} nA")
         self.label11.configure(text=f"{vpiezo_dist:.4f}")
 
+    '''
     def get_current_label2(self):
         """
         Used to get the current data from widget label 2.
@@ -1880,6 +2052,7 @@ class MeasGUI:
         """
         current_value = float(self.label2.cget("text").split()[0])  # assuming label2 text value is "value" nA
         return current_value
+    '''
     
     def save_notes(self, _=None):
         """_summary_
@@ -2020,7 +2193,7 @@ class GraphGUI:
         *Updates every 36ms
         """
         global curr_data
-        
+
         # Fetch current data from label 2
         #current_data = self.meas_gui.get_current_label2()
         current_data = curr_data
@@ -2050,6 +2223,7 @@ class GraphGUI:
         self.canvas.draw()
         self.canvas.flush_events()
 
+        
     def reset_graph(self):
         """
         Resets the visual graph and clears the data points.
@@ -2063,6 +2237,7 @@ class GraphGUI:
         self.line, = self.ax.plot([], [], 'r-')
         self.canvas.draw()
         self.canvas.flush_events()
+
 
 if __name__ == "__main__":
     root_gui = RootGUI()
