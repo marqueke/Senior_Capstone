@@ -40,6 +40,9 @@ tip_app_total_steps = None
 
 startup_flag = 0
 
+TIP_APPR_FLAG = 0
+CAP_APPR_FLAG = 0
+PERIODICS_FLAG = 0
 STOP_BTN_FLAG = 0
 
 class RootGUI:
@@ -81,8 +84,14 @@ class RootGUI:
         print("Starting to read data...")
         if self.serial_ctrl:
             print("Serial controller is initialized, starting now...")
-            #self.meas_gui.tip_approach()
-            self.meas_gui.enable_periodics()
+            if(TIP_APPR_FLAG):
+                self.meas_gui.tunneling_approach()
+            elif(CAP_APPR_FLAG):
+                self.meas_gui.cap_approach()
+            elif(PERIODICS_FLAG):
+                self.meas_gui.enable_periodics()
+            
+            # ??
             self.serial_ctrl.running = True
         else:
             print("Serial controller is not initialized.")
@@ -407,34 +416,42 @@ class MeasGUI:
         self.add_btn_image1 = ctk.CTkImage(Image.open("Images/Vpzo_Down_Btn.png"), size=(40,40))
         self.add_btn_image2 = ctk.CTkImage(Image.open("Images/Fine_Adjust_Btn_Up.png"), size=(40,40))
         self.add_btn_image3 = ctk.CTkImage(Image.open("Images/Fine_Adjust_Btn_Down.png"), size=(40,40))
-        self.add_btn_image4 = ctk.CTkImage(Image.open("Images/Start_Btn.png"), size=(90,35))
-        self.add_btn_image5 = ctk.CTkImage(Image.open("Images/Stop_Btn.png"), size=(90,35))
+        #self.add_btn_image4 = ctk.CTkImage(Image.open("Images/Start_Btn.png"), size=(90,35))
+        #self.add_btn_image5 = ctk.CTkImage(Image.open("Images/Stop_Btn.png"), size=(90,35))
         self.add_btn_image6 = ctk.CTkImage(Image.open("Images/Acquire_IV.png"), size=(90,35))
         self.add_btn_image7 = ctk.CTkImage(Image.open("Images/Acquire_IZ.png"), size=(90,35))
     
-        self.add_btn_image8 = ctk.CTkImage(Image.open("Images/Stop_LED.png"), size=(35,35))
+        self.add_btn_image8 = ctk.CTkImage(Image.open("Images/Stop_LED.png"), size=(45,45))
         self.add_btn_image9 = ctk.CTkImage(Image.open("Images/Start_LED.png"), size=(35,35))
         
         self.add_btn_image10 = ctk.CTkImage(Image.open("Images/Save_Home_Btn.png"), size=(90,35))
         self.add_btn_image11 = ctk.CTkImage(Image.open("Images/Return_Home_Btn.png"), size=(35,35))
         
         # create buttons with proper sizes															   
-        self.start_btn = ctk.CTkButton(self.root, image=self.add_btn_image4, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.start_reading)
-        self.stop_btn = ctk.CTkButton(self.root, image=self.add_btn_image5, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.stop_reading)
-        self.acquire_iv_btn = ctk.CTkButton(self.root, image=self.add_btn_image6, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.open_iv_window)
-        self.acquire_iz_btn = ctk.CTkButton(self.root, image=self.add_btn_image7, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.open_iz_window)
+        self.start_stop_frame = LabelFrame(self.root, text="Start/Stop Processes", labelanchor="s", padx=10, pady=10, bg="#eeeeee")
+        self.tip_approach_btn = ctk.CTkButton(self.start_stop_frame,text="Start Tip Approach", width=180, height=45, fg_color="#ff8000", text_color="black", bg_color="#eeeeee", corner_radius=10, command=self.start_tip_appr)
+        self.cap_approach_btn = ctk.CTkButton(self.start_stop_frame,text="Start Capacitance Approach", width=90, height=45, fg_color="#ffff00", text_color="black", bg_color="#eeeeee", corner_radius=10, command=self.start_cap_appr)
+        self.enable_periodics_btn = ctk.CTkButton(self.start_stop_frame, text="Start Periodic Data Transfer", width=90, height=45, fg_color="#00cc00", text_color="black", bg_color="#eeeeee", corner_radius=10, command=self.start_periodics)
+        self.stop_btn = ctk.CTkButton(self.start_stop_frame, text="STOP", width=90, height=75, fg_color="#D51717", text_color="black", bg_color="#eeeeee", corner_radius=10, command=self.stop_reading)
+        self.stop_led_btn = ctk.CTkLabel(self.start_stop_frame, image=self.add_btn_image8, text="", width=45, height=45, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0)
+        self.start_led_btn = ctk.CTkLabel(self.start_stop_frame, image=self.add_btn_image9, text="", width=30, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0)
+        
+        # sweep windows frame and buttons
+        self.sweep_windows_frame = LabelFrame(self.root, text="Sweep Windows", labelanchor="s", padx=10, pady=10, bg="#eeeeee")
+        self.acquire_iv_btn = ctk.CTkButton(self.sweep_windows_frame, image=self.add_btn_image6, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.open_iv_window)
+        self.acquire_iz_btn = ctk.CTkButton(self.sweep_windows_frame, image=self.add_btn_image7, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.open_iz_window)
         self.save_home_pos = ctk.CTkButton(self.root, image=self.add_btn_image10, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.save_home)
-        
-        self.stop_led_btn = ctk.CTkLabel(self.root, image=self.add_btn_image8, text="", width=30, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0)
-        self.start_led_btn = ctk.CTkLabel(self.root, image=self.add_btn_image9, text="", width=30, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0)
-        
+
+        # return/save home position buttons
         self.return_to_home_frame = LabelFrame(self.root, text="Return Home", labelanchor= "s", padx=10, pady=5, bg="#eeeeee")
         self.return_to_home_pos = ctk.CTkButton(self.return_to_home_frame, image=self.add_btn_image11, text="", width=30, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.return_home)
         
+        # piezo adjust frame and buttons
         self.vpiezo_btn_frame = LabelFrame(self.root, text="Piezo Tip Adjust", padx=10, pady=5, bg="#eeeeee")
         self.vpiezo_adjust_btn_up = ctk.CTkButton(master=self.vpiezo_btn_frame, image=self.add_btn_image0, text = "", width=40, height=40, compound="bottom", fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.piezo_inc)
         self.vpiezo_adjust_btn_down = ctk.CTkButton(master=self.vpiezo_btn_frame, image=self.add_btn_image1, text="", width=40, height=40, compound="bottom", fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.piezo_dec)
         
+        # stepper motor adjust frame and buttons
         self.fine_adjust_frame = LabelFrame(self.root, text="Stepper Motor", padx=10, pady=5, bg="#eeeeee")
         self.fine_adjust_btn_up = ctk.CTkButton(master=self.fine_adjust_frame, image=self.add_btn_image2, text = "", width=40, height=40, compound="bottom", fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.stepper_motor_up)
         self.fine_adjust_btn_down = ctk.CTkButton(master=self.fine_adjust_frame, image=self.add_btn_image3, text="", width=40, height=40, compound="bottom", fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.stepper_motor_down)
@@ -486,15 +503,19 @@ class MeasGUI:
         self.fine_adjust_btn_down.grid(row=1, column=0)
         
         # start/stop buttons
-        self.start_btn.grid(row=3, column=9, sticky="e")
-        self.stop_btn.grid(row=4, column=9, sticky="ne")
-        
-        # sweep windows buttons
-        self.acquire_iv_btn.grid(row=5, column=9, sticky="ne")
-        self.acquire_iz_btn.grid(row=6, column=9, sticky="ne")
-        
+        self.start_stop_frame.grid(row=3, column=9, columnspan=4)
+        self.tip_approach_btn.grid(row=0, column=0, sticky="e")
+        self.cap_approach_btn.grid(row=1, column=0, sticky="e")
+
+        self.enable_periodics_btn.grid(row=2, column=0, sticky="e")
+        self.stop_btn.grid(row=1, column=1, sticky="ne", padx=20, pady=10)
         # led
-        self.stop_led_btn.grid(row=3, column=10, sticky="e")
+        self.stop_led_btn.grid(row=0, column=1, sticky="")
+
+        # sweep windows buttons
+        self.sweep_windows_frame.grid(row=8, column=10, rowspan=2)
+        self.acquire_iv_btn.grid(row=0, column=0, sticky="")
+        self.acquire_iz_btn.grid(row=1, column=0, sticky="")
 
         # save home position
         self.save_home_pos.grid(row=8, column=9)
@@ -527,7 +548,9 @@ class MeasGUI:
         self.acquire_iz_btn.configure(state="disabled")
         self.save_home_pos.configure(state="disabled")
         self.return_to_home_pos.configure(state="disabled")
-        self.start_btn.configure(state="disabled")
+        self.tip_approach_btn.configure(state="disabled")
+        self.cap_approach_btn.configure(state="disabled")
+        self.enable_periodics_btn.configure(state="disabled")
         self.stop_btn.configure(state="normal")
     
     def enable_widgets(self):
@@ -539,7 +562,9 @@ class MeasGUI:
         self.acquire_iz_btn.configure(state="normal")
         self.save_home_pos.configure(state="normal")
         self.return_to_home_pos.configure(state="normal")
-        self.start_btn.configure(state="normal")
+        self.tip_approach_btn.configure(state="normal")
+        self.cap_approach_btn.configure(state="normal")
+        self.enable_periodics_btn.configure(state="normal")
         self.stop_btn.configure(state="disable")
       
     def open_iv_window(self):
@@ -582,7 +607,7 @@ class MeasGUI:
         Method to change the LEDs upon the user pressing the start button.
         """
         self.stop_led_btn.grid_remove()
-        self.start_led_btn.grid(row=3, column=10, sticky="e")
+        self.start_led_btn.grid(row=0, column=1, sticky="")
     
     def stop_leds(self):
         """
@@ -590,6 +615,40 @@ class MeasGUI:
         """
         self.stop_led_btn.grid()
         self.start_led_btn.grid_remove()
+
+    def start_tip_appr(self):
+        global TIP_APPR_FLAG
+        global CAP_APPR_FLAG
+        global PERIODICS_FLAG
+
+        TIP_APPR_FLAG = 1
+        CAP_APPR_FLAG = 0
+        PERIODICS_FLAG = 0
+
+        self.start_reading()
+
+    def start_cap_appr(self):
+        global TIP_APPR_FLAG
+        global CAP_APPR_FLAG
+        global PERIODICS_FLAG
+
+        TIP_APPR_FLAG = 0
+        CAP_APPR_FLAG = 1
+        PERIODICS_FLAG = 0
+        
+        self.start_reading()
+
+    def start_periodics(self):
+        global TIP_APPR_FLAG
+        global CAP_APPR_FLAG
+        global PERIODICS_FLAG
+
+        TIP_APPR_FLAG = 0
+        CAP_APPR_FLAG = 0
+        PERIODICS_FLAG = 1
+        
+        self.start_reading()
+
        
     def start_reading(self):
         """
@@ -897,6 +956,241 @@ class MeasGUI:
                 
                 tip_app_total_steps = self.send_msg_retry(self.parent.serial_ctrl.serial_port, globals.MSG_C, ztmCMD.CMD_REQ_STEP_COUNT.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value)
                 self.enable_periodics()
+
+############################################# TIP APPROACH #################################################
+    def tunneling_approach(self):
+        """
+        @brief: This function looks for a desired tunneling current using the traditional algorithm
+        @param targetCurrent_nA: The desired tunneling current the algorithm is looking for
+        @retval: None
+        """
+        global STOP_BTN_FLAG
+        global curr_setpoint
+        global vpiezo_tip
+        global tunneling_steps
+        global curr_data
+        global vb_V
+        global vp_V
+        
+        if self.check_connection():
+            return
+        else:
+        ##########    
+            port = self.parent.serial_ctrl.serial_port
+            
+            if not self.saveCurrentSetpoint():
+                return 
+            
+            # Set sample size to 24
+            self.send_msg_retry(port, globals.MSG_B, ztmCMD.CMD_SET_ADC_SAMPLE_SIZE.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, globals.TUNNELING_SAMPLE_SIZE)
+
+            # Get a measurement from the MCU, send_msg_retry() will change the val of the global vars curr, vbias, vpzo
+            success = self.send_msg_retry(port, globals.MSG_C, ztmCMD.CMD_REQ_DATA.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_MEASUREMENTS.value)
+            
+            if success:
+                print("\n----------BEGINNING TIP APPROACH ALGORITHM----------")
+                # Resets visual graph and data
+                self.parent.graph_gui.reset_graph()
+                
+                # Turns interactive graph on
+                plt.ion()
+                
+                self.startup_leds()
+                self.disable_widgets()
+                
+                while True:
+                    if STOP_BTN_FLAG == 1:
+                        plt.ioff()
+                        break
+                    
+                    # Immediately step back and return if current >= target
+                    if(curr_data >= curr_setpoint):
+                        adjust_success = self.send_msg_retry(port, globals.MSG_D, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, globals.EIGHTH_STEP, globals.DIR_DOWN, globals.NUM_STEPS)
+                        if adjust_success:
+                            tunneling_steps -= globals.INC_EIGHT
+                            plt.ioff()
+                            return 1, curr_data, vb_V, vp_V, tunneling_steps
+                        else:
+                            print("Did not receive correct response back.")
+                            messagebox.showerror("ERROR", "Error. Unable to adjust the stepper motor.")
+                    else:
+                        # Update the graph with new data
+                        self.parent.graph_gui.update_graph()
+                        
+                        vpiezo_tip, tunneling_steps = self.auto_move_tip(tunneling_steps, globals.APPROACH_STEP_SIZE_NM, globals.DIR_DOWN)
+                        #plt.ioff()
+                        
+                        #return 0, curr_data, vb_V, vp_V, tunneling_steps
+                STOP_BTN_FLAG = 0
+            else:
+                print("Did not receive correct response back.")
+                messagebox.showerror("ERROR", "Error. Did not receive correct response back.")
+            
+                # Turns interactive graph off
+                plt.ioff()
+            
+    
+    def auto_move_tip(self, steps, dist, dir):
+        """
+        @brief: This function changes the tip height using either the piezo or stepper motor.
+        Note: If the distance is out of range for the piezo then the stepper motor will step up
+        or down, and the new distance will not be exactly what was desired. This function was 
+        created for the tunneling_approach function
+        @param dist: The desired change in distance in nm
+        @param dir: Direction for tip to move. Send "DOWN" to move tip down and "UP" to move tip up
+        @retval: None
+        """
+        global vpiezo_tip
+        
+        port = self.parent.serial_ctrl.serial_port
+        stepSet = False
+        piezoSet = False
+        delta_V = dist / globals.PIEZO_EXTN_RATIO
+        
+        # MOVING DOWN
+        if(dir == globals.DIR_DOWN):
+            # Piezo is fully extended, so we retract the tip and step the motor down
+            if(vpiezo_tip + delta_V > globals.VPIEZO_APPROACH_MAX):
+                vpiezo_tip = self.piezo_full_retract()
+                # Move stepper motor DOWN an eighth step
+                while(stepSet == False):
+                    stepSet = self.send_msg_retry(port, globals.MSG_D, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, globals.EIGHTH_STEP, globals.DIR_DOWN, globals.NUM_STEPS)
+                # Increment number of steps 
+                steps += globals.INC_EIGHT
+            # Increment the piezo voltage by delta_V to step it down
+            else:
+                vpiezo_tip += delta_V
+                # Send message to update vpiezo
+                while(piezoSet == False):
+                    piezoSet = self.send_msg_retry(port, globals.MSG_A, ztmCMD.CMD_PIEZO_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, 0, 0, vpiezo_tip)
+        ########################################################################
+        # MOVING UP
+        else:
+            if(vpiezo_tip - delta_V < globals.VPIEZO_APPROACH_MIN):
+            # Piezo is fully retracted, so we extend the tip and step the motor up
+            # Place the tip in approximately the same position
+                # Move stepper motor UP an eighth step    
+                while(stepSet == False):
+                    stepSet = self.send_msg_retry(port, globals.MSG_D, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, globals.EIGHTH_STEP, globals.DIR_UP, globals.NUM_STEPS)
+                    # Decrement number of steps 
+                steps -= globals.INC_EIGHT
+                vpiezo_tip = self.piezo_full_extend()
+            else:
+                vpiezo_tip -= delta_V
+                # Send message to update vpiezo
+                while(piezoSet == False):
+                    piezoSet = self.send_msg_retry(port, globals.MSG_A, ztmCMD.CMD_PIEZO_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, 0, 0, vpiezo_tip)
+        print(f"\nNew vpiezo for tip approach: {vpiezo_tip} V\nStep Count: {steps}")
+        return vpiezo_tip, steps
+                
+    def piezo_full_extend(self):
+        """
+        This function adjusts the tip down in increments instead of one total distance.
+
+        Args:
+            vpiezo (_type_): _description_
+        """
+        global vpiezo_tip
+
+        print("Piezo is extending...")
+        
+        port = self.parent.serial_ctrl.serial_port
+        piezoSet = False
+        # Extend piezo in small increments
+        piezoStep = vpiezo_tip / 32
+        while (vpiezo_tip != globals.VPIEZO_APPROACH_MAX):
+            if vpiezo_tip < globals.VPIEZO_APPROACH_MAX:
+                vpiezo_tip += piezoStep
+            elif vpiezo_tip > globals.VPIEZO_APPROACH_MAX:
+                vpiezo_tip = globals.VPIEZO_APPROACH_MAX
+            while(piezoSet == False):
+                piezoSet = self.send_msg_retry(port, globals.MSG_A, ztmCMD.CMD_PIEZO_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, 0, 0, vpiezo_tip)
+        return vpiezo_tip
+    
+    def piezo_full_retract(self):
+        """
+        This function adjusts the tip up in increments instead of one total distasnce.
+
+        Args:
+            vpiezo (_type_): _description_
+        """
+        global vpiezo_tip
+        
+        print("Piezo is retracting...")
+        
+        port = self.parent.serial_ctrl.serial_port
+        piezoSet = False
+        # Retract piezo in small increments
+        piezoStep = vpiezo_tip / 32
+        while (vpiezo_tip != globals.VPIEZO_APPROACH_MIN):
+            if vpiezo_tip > globals.VPIEZO_APPROACH_MIN:
+                vpiezo_tip -= piezoStep
+            elif vpiezo_tip < globals.VPIEZO_APPROACH_MIN:
+                vpiezo_tip = globals.VPIEZO_APPROACH_MIN
+            while(piezoSet == False):
+                piezoSet = self.send_msg_retry(port, globals.MSG_A, ztmCMD.CMD_PIEZO_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, 0, 0, vpiezo_tip)
+        return vpiezo_tip
+
+    def cap_approach(self):
+        """
+        @brief: This function gets the tip close to the sample by using the displacement current
+        between the tip and the sample. It looks at the difference between the present displacement
+        current and a previous displacement current. It uses a circular buffer to store the delayed
+        displacement currents.
+
+        @retval: None
+        """
+        delay_line = []
+        port = self.parent.serial_ctrl.serial_port
+        # Start Sinusoidal Vbias
+        self.send_msg_retry(port, globals.MSG_E, ztmCMD.CMD_VBIAS_SET_SINE.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, globals.cap_approach_ampl, globals.cap_approach_freq)
+
+        # Get first fft measurement
+        fft_meas = self.get_fft_peak()
+        for i in range(globals.delay_line_len+1): delay_line[i] = fft_meas
+        notDone = 1
+        fft_count = 0
+        peaks = []
+        detector_count = 0
+        while(notDone):
+            # Measure fft peak
+            peaks[fft_count] = self.get_fft_peak()
+
+            if(fft_count >= globals.fft_avg_len):
+                fft_meas = self.get_avg_meas(peaks)
+                delay_line[delay_index] = fft_meas # Store the new displacement current
+
+                # Increments index of circular buffer
+                delay_index = (delay_index + 1) % (globals.delay_line_len + 1) 
+
+                # takes difference between the new current and the current 
+                diff = fft_meas - delay_line[delay_index] 
+                if(diff > globals.crit_cap_slope):
+                    detector_count += 1
+                    if(detector_count >= 3):
+                        notDone = 0
+                    else:
+                        notDone = 1
+                else:
+                    detector_count = 0
+                    notDone = 1
+                    self.send_msg_retry(port, globals.MSG_D, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, globals.EIGHTH_STEP, globals.DIR_DOWN, globals.cap_approach_num_steps)
+            else:
+                fft_count = fft_count + 1
+            
+        self.send_msg_retry(port, globals.MSG_C, ztmCMD.CMD_VBIAS_STOP_SINE.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value)
+            
+    def get_fft_peak(self):
+        port = self.parent.serial_ctrl.serial_port
+        peak, _ = self.send_msg_retry(port, globals.MSG_C, ztmCMD.CMD_REQ_FFT_DATA.value, ztmSTATUS.STATUS_MEASUREMENTS.value, ztmSTATUS.STATUS_FFT_DATA.value)
+        return peak
+    
+    def get_avg_meas(self, measurements):
+        sum = 0
+        for i in range(len(measurements)): sum += measurements[i]
+        sum /= len(measurements)
+        return sum
+
 
     def enable_periodics(self):
         """
