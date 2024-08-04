@@ -43,4 +43,4 @@ class DataCtrl:
         print(f"Sending command: {data.hex()}")
         self.serial_ctrl.write_serial(data) 
     '''
-        
+            
