@@ -155,7 +155,7 @@ class usbMsgFunctions:
             try:   
                 port.write(serial.to_bytes(messageC))
                 # clear buffer    
-                time.sleep(0.001)
+                #time.sleep(0.001)
                 port.flush()  
                 return True
             except serial.SerialException as e:

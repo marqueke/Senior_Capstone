@@ -100,9 +100,9 @@ class RootGUI:
         #print(("Starting to read data...")
         if self.serial_ctrl:
             #print(("Serial controller is initialized, starting now...")
-            self.meas_gui.tunneling_approach()
+            #self.meas_gui.tunneling_approach()
             #self.meas_gui.enable_periodics()
-            #self.meas_gui.cap_approach()
+            self.meas_gui.cap_approach()
             self.serial_ctrl.running = True
        #else:
             #print(("Serial controller is not initialized.")
@@ -1086,10 +1086,10 @@ class MeasGUI:
                         detector_count = 0
                         notDone = 1
                         success_move = self.send_msg_retry(port, globals.MSG_D, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, globals.EIGHTH_STEP, globals.DIR_DOWN, globals.CAP_APPROACH_NUM_STEPS)
-                        #if success_move:
-                            #print(("SUCCESS. Stepper motor moved in cap approach.")
-                        #else:
-                            #print(("ERROR. Stepper motor failed to move in capacitance approach.")
+                        if success_move:
+                            print("SUCCESS. Stepper motor moved in cap approach.")
+                        else:
+                            print("ERROR. Stepper motor failed to move in capacitance approach.")
                     self.update_label()
                     self.parent.graph_gui.update_graph()
                 else:
@@ -1100,10 +1100,10 @@ class MeasGUI:
             self.enable_widgets()
             self.parent.clear_buffer()
             success_stop_vbias = self.send_msg_retry(port, globals.MSG_C, ztmCMD.CMD_VBIAS_STOP_SINE.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value)
-            #if success_stop_vbias:
-                #print(("SUCCESS. Sinusoidal vbias has stopped.")
-            #else:
-                #print(("ERROR. Sinusoidal vbias failed to stop.")
+            if success_stop_vbias:
+                print("SUCCESS. Sinusoidal vbias has stopped.")
+            else:
+                print("ERROR. Sinusoidal vbias failed to stop.")
                 
     def get_fft_peak(self):
         """
@@ -2041,7 +2041,7 @@ class GraphGUI:
 
         # set x-axis parameters
         self.ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M:%S'))
-        self.ax.xaxis.set_major_locator(mdates.SecondLocator(interval=2))
+        self.ax.xaxis.set_major_locator(mdates.SecondLocator(interval=1))
         # controls how much time is shown within the graph, currently displays the most recent 10 seconds
         self.ax.set_xlim(datetime.datetime.now() - datetime.timedelta(seconds=globals.ROLLOVER_GRAPH_TIME), datetime.datetime.now())
         self.ax.autoscale_view()

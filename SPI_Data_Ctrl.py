@@ -130,9 +130,10 @@ class SerialCtrl:
                     bytesize=serial.EIGHTBITS,
                     parity=serial.PARITY_NONE,
                     stopbits=serial.STOPBITS_ONE,
-                    timeout=2,  # Set a timeout for read operations
-                    write_timeout=2,  # Set a timeout for write operations
-                    xonxoff=True,
+                    timeout=0.01,  # Set a timeout for read operations
+                    write_timeout=0.01,  # Set a timeout for write operations
+                    xonxoff=False,
+                    rtscts = True,
                 )
                 self.running = True
                 self.thread = threading.Thread(target=self.read_serial)
