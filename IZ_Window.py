@@ -1,6 +1,6 @@
 # iz_window.py
 
-from tkinter import *
+from tkinter import Label, LabelFrame, Entry, Text, SE, NE
 from tkinter import messagebox, filedialog
 from PIL import Image
 import customtkinter as ctk

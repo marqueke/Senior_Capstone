@@ -1,14 +1,8 @@
-import GLOBALS
+'''
+# THIS FILE IS INACTIVE
 
-'''
-MSG A used to set voltage outputs and transmit standard measurements
-MSG B used for data and sampling rates
-MSG C used for CMDs and STATUSes
-MSG D used by PC to command the MCU to step the stepper motor at a defined step size
-        - used by MCU to transmit total # of stepper motor steps (in 1/8 steps)
-MSG E used by PC to CMD the MCU to set a sinusoidal vbias
-MSG F used by MCU to transmit FFT results - amplitude and frequency
-'''
+import globals
+
 
 class DataCtrl:
     def __init__(self, baudrate, callback):
@@ -36,11 +30,5 @@ class DataCtrl:
         if len(raw_data) < GLOBALS.MSG_BYTES:
             print("Incomplete data frame received.")
             return None
-
-    '''
-    def send_command(self, msg, cmd, status, payload):
-        data = struct.pack('BBB', msg, cmd, status) + payload
-        print(f"Sending command: {data.hex()}")
-        self.serial_ctrl.write_serial(data) 
-    '''
-        
+  
+'''

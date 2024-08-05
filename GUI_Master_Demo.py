@@ -1,4 +1,4 @@
-from tkinter import *
+from tkinter import Label, LabelFrame, Button, StringVar, OptionMenu, Entry, END, Text
 from tkinter import messagebox 
 from tkinter import filedialog
 from PIL import Image
@@ -9,13 +9,14 @@ import serial
 import os
 import struct
 import time
+import queue
 import csv
-import sys
+#import sys
 import datetime
 import threading
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
-import matplotlib.animation as animation
+#import matplotlib.animation as animation
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 # import other files
@@ -119,8 +120,6 @@ class RootGUI:
         Disables the reading of periodic data in a background thread.
         """
         def stop_reading_task():
-            global STOP_BTN_FLAG
-            
             # Clear buffer
             self.clear_buffer()
             
@@ -132,10 +131,11 @@ class RootGUI:
             
             if success:
                 print("Stopped reading data...")
+                self.meas_gui.enable_widgets()
+                self.meas_gui.stop_leds()
             else:
                 print("Did not receive valid response within timeout period. Moving on.")
-            self.meas_gui.enable_widgets()
-            self.meas_gui.stop_leds()
+
 
         # Run the stop reading task in a separate thread
         stop_thread = threading.Thread(target=stop_reading_task)
@@ -800,8 +800,8 @@ class MeasGUI:
             
             if msg_response:
                 # returns 11 bytes of payload FALSE or byte response
-                testMsg = self.parent.serial_ctrl.ztmGetMsg(port)
-                #testMsg = self.parent.serial_ctrl.read_serial()
+                #testMsg = self.parent.serial_ctrl.ztmGetMsg()
+                testMsg = self.parent.serial_ctrl.receive_serial()
                 print(f"Test msg: {testMsg}")
                 
                 ### Unpack data and display on the GUI
@@ -922,7 +922,7 @@ class MeasGUI:
                 while (time.time() - start_time) < timeout:
                     # Check if data is available in the serial buffer
                     if self.parent.serial_ctrl.serial_port.in_waiting == 11:
-                        testMsg = self.parent.serial_ctrl.ztmGetMsg(port)
+                        testMsg = self.parent.serial_ctrl.ztmGetMsg()
                         print(f"Test msg: {testMsg}")
                         
                         if testMsg:
@@ -1465,7 +1465,7 @@ class MeasGUI:
                         plt.ioff()
                         break
                     
-                    response = self.parent.serial_ctrl.ztmGetMsg(port)
+                    response = self.parent.serial_ctrl.ztmGetMsg()
                     if response[2] == ztmSTATUS.STATUS_MEASUREMENTS.value or response[2] == ztmSTATUS.STATUS_ACK.value:
                         print(f"Received correct response: {response[2]}")
                         
@@ -1594,7 +1594,7 @@ class MeasGUI:
                 self.parent.clear_buffer()
                 
                 # Get msg
-                testMsg = self.parent.serial_ctrl.ztmGetMsg(port)
+                testMsg = self.parent.serial_ctrl.ztmGetMsg()
 
                 # Unpack new vpzo value
                 _, _, vpzo_new = self.parent.ztm_serial.unpackRxMsg(testMsg)
@@ -1714,7 +1714,7 @@ class MeasGUI:
                     self.parent.clear_buffer()
                     
                     # Get newest vbias value
-                    testMsg = self.parent.serial_ctrl.ztmGetMsg(port)
+                    testMsg = self.parent.serial_ctrl.ztmGetMsg()
 
                     _, vbias_new, _ = self.parent.ztm_serial.unpackRxMsg(testMsg)
                     
@@ -2173,7 +2173,7 @@ class GraphGUI:
         #configures plot
         self.fig, self.ax = plt.subplots()
         self.ax.set_xlabel('Time (s)')
-        self.ax.set_ylabel('Tunneling Current (nA)')
+        self.ax.set_ylabel('Current (nA)')
        
         # initializes graphical data
         self.y_data = []
@@ -2185,6 +2185,7 @@ class GraphGUI:
         # Create a canvas to embed the figure in Tkinter
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.root)
         self.canvas.get_tk_widget().grid(row=0, column=3, columnspan=6, rowspan=10, padx=10, pady=5)
+        
     
     def update_graph(self):
         """
@@ -2196,10 +2197,10 @@ class GraphGUI:
 
         # Fetch current data from label 2
         #current_data = self.meas_gui.get_current_label2()
-        current_data = curr_data
+        #current_data = curr_data
         
         # update data with next data points
-        self.y_data.append(current_data)
+        self.y_data.append(curr_data)
         time_now = datetime.datetime.now()
         # append current time to x axis on graph
         self.x_data.append(time_now)

@@ -1,6 +1,6 @@
 # iv_window.py
 
-from tkinter import *
+from tkinter import Label, LabelFrame, Entry, Text
 from tkinter import messagebox, filedialog
 from PIL import Image
 import customtkinter as ctk

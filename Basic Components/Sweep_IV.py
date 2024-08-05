@@ -1,3 +1,6 @@
+'''
+# THIS FILE IS INACTIVE
+
 from tkinter import *
 from tkinter import messagebox
 from PIL import Image
@@ -44,3 +47,4 @@ class SweepIV_Window:
         # buttons
         self.save_btn.grid(row=3, column=5, padx=5, sticky="se")
         self.exit_btn.grid(row=4, column=5, padx=5, sticky="ne")   
+'''
