@@ -25,10 +25,10 @@ class SerialCtrl:
                 response = self.serial_port.read(globals.MSG_BYTES)
                 return response
             except serial.SerialException as e:
-                print(f"Read operation failed: {e}")    
+                #print(f"Read operation failed: {e}")    
                 attempts += 1        
         if attempts == globals.MAX_ATTEMPTS:
-            print(f"Failed to receive complete message.\n")   
+            #print(f"Failed to receive complete message.\n")   
             return False
         
     def receive_serial(self):
@@ -40,7 +40,7 @@ class SerialCtrl:
                 if self.serial_port.in_waiting > 0:
                     raw_data = self.serial_port.read(self.serial_port.in_waiting)
                     self.receive_queue.put(raw_data)  # Push received data to queue
-                    print(f"Received data: {raw_data.hex()}")
+                    #print(f"Received data: {raw_data.hex()}")
                     return raw_data
             except serial.SerialException as e:
                 print(f"Error reading serial port: {e}")
@@ -55,11 +55,11 @@ class SerialCtrl:
                 data = self.send_queue.get(timeout=0.1)  # Wait for data with a timeout
                 if data:
                     self.serial_port.write(data)
-                    print(f"Sent data: {data.hex()}")
+                    #print(f"Sent data: {data.hex()}")
             except queue.Empty:
                 continue  # No data to send, loop back
-            except serial.SerialException as e:
-                print(f"Failed to write to serial port: {e}")
+            #except serial.SerialException as e:
+                #print(f"Failed to write to serial port: {e}")
 
     def start(self):
         try:
@@ -83,10 +83,10 @@ class SerialCtrl:
             self.receive_thread = threading.Thread(target=self.receive_serial)
             self.send_thread.start()
             self.receive_thread.start()
-            print("Send and receive threads started.")
+            #print("Send and receive threads started.")
             return True
         except serial.SerialException as e:
-            print(f"Error opening serial port: {e}")
+            #print(f"Error opening serial port: {e}")
             self.serial_port = None
             return False
 
@@ -97,7 +97,7 @@ class SerialCtrl:
             self.send_thread.join()
             self.receive_thread.join()
             self.serial_port.close()
-            print("Serial communication stopped.")
+            #print("Serial communication stopped.")
 
     def queue_data_for_sending(self, data):
         """
@@ -113,7 +113,6 @@ class SerialCtrl:
             return self.receive_queue.get_nowait()
         except queue.Empty:
             return None
-
             
 '''
 # OLD VERSION

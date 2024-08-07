@@ -92,7 +92,7 @@ class RootGUI:
         """
         Quits the application and closes the serial read thread.
         """
-        print("\nQUITTING APPLICATION")
+        #print("\nQUITTING APPLICATION")
         if self.serial_ctrl:
             self.serial_ctrl.stop()
         
@@ -102,9 +102,9 @@ class RootGUI:
         """
         Opens the serial read thread and enables the start of periodic data reading.
         """
-        print("Starting to read data...")
+        #print("Starting to read data...")
         if self.serial_ctrl:
-            print("Serial controller is initialized, starting now...")
+            #print("Serial controller is initialized, starting now...")
             if(TUNN_APPR_FLAG):
                 self.meas_gui.tunneling_approach()
             elif(CAP_APPR_FLAG):
@@ -112,8 +112,8 @@ class RootGUI:
             elif(PERIODICS_FLAG):
                 self.meas_gui.enable_periodics()
             self.serial_ctrl.running = True
-        else:
-            print("Serial controller is not initialized.")
+        #else:
+            #print("Serial controller is not initialized.")
     
     def stop_reading(self):
         """
@@ -130,11 +130,11 @@ class RootGUI:
                 success = self.meas_gui.send_msg_retry(self.serial_ctrl.serial_port, globals.MSG_C, ztmCMD.CMD_PERIODIC_DATA_DISABLE.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value)
             
             if success:
-                print("Stopped reading data...")
+                #print("Stopped reading data...")
                 self.meas_gui.enable_widgets()
                 self.meas_gui.stop_leds()
-            else:
-                print("Did not receive valid response within timeout period. Moving on.")
+            #else:
+                #print("Did not receive valid response within timeout period. Moving on.")
 
 
         # Run the stop reading task in a separate thread
@@ -146,11 +146,11 @@ class RootGUI:
         Clears the serial buffer to make room for other messages.
         """
         if self.serial_ctrl.serial_port.in_waiting > 0:
-            print(f"{self.serial_ctrl.serial_port.in_waiting} bytes are stuck in the buffer.")
+            #print(f"{self.serial_ctrl.serial_port.in_waiting} bytes are stuck in the buffer.")
             self.serial_ctrl.serial_port.read(self.serial_ctrl.serial_port.in_waiting)
-            print(f"{self.serial_ctrl.serial_port.in_waiting} bytes are stuck in the buffer.")
-        else:
-            print("No bytes stuck in the buffer.")
+            #print(f"{self.serial_ctrl.serial_port.in_waiting} bytes are stuck in the buffer.")
+        #else:
+            #print("No bytes stuck in the buffer.")
 
 ###################################################################################################################
 #                                                 ComGUI CLASS                                                    #
@@ -217,7 +217,7 @@ class ComGUI:
         """
         Refreshes the list of available COMs.
         """
-        print("Refresh")
+        #print("Refresh")
         self.drop_com.destroy()
         self.ComOptionMenu()
         self.drop_com.grid(column=2, row=2, padx=self.padx)
@@ -238,7 +238,7 @@ class ComGUI:
 
                 # If the port is available, proceed with the connection
                 self.parent.serial_ctrl.port = port
-                print(f"Connecting to {port}...")
+                #print(f"Connecting to {port}...")
                 
                 serial_response = self.parent.serial_ctrl.start()
 
@@ -250,7 +250,7 @@ class ComGUI:
                     self.drop_com["state"] = "active"
                     InfoMsg = f"Failed to connect to {self.clicked_com.get()}."
                     messagebox.showerror("Connection Error", InfoMsg)
-                    print(f"Failed to connect to {port}.")
+                    #print(f"Failed to connect to {port}.")
                     self.parent.serial_ctrl.running = False
                 
                 
@@ -260,7 +260,7 @@ class ComGUI:
                 self.drop_com["state"] = "active"
                 InfoMsg = f"Failed to connect to {self.clicked_com.get()}: {e}"
                 messagebox.showerror("Connection Error", InfoMsg)
-                print(f"Failed to connect to {port}: {e}")
+                #print(f"Failed to connect to {port}: {e}")
                 self.parent.serial_ctrl.running = False
         else:
             if self.parent.serial_ctrl:
@@ -270,7 +270,7 @@ class ComGUI:
             self.drop_com["state"] = "active"
             InfoMsg = f"UART connection using {self.clicked_com.get()} is now closed."
             messagebox.showwarning("Disconnected", InfoMsg)
-            print("\nDisconnected.")
+            #print("\nDisconnected.")
             
             startup_flag = 0
 
@@ -279,17 +279,17 @@ class ComGUI:
         A message sent to the MCU upon valid connection of a port, starting the MCU program.
         """
         global startup_flag
-        print("*************** BEGINNING STARTUP ROUTINE ***************")
+        #print("*************** BEGINNING STARTUP ROUTINE ***************")
         port = self.parent.serial_ctrl.serial_port
-        print(f"{port}")
+        #print(f"{port}")
         # check for port connection
-        if port is None:
-            print("Port is not connected.")
+        #if port is None:
+            #print("Port is not connected.")
         
         msg_response = self.parent.meas_gui.send_msg_retry(port, globals.MSG_C, ztmCMD.CMD_CLR.value, ztmSTATUS.STATUS_RDY.value, ztmSTATUS.STATUS_ACK.value)   
         
         if msg_response:
-            print("SUCCESS. Startup routine completed.")
+            #print("SUCCESS. Startup routine completed.")
             self.btn_connect["text"] = "Disconnect"
             self.btn_refresh["state"] = "disable"
             self.drop_com["state"] = "disable"
@@ -302,9 +302,9 @@ class ComGUI:
             self.drop_com["state"] = "active"
             InfoMsg = f"Failed to connect to {self.clicked_com.get()}."
             messagebox.showerror("Connection Error", InfoMsg)
-            print(f"Failed to connect to {self.clicked_com.get()}.")            
+            #print(f"Failed to connect to {self.clicked_com.get()}.")            
             #self.parent.serial_ctrl.running = False
-            print("ERROR. Failed to connect.")
+            #print("ERROR. Failed to connect.")
             self.parent.serial_ctrl.running = False
             
             startup_flag = 0
@@ -663,7 +663,7 @@ class MeasGUI:
         if self.check_connection():
             return
         else:
-            print("ButtonGUI: Start button pressed")
+            #print("ButtonGUI: Start button pressed")
             STOP_BTN_FLAG = 0
             # will need to move this section so it only runs when we receive a valid response back
             self.parent.start_reading()			  
@@ -682,7 +682,7 @@ class MeasGUI:
         if self.check_connection():
             return
         else:
-            print("ButtonGUI: Stop button pressed")
+            #print("ButtonGUI: Stop button pressed")
             STOP_BTN_FLAG = 1
             self.parent.stop_reading()
 
@@ -781,10 +781,10 @@ class MeasGUI:
         # Convert each element in msg_print to a hex string
         msg_print_hex = ' '.join(format(x, '02X') for x in msg_print)
         
-        print(f"\nMESSAGE BEING SENT: {msg_print_hex}")
+        #print(f"\nMESSAGE BEING SENT: {msg_print_hex}")
         
         while attempt < max_attempts:
-            print(f"\n========== ATTEMPT NUMBER: {attempt+1} ==========")
+            #print(f"\n========== ATTEMPT NUMBER: {attempt+1} ==========")
             if msg_type == globals.MSG_A:
                 msg_response = self.parent.ztm_serial.sendMsgA(port, cmd, status, *params)
             elif msg_type == globals.MSG_B:
@@ -802,76 +802,76 @@ class MeasGUI:
                 # returns 11 bytes of payload FALSE or byte response
                 #testMsg = self.parent.serial_ctrl.ztmGetMsg()
                 testMsg = self.parent.serial_ctrl.receive_serial()
-                print(f"Test msg: {testMsg}")
+                #print(f"Test msg: {testMsg}")
                 
                 ### Unpack data and display on the GUI
                 if testMsg:
                     testMsg_hex = [b for b in testMsg]
-                    print(f"Serial response: {testMsg_hex}")
+                    #print(f"Serial response: {testMsg_hex}")
                     
                     # checks if status byte read is the same as status byte expected AND that the response is 11 bytes long
                     if testMsg_hex[2] == status_response and len(testMsg) == 11:
                         unpackResponse = self.parent.ztm_serial.unpackRxMsg(testMsg)
-                        print(f"Received correct status response from MCU: {testMsg[2]}")
+                        #print(f"Received correct status response from MCU: {testMsg[2]}")
                         
                         if isinstance(unpackResponse, tuple):
                             if len(unpackResponse) == 3:
                                 if testMsg_hex[2] == ztmSTATUS.STATUS_MEASUREMENTS.value: #and testMsg_hex[1] == ztmCMD.CMD_PERIODIC_DATA_ENABLE.value:
                                     curr_data, vb_V, vp_V = unpackResponse
                                     
-                                    print(f"Received values\n\tCurrent: {curr_data} nA\n")
-                                    print(f"\tVbias: {vb_V} V\n")
-                                    print(f"\tVpiezo: {vp_V} V\n")
+                                    #print(f"Received values\n\tCurrent: {curr_data} nA\n")
+                                    #print(f"\tVbias: {vb_V} V\n")
+                                    #print(f"\tVpiezo: {vp_V} V\n")
                                     
                                     vpiezo_tip = vp_V
                                     
                                     return True
                                 #elif testMsg_hex[2] == ztmSTATUS.STATUS_MEASUREMENTS.value and testMsg_hex[1] == ztmCMD.CMD_REQ_DATA.value:
                                 #    pass
-                            else:
-                                print("Unknown tuple response.")
+                            #else:
+                                #print("Unknown tuple response.")
                         else:
                             if testMsg_hex[2] == ztmSTATUS.STATUS_STEP_COUNT.value:
-                                print(f"Received values:\n\tStepper Position Total (1/8) Steps: {unpackResponse}")
+                                #print(f"Received values:\n\tStepper Position Total (1/8) Steps: {unpackResponse}")
                                 return unpackResponse  
                         return True
                     
                     elif testMsg_hex[2] == ztmSTATUS.STATUS_NACK.value:
-                        print("NACK received.")
+                        #print("NACK received.")
                         return
                     elif testMsg_hex[2] == ztmSTATUS.STATUS_FAIL.value:
-                        print("FAIL received.")
+                        #print("FAIL received.")
                         return
                     elif testMsg_hex[2] == ztmSTATUS.STATUS_RESEND.value:
-                        print("RESEND received. Resending message.")
+                        #print("RESEND received. Resending message.")
                         return
                     # overcurrent(?)
                     elif testMsg_hex[2] == ztmSTATUS.STATUS_BUSY.value:
-                        print("BUSY received. Try again.")
+                        #print("BUSY received. Try again.")
                         return
                     elif testMsg_hex[2] == ztmSTATUS.STATUS_ERROR.value:
-                        print(f"Wrong message was sent.")
+                        #print(f"Wrong message was sent.")
                         return 
                     else:
-                        print(f"ERROR. Wrong response recieved: {testMsg}")
-                        print(f"Length of message received {len(testMsg)}")
-                        print(f"\tReceived status: {testMsg[2]}")
-                        print(f"\tExpected status: {status_response}")
+                        #print(f"ERROR. Wrong response recieved: {testMsg}")
+                        #print(f"Length of message received {len(testMsg)}")
+                        #print(f"\tReceived status: {testMsg[2]}")
+                        #print(f"\tExpected status: {status_response}")
                         
                         if testMsg_hex[2] == ztmSTATUS.STATUS_MEASUREMENTS.value:
                             if cmd == ztmCMD.CMD_SET_VBIAS.value:
                                 vb_V = round(Convert.get_Vbias_float(struct.unpack('H',bytes(testMsg[7:9]))[0]), 3) #unpack bytes & convert
                                 vbStr = str(vb_V)   # format as a string
-                                print("\tVbias: " + vbStr + " V\n")
+                                #print("\tVbias: " + vbStr + " V\n")
                                 return vb_V
                             elif cmd == ztmCMD.CMD_PIEZO_ADJ.value:
                                 # vpiezo
                                 vp_V = round(Convert.get_Vpiezo_float(struct.unpack('H',bytes(testMsg[9:11]))[0]), 3) #unpack bytes & convert
                                 vpStr = str(vp_V)   # format as a string
-                                print("\tVpiezo: " + vpStr + " V\n")
+                                #print("\tVpiezo: " + vpStr + " V\n")
                                 return vp_V
-                elif attempt == globals.MAX_ATTEMPTS:
-                    print("ERROR. Failed to receive a response from MCU.")
+                #elif attempt == globals.MAX_ATTEMPTS:
+                    #print("ERROR. Failed to receive a response from MCU.")
                 #time.sleep(sleep_time)
                 attempt += 1
                 
@@ -910,10 +910,10 @@ class MeasGUI:
         # Convert each element in msg_print to a hex string
         msg_print_hex = ' '.join(format(x, '02X') for x in msg_print)
         
-        print(f"\nMESSAGE BEING SENT: {msg_print_hex}")
+        #print(f"\nMESSAGE BEING SENT: {msg_print_hex}")
         
         while attempt < max_attempts:
-            print(f"\n========== ATTEMPT NUMBER: {attempt + 1} ==========")
+            #print(f"\n========== ATTEMPT NUMBER: {attempt + 1} ==========")
 
             msg_response = self.parent.ztm_serial.sendMsgC(port, cmd, status)
             
@@ -923,49 +923,49 @@ class MeasGUI:
                     # Check if data is available in the serial buffer
                     if self.parent.serial_ctrl.serial_port.in_waiting == 11:
                         testMsg = self.parent.serial_ctrl.ztmGetMsg()
-                        print(f"Test msg: {testMsg}")
+                        #print(f"Test msg: {testMsg}")
                         
                         if testMsg:
                             testMsg_hex = [b for b in testMsg]
-                            print(f"Serial response: {testMsg_hex}")
+                            #print(f"Serial response: {testMsg_hex}")
                             
                             if testMsg_hex[2] == status_response and len(testMsg) == 11:
                                 unpackResponse = self.parent.ztm_serial.unpackRxMsg(testMsg)
-                                print(f"Received correct status response from MCU: {testMsg[2]}")
+                                #print(f"Received correct status response from MCU: {testMsg[2]}")
                                 
                                 if isinstance(unpackResponse, tuple):
                                     if len(unpackResponse) == 2 and testMsg_hex[2] == ztmSTATUS.STATUS_FFT_DATA.value:
                                         fft_amp, fft_freq = unpackResponse
-                                        print(f"Received values\n\tFFT Amplitude: {fft_amp} nA")
-                                        print(f"\tFFT Frequency: {fft_freq} Hz\n")
+                                        #print(f"Received values\n\tFFT Amplitude: {fft_amp} nA")
+                                        #print(f"\tFFT Frequency: {fft_freq} Hz\n")
                                         
                                         curr_data = fft_amp
                                         return fft_amp, fft_freq
-                            else:
-                                print(f"ERROR. Wrong response received: {testMsg}")
-                                print(f"Length of message received {len(testMsg)}")
-                                print(f"\tReceived status: {testMsg[2]}")
-                                print(f"\tExpected status: {status_response}")
+                            #else:
+                                #print(f"ERROR. Wrong response received: {testMsg}")
+                                #print(f"Length of message received {len(testMsg)}")
+                                #print(f"\tReceived status: {testMsg[2]}")
+                                #print(f"\tExpected status: {status_response}")
                         
                         # Handle specific statuses
                         if testMsg_hex[2] == ztmSTATUS.STATUS_NACK.value:
-                            print("NACK received.")
+                            #print("NACK received.")
                             return
                         elif testMsg_hex[2] == ztmSTATUS.STATUS_FAIL.value:
-                            print("FAIL received.")
+                            #print("FAIL received.")
                             return
                         elif testMsg_hex[2] == ztmSTATUS.STATUS_RESEND.value:
-                            print("RESEND received. Resending message.")
+                            #print("RESEND received. Resending message.")
                             return
                         elif testMsg_hex[2] == ztmSTATUS.STATUS_BUSY.value:
-                            print("BUSY received. Try again.")
+                            #print("BUSY received. Try again.")
                             return
                         elif testMsg_hex[2] == ztmSTATUS.STATUS_ERROR.value:
-                            print(f"Wrong message was sent.")
+                            #print(f"Wrong message was sent.")
                             return 
                 
                 # If no valid response within the timeout period
-                print("ERROR. Failed to receive a response within the timeout period.")
+                #print("ERROR. Failed to receive a response within the timeout period.")
                 attempt += 1
             else:
                 return False
@@ -985,7 +985,7 @@ class MeasGUI:
         """
         try:
             value = float(label.get())
-            print(value)
+            #print(value)
         except ValueError:
             messagebox.showerror("Invalid Value", f"Invalid input for {value_name}. Using default value of {default_value}.")
             value = default_value
@@ -1022,7 +1022,7 @@ class MeasGUI:
             success = self.send_msg_retry(port, globals.MSG_C, ztmCMD.CMD_REQ_DATA.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_MEASUREMENTS.value)
             
             if success:
-                print("\n----------BEGINNING TIP APPROACH ALGORITHM----------")
+                #print("\n----------BEGINNING TIP APPROACH ALGORITHM----------")
                 # Resets visual graph and data
                 self.parent.graph_gui.reset_graph()
                 
@@ -1043,12 +1043,12 @@ class MeasGUI:
                     if(curr_data >= curr_setpoint):
                         adjust_success = self.send_msg_retry(port, globals.MSG_D, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, globals.EIGHTH_STEP, globals.DIR_DOWN, globals.NUM_STEPS)
                         if adjust_success:
-                            print("ADJUST SUCCESS.")
+                            #print("ADJUST SUCCESS.")
                             tunneling_steps -= globals.INC_EIGHT
                             plt.ioff()
                             return 1, curr_data, vb_V, vp_V, tunneling_steps
                         else:
-                            print("Did not receive correct response back.")
+                            #print("Did not receive correct response back.")
                             messagebox.showerror("ERROR", "Error. Unable to adjust the stepper motor.")
                     else:
                         # Update the graph with new data
@@ -1060,7 +1060,7 @@ class MeasGUI:
                     self.parent.graph_gui.update_graph()
                 STOP_BTN_FLAG = 0
             else:
-                print("Did not receive correct response back.")
+                #print("Did not receive correct response back.")
                 messagebox.showerror("ERROR", "Error. Did not receive correct response back.")
             
                 # Turns interactive graph off
@@ -1117,7 +1117,7 @@ class MeasGUI:
                 # Send message to update vpiezo
                 while(piezoSet == False):
                     piezoSet = self.send_msg_retry(port, globals.MSG_A, ztmCMD.CMD_PIEZO_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, 0, 0, vpiezo_tip)
-        print(f"\nNew vpiezo for tip approach: {vpiezo_tip} V\nStep Count: {steps}")
+        #print(f"\nNew vpiezo for tip approach: {vpiezo_tip} V\nStep Count: {steps}")
         return vpiezo_tip, steps
                 
     def piezo_full_extend(self):
@@ -1129,7 +1129,7 @@ class MeasGUI:
         """
         global vpiezo_tip
 
-        print("Piezo is extending...")
+        #print("Piezo is extending...")
         
         port = self.parent.serial_ctrl.serial_port
         piezoSet = False
@@ -1153,7 +1153,7 @@ class MeasGUI:
         """
         global vpiezo_tip
         
-        print("Piezo is retracting...")
+        #print("Piezo is retracting...")
         
         port = self.parent.serial_ctrl.serial_port
         piezoSet = False
@@ -1186,7 +1186,7 @@ class MeasGUI:
         success = self.send_msg_retry(port, globals.MSG_E, ztmCMD.CMD_VBIAS_SET_SINE.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, globals.CAP_APPROACH_AMPL, globals.CAP_APPROACH_FREQ)
         
         if success:
-            print("\n----------BEGINNING CAP APPROACH ALGORITHM----------")
+            #print("\n----------BEGINNING CAP APPROACH ALGORITHM----------")
             # Resets visual graph and data
             self.parent.graph_gui.reset_graph()
             
@@ -1198,7 +1198,7 @@ class MeasGUI:
             # Get first fft measurement
             fft_meas = self.get_fft_peak()
             if fft_meas is None:
-                print("ERROR. Unable to start cap approach due to invalid FFT measurements.")
+                #print("ERROR. Unable to start cap approach due to invalid FFT measurements.")
                 return
             
             for i in range(globals.DELAY_LINE_LEN + 1): delay_line[i] = fft_meas
@@ -1235,10 +1235,10 @@ class MeasGUI:
                         detector_count = 0
                         notDone = 1
                         success_move = self.send_msg_retry(port, globals.MSG_D, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, globals.EIGHTH_STEP, globals.DIR_DOWN, globals.CAP_APPROACH_NUM_STEPS)
-                        if success_move:
-                            print("SUCCESS. Stepper motor moved in cap approach.")
-                        else:
-                            print("ERROR. Stepper motor failed to move in capacitance approach.")
+                        #if success_move:
+                            #print("SUCCESS. Stepper motor moved in cap approach.")
+                        #else:
+                            #print("ERROR. Stepper motor failed to move in capacitance approach.")
                     self.update_label()
                     self.parent.graph_gui.update_graph()
                 else:
@@ -1249,10 +1249,10 @@ class MeasGUI:
             self.enable_widgets()
             self.parent.clear_buffer()
             success_stop_vbias = self.send_msg_retry(port, globals.MSG_C, ztmCMD.CMD_VBIAS_STOP_SINE.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value)
-            if success_stop_vbias:
-                print("SUCCESS. Sinusoidal vbias has stopped.")
-            else:
-                print("ERROR. Sinusoidal vbias failed to stop.")
+            #if success_stop_vbias:
+                #print("SUCCESS. Sinusoidal vbias has stopped.")
+            #else:
+                #print("ERROR. Sinusoidal vbias failed to stop.")
                 
     def get_fft_peak(self):
         """
@@ -1265,7 +1265,7 @@ class MeasGUI:
         
         result = self.sendMsgCapApproach(port, globals.MSG_C, ztmCMD.CMD_REQ_FFT_DATA.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_FFT_DATA.value)
         if result is None:
-            print("ERROR. Failed to retrieve FFT data.")
+            #print("ERROR. Failed to retrieve FFT data.")
             return None
         else:
             peak, _ = result
@@ -1339,7 +1339,7 @@ class MeasGUI:
         if tip_app_total_steps == curr_pos_total_steps:
                 self.enable_periodics()
         else:
-            print("\n----------BEGINNING TIP APPROACH ALGORITHM----------")
+            #print("\n----------BEGINNING TIP APPROACH ALGORITHM----------")
             
             # check for port connection
             port = self.parent.serial_ctrl.serial_port
@@ -1358,8 +1358,8 @@ class MeasGUI:
                 curr_setpoint = float(curr_setpoint)
             except (TypeError, ValueError):
                 curr_setpoint = 0.5     # set to default value
-                print("Current setpoint set to default value.")
-            print(f"Current setpoint: {curr_setpoint}")
+                #print("Current setpoint set to default value.")
+            #print(f"Current setpoint: {curr_setpoint}")
             
             # error check sample bias
             if not vbias_done_flag:
@@ -1368,7 +1368,7 @@ class MeasGUI:
                     vbias_save = float(vbias_save)      # check if there is a sample bias user input
                 except (TypeError, ValueError):
                     vbias_save = 1.0                    # set to default value
-                    print("Sample bias set to default value. Sending sample bias message to MCU.")
+                    #print("Sample bias set to default value. Sending sample bias message to MCU.")
                 
                 # send samplel bias msg and retrieve done
                 success = self.send_msg_retry(port, MSG_A, ztmCMD.CMD_SET_VBIAS.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, 0, vbias_save, 0)
@@ -1377,14 +1377,14 @@ class MeasGUI:
                     vbias_done_flag = 1
                 else:
                     vbias_done_flag = 0
-            print(f"Sample bias: {vbias_save}")
+            #print(f"Sample bias: {vbias_save}")
             
             # error check sample rate
             if not sample_rate_done_flag:
                 # get sample rate
                 if sample_rate_save == None:
                     sample_rate_save = 25000    # set to default vaue
-                    print("Sample rate set to default value. Sending sample rate message to MCU.")
+                    #print("Sample rate set to default value. Sending sample rate message to MCU.")
                     
                 # send sample rate msg and receive done
                 success = self.send_msg_retry(port, MSG_B, ztmCMD.CMD_SET_ADC_SAMPLE_RATE.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value,  sample_rate_save)
@@ -1393,7 +1393,7 @@ class MeasGUI:
                     sample_rate_done_flag = 1
                 else:
                     sample_rate_done_flag = 0
-            print(f"Sample rate: {sample_rate_save}")
+            #print(f"Sample rate: {sample_rate_save}")
             
             
             # error check sample size - CURRENTLY WORKING ON
@@ -1403,7 +1403,7 @@ class MeasGUI:
                     sample_size_save = int(sample_size_save)      # check if there is a sample bias user input
                 except (TypeError, ValueError):
                     sample_size_save = int(100)                    # set to default value
-                    print("Sample size set to default value. Sending sample size message to MCU.")
+                    #print("Sample size set to default value. Sending sample size message to MCU.")
                 
                 # send sample size msg and retrieve done
                 success = self.send_msg_retry(port, MSG_B, ztmCMD.CMD_SET_ADC_SAMPLE_SIZE.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, sample_size_save)
@@ -1412,7 +1412,7 @@ class MeasGUI:
                     sample_size_done_flag = 1
                 else:
                     sample_size_done_flag = 0
-            print(f"Sample size: {sample_size_save}") 
+            #print(f"Sample size: {sample_size_save}") 
             
             # sample_size_save = 10 # for debugging purposes, delete later
             
@@ -1423,7 +1423,7 @@ class MeasGUI:
             # 6. b) Keep going until read current reaches current setpoint (if curr_data < curr_setpoint = keep reading)
             ######### NOTE: put in function for vpiezo/delta v error check and TIP APPROACH #########
             if vbias_done_flag and sample_rate_done_flag and sample_size_done_flag:
-                print("\n********** ADD SEAN'S TIP-APPROACH HERE **********")
+                #print("\n********** ADD SEAN'S TIP-APPROACH HERE **********")
 
                 # when completed, tip_approach_done_flag = 1
                     # BUT add a condition to check if the done flag already = 1
@@ -1450,8 +1450,8 @@ class MeasGUI:
             enable_data_success = self.send_msg_retry(port, globals.MSG_C, ztmCMD.CMD_PERIODIC_DATA_ENABLE.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value)
             
             if enable_data_success:
-                print("\n********** BEGIN ENABLING PERIODIC DATA **********")
-                print("Received DONE.")
+                #print("\n********** BEGIN ENABLING PERIODIC DATA **********")
+                #print("Received DONE.")
                 # Resets visual graph and data
                 self.parent.graph_gui.reset_graph() 
                 # Turns interactive graph on
@@ -1467,13 +1467,13 @@ class MeasGUI:
                     
                     response = self.parent.serial_ctrl.ztmGetMsg()
                     if response[2] == ztmSTATUS.STATUS_MEASUREMENTS.value or response[2] == ztmSTATUS.STATUS_ACK.value:
-                        print(f"Received correct response: {response[2]}")
+                        #print(f"Received correct response: {response[2]}")
                         
                         curr_data = round(struct.unpack('f', bytes(response[3:7]))[0], 3) 
                         cStr = str(curr_data) 
-                        print("Received values\n\tCurrent: " + cStr + " nA\n")
-                    else:
-                        print(f"Did not receive correct response: {response[2]}")
+                        #print("Received values\n\tCurrent: " + cStr + " nA\n")
+                    #else:
+                        #print(f"Did not receive correct response: {response[2]}")
                     
                     # Use this to call update_graph() everytime a data point is recieved
                     self.adc_curr = curr_data
@@ -1481,7 +1481,7 @@ class MeasGUI:
                     self.parent.graph_gui.update_graph()
                 STOP_BTN_FLAG = 0    
             else:
-                print("Did not receive DONE.")
+                #print("Did not receive DONE.")
                 messagebox.showerror("ERROR.", "Failed to enable periodic data. Try again.")
 
             # Turns interactive graph off
@@ -1507,7 +1507,7 @@ class MeasGUI:
                 vpzo_value = globals.VPIEZO_DELTA_MIN
                 messagebox.showerror("Invalid Value", "Invalid input. Voltage is too small, defaulted to 3 mV.")
                 
-            print(f"Saved vpiezo value: {vpzo_value}")
+            #print(f"Saved vpiezo value: {vpzo_value}")
             
             self.label12.configure(text=f"{0:.3f} ")
             self.label10.delete(0, END)
@@ -1543,13 +1543,13 @@ class MeasGUI:
         if self.check_connection():
             return
         else:
-            print("\n----------SENDING PIEZO ADJUST----------")
+            #print("\n----------SENDING PIEZO ADJUST----------")
                 
             port = self.parent.serial_ctrl.serial_port
             
             delta_v_float = self.get_float_value(self.label10, 1.0, "Piezo Voltage")
             
-            print(f"Saved delta V: {delta_v_float} V")
+            #print(f"Saved delta V: {delta_v_float} V")
             
             if globals.VPIEZO_MIN <= self.total_voltage <= globals.VPIEZO_MAX:
                 if self.vpzo_up:
@@ -1605,7 +1605,7 @@ class MeasGUI:
                     return
                 else:
                     messagebox.showinfo("Information", f"Did not process change in value within {globals.TIMEOUT} period. Please try again.")
-                    print("Not received.")
+                    #print("Not received.")
                 
     def saveCurrentSetpoint(self, _=None): 
         """
@@ -1625,7 +1625,7 @@ class MeasGUI:
             try:
                 curr_setpoint = float(self.label3.get())
                 if 0.1 <= curr_setpoint <= 10:
-                    print(f"\nSaved current setpoint value: {curr_setpoint} nA")
+                    #print(f"\nSaved current setpoint value: {curr_setpoint} nA")
                     return True
                 else:
                     self.label3.delete(0,END)
@@ -1652,7 +1652,7 @@ class MeasGUI:
         else:
             try:
                 self.curr_offset = float(self.label4.get())
-                print(f"\nSaved current offset value: {self.curr_offset} nA")
+                #print(f"\nSaved current offset value: {self.curr_offset} nA")
                 self.root.focus()
             except ValueError:
                 self.root.focus()
@@ -1680,7 +1680,7 @@ class MeasGUI:
             self.root.focus()
             port = self.parent.serial_ctrl.serial_port
             try:
-                print("\n----------SENDING SAMPLE BIAS----------")
+                #print("\n----------SENDING SAMPLE BIAS----------")
                 
                 vbias_save = self.get_float_value(self.label6, 1.0, "Voltage Bias")
                 
@@ -1705,7 +1705,7 @@ class MeasGUI:
                 
                 if isinstance(success, bool):       # if we received a DONE msg
                     if success:
-                        print(f"Saved sample bias: {vbias_save} V")
+                        #print(f"Saved sample bias: {vbias_save} V")
                         return
                     else:
                         messagebox.showinfo("Information", "Did not process change in value within timeout period. Please try again.")
@@ -1719,11 +1719,11 @@ class MeasGUI:
                     _, vbias_new, _ = self.parent.ztm_serial.unpackRxMsg(testMsg)
                     
                     if abs(vbias_new - vbias_save) <= 0.05 * vbias_save:
-                        print(f"Saved sample bias: {vbias_save} V")
+                        #print(f"Saved sample bias: {vbias_save} V")
                         return
                     else:
                         messagebox.showinfo("Information", "Did not process change in value within timeout period. Please try again.")
-                        print("Not received.")
+                        #print("Not received.")
                 else:
                     messagebox.showinfo("Information", "Did not process change in value within timeout period. Please try again.")
                     
@@ -1745,7 +1745,7 @@ class MeasGUI:
         if self.check_connection():
             return
         else:
-            print("\n----------SENDING SAMPLE RATE----------")
+            #print("\n----------SENDING SAMPLE RATE----------")
             port = self.parent.serial_ctrl.serial_port
             
             if self.sample_rate_var.get() == "25 kHz":
@@ -1758,7 +1758,7 @@ class MeasGUI:
                 sample_rate_save = 10000
             elif self.sample_rate_var.get() == "5 kHz":
                 sample_rate_save = 5000
-            print(f"Saved sample rate value: {self.sample_rate_var.get()}")
+            #print(f"Saved sample rate value: {self.sample_rate_var.get()}")
 
             # Clear buffer
             self.parent.clear_buffer()
@@ -1793,7 +1793,7 @@ class MeasGUI:
             self.root.focus()
             port = self.parent.serial_ctrl.serial_port
             try:
-                print("\n----------SENDING SAMPLE SIZE----------")
+                #print("\n----------SENDING SAMPLE SIZE----------")
                 sample_size_save = int(self.sample_size.get())
                 if sample_size_save not in range(1, 1025):
                     if sample_size_save < 1:
@@ -1808,7 +1808,7 @@ class MeasGUI:
                     self.sample_size.delete(0, END)
                     self.sample_size.insert(0, sample_size_str)
                 
-                print(f"Saved sample size value: {sample_size_save}")
+                #print(f"Saved sample size value: {sample_size_save}")
 
                 # Clear buffer
                 self.parent.clear_buffer()
@@ -1854,9 +1854,9 @@ class MeasGUI:
                 self.fine_adjust_step_size = globals.EIGHTH_STEP
                 approx_step_distance = globals.EIGHTH_STEP_DISTANCE  
             
-            print("\n---------- SENDING STEPPER MOTOR STEP SIZE ----------")
+            #print("\n---------- SENDING STEPPER MOTOR STEP SIZE ----------")
             # Print confirmation to terminal
-            print(f"\nSaved fine adjust step size: {self.coarse_adjust_var.get()} : {approx_step_distance} nm")
+            #print(f"\nSaved fine adjust step size: {self.coarse_adjust_var.get()} : {approx_step_distance} nm")
 
             # Display approx distance per step size to user
             self.label5.configure(text=f"{approx_step_distance:.3f} nm")
@@ -1902,7 +1902,7 @@ class MeasGUI:
                 self.step_down  = 0
                 dir_name = "DOWN"
                 
-            print(f"\n----------SENDING STEPPER MOTOR {dir_name}----------")
+            #print(f"\n----------SENDING STEPPER MOTOR {dir_name}----------")
             # Clear buffer
             self.parent.clear_buffer()
                         
@@ -1926,7 +1926,7 @@ class MeasGUI:
         if self.check_connection():
             return
         else:
-            print("\n----------SETTING NEW HOME POSITION----------")
+            #print("\n----------SETTING NEW HOME POSITION----------")
             port = self.parent.serial_ctrl.serial_port
             
             # Clear buffer
@@ -1940,7 +1940,7 @@ class MeasGUI:
             
             if curr_pos_total_steps:
                 home_pos_total_steps = curr_pos_total_steps
-                print(f"Saved home position (in number of steps): {home_pos_total_steps}")
+                #print(f"Saved home position (in number of steps): {home_pos_total_steps}")
                 return
             else:
                 messagebox.showinfo("Information", "Did not process change in value within timeout period. Please try again.")
@@ -1954,7 +1954,7 @@ class MeasGUI:
         if self.check_connection():
             return
         else:
-            print("\n----------RETURN TO HOME POSITION----------")
+            #print("\n----------RETURN TO HOME POSITION----------")
             # Request total step for stepper motor from MCU
             port = self.parent.serial_ctrl.serial_port
             
@@ -1981,33 +1981,33 @@ class MeasGUI:
                 if home_pos_total_steps > curr_pos_total_steps:
                     return_dir = 1 # down
                     num_of_steps = (home_pos_total_steps - curr_pos_total_steps) * 8
-                    print(f"Home position is lower than the current position by: {num_of_steps} (# of 1/8 steps)")
+                    #print(f"Home position is lower than the current position by: {num_of_steps} (# of 1/8 steps)")
 
                     # Send command to stepper motor for number of steps between current position and home position
                     num_of_steps_int = int(num_of_steps)
                     success = self.send_msg_retry(self.parent.serial_ctrl.serial_port, globals.MSG_D, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, globals.EIGHTH_STEP, return_dir, num_of_steps_int)
-                    if success:
-                        print("Done returning to home position.")
-                    else:
-                        print("Failed to return to home position.")
+                    #if success:
+                        #print("Done returning to home position.")
+                    #else:
+                        #print("Failed to return to home position.")
 
                 # If home position is higher than the tip's current position
                 elif home_pos_total_steps < curr_pos_total_steps:
                     return_dir = 0 # up
                     num_of_steps = (curr_pos_total_steps - home_pos_total_steps) * 8
-                    print(f"Home position is higher than the current position by: {num_of_steps} (# of 1/8) steps")
+                    #print(f"Home position is higher than the current position by: {num_of_steps} (# of 1/8) steps")
 
                     num_of_steps_int = int(num_of_steps)
                     # Send command to stepper motor for number of steps between current position and home position
                     success = self.send_msg_retry(self.parent.serial_ctrl.serial_port, globals.MSG_D, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, globals.EIGHTH_STEP, return_dir, num_of_steps_int)
-                    if success:
-                        print("Done returning to home position.")
-                    else:
-                        print("Failed to return to home position.")
+                    #if success:
+                        #print("Done returning to home position.")
+                    #else:
+                        #print("Failed to return to home position.")
                 curr_pos_total_steps = self.send_msg_retry(self.parent.serial_ctrl.serial_port, globals.MSG_C, ztmCMD.CMD_REQ_STEP_COUNT.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_STEP_COUNT.value)
             else:
                 messagebox.showinfo("Information", "Did not process change in value within timeout period. Please try again.")
-                print("Failed to receive a response from MCU.")
+                #print("Failed to receive a response from MCU.")
 
     
     def check_connection(self):
