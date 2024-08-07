@@ -9,12 +9,14 @@ import serial
 import os
 import struct
 import time
-import queue
+from multiprocessing import Process, Queue
 import csv
 #import sys
 import datetime
 import threading
+import math
 import matplotlib.dates as mdates
+import multiprocessing
 import matplotlib.pyplot as plt
 #import matplotlib.animation as animation
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -337,46 +339,11 @@ class MeasGUI:
         # Local variables for stepper motor adjusting
         self.step_up    = 0
         self.step_down  = 0
-
-
-        '''    
-        # Create a frame to hold the label and text box
-        self.console_frame = ctk.CTkFrame(self.root, width=500, height=250)
-        self.console_frame.grid(row=2, column=11, padx=20, pady=10, rowspan=13, sticky="nsew")
-
-        # Create a label for the console panel
-        self.console_label = ctk.CTkLabel(self.console_frame, text="Console Window", anchor="w", text_color="black", bg_color="#eeeeee")
-        self.console_label.pack(fill="x", pady=(0, 5))
-
-        # Create a text widget to serve as the console panel
-        self.console_text = ctk.CTkTextbox(self.console_frame, height=500, width=250)
-        self.console_text.pack(fill="both", expand=True)
-        self.console_text.configure(state='disabled')
-
-        # Set font size for the console text
-        self.console_text.configure(font=("Helvetica", 10))  # Change font size as needed
-
-        # Redirect stdout to the console text widget
-        sys.stdout = self
-        sys.stderr = self
-        '''
         
         # Initialize measurement widgets
         self.initialize_widgets()
         self.update_label()
 
-    def write(self, message):
-        """
-        Writes a message to the console text widget.
-
-        Args:
-            message (str): The message to be written to the console text widget.
-        """
-        self.console_text.configure(state='normal')
-        self.console_text.insert(tk.END, message)
-        self.console_text.see(tk.END)  # Scroll to the end
-        self.console_text.configure(state='disabled')
-        
     def initialize_widgets(self):
         """
         Initializes widgets needed for data.
@@ -478,10 +445,13 @@ class MeasGUI:
         self.add_btn_image1 = ctk.CTkImage(Image.open("Images/Vpzo_Down_Btn.png"), size=(40,40))
         self.add_btn_image2 = ctk.CTkImage(Image.open("Images/Fine_Adjust_Btn_Up.png"), size=(40,40))
         self.add_btn_image3 = ctk.CTkImage(Image.open("Images/Fine_Adjust_Btn_Down.png"), size=(40,40))
-        #self.add_btn_image4 = ctk.CTkImage(Image.open("Images/Start_Btn.png"), size=(90,35))
-        #self.add_btn_image5 = ctk.CTkImage(Image.open("Images/Stop_Btn.png"), size=(90,35))
+        self.add_btn_image4 = ctk.CTkImage(Image.open("Images/Start_Tip_Approach.png"), size=(100,35))
+        self.add_btn_image5 = ctk.CTkImage(Image.open("Images/Stop_Btn.png"), size=(90,35))
         self.add_btn_image6 = ctk.CTkImage(Image.open("Images/Acquire_IV.png"), size=(90,35))
         self.add_btn_image7 = ctk.CTkImage(Image.open("Images/Acquire_IZ.png"), size=(90,35))
+        self.add_btn_image12 = ctk.CTkImage(Image.open("Images/Start_Cap_Approach.png"), size=(100,45))
+        self.add_btn_image13 = ctk.CTkImage(Image.open("Images/Start_Periodic_Data.png"), size=(100,45))
+        
     
         self.add_btn_image8 = ctk.CTkImage(Image.open("Images/Stop_LED.png"), size=(35,35))
         self.add_btn_image9 = ctk.CTkImage(Image.open("Images/Start_LED.png"), size=(35,35))
@@ -491,10 +461,10 @@ class MeasGUI:
         
         # create buttons with proper sizes															   
         self.start_stop_frame = LabelFrame(self.root, text="Start/Stop Processes", labelanchor="n", padx=10, pady=10, bg="#eeeeee")
-        self.tip_approach_btn = ctk.CTkButton(self.start_stop_frame,text="Start Tip Approach", width=180, height=45, fg_color="#ff8000", text_color="black", bg_color="#eeeeee", corner_radius=10, command=self.start_tip_appr)
-        self.cap_approach_btn = ctk.CTkButton(self.start_stop_frame,text="Start Capacitance Approach", width=90, height=45, fg_color="#ffff00", text_color="black", bg_color="#eeeeee", corner_radius=10, command=self.start_cap_appr)
-        self.enable_periodics_btn = ctk.CTkButton(self.start_stop_frame, text="Start Periodic Data Transfer", width=90, height=45, fg_color="#00cc00", text_color="black", bg_color="#eeeeee", corner_radius=10, command=self.start_periodics)
-        self.stop_btn = ctk.CTkButton(self.start_stop_frame, text="STOP", width=90, height=75, fg_color="#D51717", text_color="black", bg_color="#eeeeee", corner_radius=10, command=self.stop_reading)
+        self.tip_approach_btn = ctk.CTkButton(self.start_stop_frame, image=self.add_btn_image4, text="", width=100, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.start_tip_appr)
+        self.cap_approach_btn = ctk.CTkButton(self.start_stop_frame, image=self.add_btn_image12, text="", width=100, height=45, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.start_cap_appr)
+        self.enable_periodics_btn = ctk.CTkButton(self.start_stop_frame, image = self.add_btn_image13, text="", width=100, height=45, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.start_periodics)
+        self.stop_btn = ctk.CTkButton(self.start_stop_frame, image=self.add_btn_image5, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.stop_reading)
         self.stop_led_btn = ctk.CTkLabel(self.start_stop_frame, image=self.add_btn_image8, text="", width=35, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0)
         self.start_led_btn = ctk.CTkLabel(self.start_stop_frame, image=self.add_btn_image9, text="", width=30, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0)
         
@@ -607,7 +577,7 @@ class MeasGUI:
         Method to change the LEDs upon the user pressing the start button.
         """
         self.stop_led_btn.grid_remove()
-        self.start_led_btn.grid(row=3, column=10, sticky="e")
+        self.start_led_btn.grid(row=0, column=1, sticky="")
     
     def stop_leds(self):
         """
@@ -1303,135 +1273,57 @@ class MeasGUI:
         '''
 
     '''
-    def tip_approach(self):
+    def enable_periodics(self):
         """
-        Function to send user-inputted parameters to MCU, sample bias, sample rate, sample
-        size, current setpoint*
-        ### WILL BE CHANGING ###
-        
-        This function consists of the tip approach algorithm and receiving periodic data
-        once the tip approach algorithm successfully finishes.
+        Function to enable and read periodic data from the MCU.
         """
-        # access global variables
-        global curr_setpoint
+        global STOP_BTN_FLAG
         global curr_data
-        
-        global vbias_save
-        global vbias_done_flag
-        
-        global sample_rate_save
-        global sample_rate_done_flag
-    
-        global sample_size_save    
-        global sample_size_done_flag
-        
-        global tip_app_total_steps
-        global curr_pos_total_steps
-        
-        # local variable
-        self.count = 0
-        
-        # inside of this function updates curr_pos_total_steps
-        curr_pos_total_steps = self.send_msg_retry(self.parent.serial_ctrl.serial_port, globals.MSG_C, ztmCMD.CMD_REQ_STEP_COUNT.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value)
         
         if self.check_connection():
             return
-        if tip_app_total_steps == curr_pos_total_steps:
-                self.enable_periodics()
         else:
-            #print("\n----------BEGINNING TIP APPROACH ALGORITHM----------")
-            
-            # check for port connection
             port = self.parent.serial_ctrl.serial_port
-                
-            # Note: Disable entry widgets when seeking
+            enable_data_success = self.send_msg_retry(port, globals.MSG_C, ztmCMD.CMD_PERIODIC_DATA_ENABLE.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value)
             
-            ########## WHEN USER PRESSES START BTN ##########
-            # 1. Check if user values are set, if not set them to a default value (vpzo = 1, vbias = 1, ***current = 0.5)
-            # 2. If user input values for vpzo, vbias, and sample rate are not set, send messages for user inputs to MCU
-            # 3. a) Verify we have DONE msgs received from MCU (vpzo and vbias)
-            # 3. b) If DONE msgs not rcvd, MCU will send RESEND status and GUI will resend until we have DONE from MCU
-            
-            # NOT NEEDED ANYMORE(?)
-            # error check current setpoint
-            try:
-                curr_setpoint = float(curr_setpoint)
-            except (TypeError, ValueError):
-                curr_setpoint = 0.5     # set to default value
-                #print("Current setpoint set to default value.")
-            #print(f"Current setpoint: {curr_setpoint}")
-            
-            # error check sample bias
-            if not vbias_done_flag:
-                # get vbias value
-                try:
-                    vbias_save = float(vbias_save)      # check if there is a sample bias user input
-                except (TypeError, ValueError):
-                    vbias_save = 1.0                    # set to default value
-                    #print("Sample bias set to default value. Sending sample bias message to MCU.")
-                
-                # send samplel bias msg and retrieve done
-                success = self.send_msg_retry(port, MSG_A, ztmCMD.CMD_SET_VBIAS.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, 0, vbias_save, 0)
-                
-                if success:
-                    vbias_done_flag = 1
-                else:
-                    vbias_done_flag = 0
-            #print(f"Sample bias: {vbias_save}")
-            
-            # error check sample rate
-            if not sample_rate_done_flag:
-                # get sample rate
-                if sample_rate_save == None:
-                    sample_rate_save = 25000    # set to default vaue
-                    #print("Sample rate set to default value. Sending sample rate message to MCU.")
-                    
-                # send sample rate msg and receive done
-                success = self.send_msg_retry(port, MSG_B, ztmCMD.CMD_SET_ADC_SAMPLE_RATE.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value,  sample_rate_save)
-                
-                if success:
-                    sample_rate_done_flag = 1
-                else:
-                    sample_rate_done_flag = 0
-            #print(f"Sample rate: {sample_rate_save}")
-            
-            
-            # error check sample size - CURRENTLY WORKING ON
-            if not sample_size_done_flag:
-                # get sample size value
-                try:
-                    sample_size_save = int(sample_size_save)      # check if there is a sample bias user input
-                except (TypeError, ValueError):
-                    sample_size_save = int(100)                    # set to default value
-                    #print("Sample size set to default value. Sending sample size message to MCU.")
-                
-                # send sample size msg and retrieve done
-                success = self.send_msg_retry(port, MSG_B, ztmCMD.CMD_SET_ADC_SAMPLE_SIZE.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, sample_size_save)
-                
-                if success:
-                    sample_size_done_flag = 1
-                else:
-                    sample_size_done_flag = 0
-            #print(f"Sample size: {sample_size_save}") 
-            
-            # sample_size_save = 10 # for debugging purposes, delete later
-            
-            
-            # 4. Once we have all DONE msgs, request data msg from GUI to MCU
-            # 5. GUI waits to receive data
-            # 6. a) GUI receives data from MCU (ADC current- possibly vbias, vpzo, and distance)
-            # 6. b) Keep going until read current reaches current setpoint (if curr_data < curr_setpoint = keep reading)
-            ######### NOTE: put in function for vpiezo/delta v error check and TIP APPROACH #########
-            if vbias_done_flag and sample_rate_done_flag and sample_size_done_flag:
-                #print("\n********** ADD SEAN'S TIP-APPROACH HERE **********")
+            if enable_data_success:
+                self.parent.graph_gui.reset_graph()
+                plt.ion()  # Turn on interactive mode
 
-                # when completed, tip_approach_done_flag = 1
-                    # BUT add a condition to check if the done flag already = 1
-                # move on to periodic data routine
+                self.startup_leds()
+                self.disable_widgets()
+
+                # Ensure the graph is set up and updated initially
+                self.parent.graph_gui.update_graph()
                 
-                tip_app_total_steps = self.send_msg_retry(self.parent.serial_ctrl.serial_port, globals.MSG_C, ztmCMD.CMD_REQ_STEP_COUNT.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value)
-                self.enable_periodics()
+                self.collect_data_periodically()  # Start the periodic data collection
+                
+            else:
+                messagebox.showerror("ERROR", "Failed to enable periodic data. Try again.")
+                plt.ioff()  # Turn off interactive mode
+
+    def collect_data_periodically(self):
+        global STOP_BTN_FLAG
+        global curr_data
+
+        if STOP_BTN_FLAG == 1:
+            plt.ioff()  # Turn off interactive mode
+            return  # Stop collecting data
+
+        response = self.parent.serial_ctrl.ztmGetMsg()
+        if response:
+            if response[2] == ztmSTATUS.STATUS_MEASUREMENTS.value or response[2] == ztmSTATUS.STATUS_ACK.value:
+                curr_data = round(struct.unpack('f', bytes(response[3:7]))[0], 3)
+                #print(f"Collected data: {curr_data}")
+                self.update_label()
+                self.parent.graph_gui.update_graph()
+            else:
+                print("No valid response received.")
+                
+        # Schedule the next data collection after 50 ms
+        self.root.after(50, self.collect_data_periodically)
     '''
+
     
     def enable_periodics(self):
         """
@@ -1471,13 +1363,14 @@ class MeasGUI:
                             #print(f"Received correct response: {response[2]}")
                             
                             curr_data = round(struct.unpack('f', bytes(response[3:7]))[0], 3) 
-                            cStr = str(curr_data) 
+                            #self.parent.graph_gui.update_data(curr_data)
+                            #cStr = str(curr_data) 
                             #print("Received values\n\tCurrent: " + cStr + " nA\n")
                         #else:
                             #print(f"Did not receive correct response: {response[2]}")
                     
                     # Use this to call update_graph() everytime a data point is recieved
-                    self.adc_curr = curr_data
+                    #self.adc_curr = curr_data
                     self.update_label()
                     self.parent.graph_gui.update_graph()
                 STOP_BTN_FLAG = 0    
@@ -1487,7 +1380,8 @@ class MeasGUI:
 
             # Turns interactive graph off
             plt.ioff()      
-             
+
+       
     def savePiezoValue(self, _=None):         
         """
         Method to save the piezo voltage delta value; the
@@ -2156,6 +2050,89 @@ class MeasGUI:
 ###################################################################################################################
 #                                                 GraphGUI CLASS                                                  #
 ###################################################################################################################
+'''
+class GraphGUI:
+    def __init__(self, root, meas_gui):
+        self.root = root
+        self.meas_gui = meas_gui
+
+        # Initialize plot
+        self.fig, self.ax = plt.subplots()
+        self.ax.set_xlabel('Time (s)')
+        self.ax.set_ylabel('Current (nA)')
+
+        # initializes graphical data
+        self.y_data = []
+        self.x_data = []
+        self.line, = self.ax.plot([], [], 'r-')
+
+        # Create a canvas to embed the figure in Tkinter
+        self.canvas = FigureCanvasTkAgg(self.fig, master=self.root)
+        self.canvas.get_tk_widget().grid(row=0, column=3, columnspan=6, rowspan=10, padx=10, pady=5)
+
+        # Queue for sharing data between processes
+        self.data_queue = multiprocessing.Queue()
+
+        # Process control flag
+        self.process = None
+
+    def start_graph(self):
+        if self.process is None:
+            self.process = multiprocessing.Process(target=self.run_graph, args=(self.data_queue,))
+            self.process.start()
+            self.root.after(50, self.update_graph)
+
+    def stop_graph(self):
+        if self.process is not None:
+            self.process.terminate()
+            self.process = None
+
+    def run_graph(self, data_queue):
+        while True:
+            # Simulate data collection
+            response = self.parent.serial_ctrl.ztmGetMsg()
+            if response:
+                if response[2] == ztmSTATUS.STATUS_MEASUREMENTS.value or response[2] == ztmSTATUS.STATUS_ACK.value:
+                    #print(f"Received correct response: {response[2]}")
+                    
+                    curr_data = round(struct.unpack('f', bytes(response[3:7]))[0], 3) 
+                    time_now = datetime.datetime.now()
+                    # Put data in the queue to send it back to the main process
+                    data_queue.put((curr_data, time_now))
+
+            time.sleep(0.1)  # Control update rate
+
+    def update_graph(self):
+        # Process any data received from the graphing process
+        while not self.data_queue.empty():
+            curr_data, time_now = self.data_queue.get()
+            self.y_data.append(curr_data)
+            self.x_data.append(time_now)
+
+        if len(self.y_data) % 100 == 0:  # Update every 100 data points
+            self.line.set_data(self.x_data, self.y_data)
+            self.ax.relim()
+            self.ax.autoscale_view()
+            self.ax.set_xlim(datetime.datetime.now() - datetime.timedelta(seconds=globals.ROLLOVER_GRAPH_TIME),
+                             datetime.datetime.now())
+            self.canvas.draw()
+            self.canvas.flush_events()
+
+        if self.process is not None:
+            self.root.after(50, self.update_graph)  # Schedule next update
+
+    def reset_graph(self):
+        self.ax.clear()
+        self.ax.set_xlabel('Time (s)')
+        self.ax.set_ylabel('Tunneling Current (nA)')
+        self.y_data = []
+        self.x_data = []
+        self.line, = self.ax.plot([], [], 'r-')
+        self.canvas.draw()
+        self.canvas.flush_events()
+'''
+
+
 class GraphGUI:
     """
     Function to initialize the data arrays and the graphical display.
@@ -2194,12 +2171,15 @@ class GraphGUI:
         the Piezo Voltage Sweep. The data points are appended to the data arrays.
         *Updates every 36ms
         """
+        # Global variables
         global curr_data
-
-        # Fetch current data from label 2
-        #current_data = self.meas_gui.get_current_label2()
-        #current_data = curr_data
+        global sample_size_save
         
+        # Local variables - calculate update interval based on sample size
+        A = 1900    # Scaling factor
+        k = 0.005   # Decay rate
+        B = 100     # Minimum interval
+
         # update data with next data points
         self.y_data.append(curr_data)
         time_now = datetime.datetime.now()
@@ -2209,10 +2189,6 @@ class GraphGUI:
         # append time to include milliseconds for exported data
         formatted_time = time_now.strftime('%H:%M:%S.%f')[:-3]
         self.time_data.append(formatted_time)
-        
-        # update graph with new data
-        #self.line.set_data(self.x_data, self.y_data)
-        #self.ax.relim()
 
         # set x-axis parameters
         self.ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M:%S'))
@@ -2220,18 +2196,26 @@ class GraphGUI:
         # controls how much time is shown within the graph, currently displays the most recent 10 seconds
         self.ax.set_xlim(datetime.datetime.now() - datetime.timedelta(seconds=globals.ROLLOVER_GRAPH_TIME), datetime.datetime.now())
         #self.ax.autoscale_view()
-        
-        # redraw canvas
-        #self.canvas.draw()
-        #self.canvas.flush_events()
-        
-        if len(self.y_data) % 100 == 0:  # Update every 100 data points
-            self.line.set_data(self.x_data, self.y_data)
-            self.ax.relim()
-            self.ax.autoscale_view()
-            self.canvas.draw()
-            self.canvas.flush_events()
 
+        if sample_size_save == None:
+            if len(self.y_data) % 100 == 0:  # Updates every 100 data points
+                self.line.set_data(self.x_data, self.y_data)
+                self.ax.relim()
+                self.ax.autoscale_view()
+                self.canvas.draw()
+                self.canvas.flush_events()
+        else:
+            # Calculate update interval using exponential decay
+            update_interval = int(A* math.exp(-k * sample_size_save) + B)
+            # Ensure interval doesn't fall below minimum value
+            update_interval = max(update_interval, B)
+            
+            if len(self.y_data) % update_interval == 0: 
+                self.line.set_data(self.x_data, self.y_data)
+                self.ax.relim()
+                self.ax.autoscale_view()
+                self.canvas.draw()
+                self.canvas.flush_events()
         
     def reset_graph(self):
         """
