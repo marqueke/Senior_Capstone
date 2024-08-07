@@ -75,7 +75,7 @@ class RootGUI:
         self.root = ctk.CTk()
         self.root.title("Homepage")
         self.root.config(bg="#eeeeee")
-        self.root.geometry("1300x650")
+        self.root.geometry("1100x650")
         #self.root.resizable(False, False)
         
         # Add a method to quit the application
@@ -189,11 +189,11 @@ class ComGUI:
         """
         Publishes the widgets for the communication manager.
         """
-        self.frame.grid(row=1, column=0, rowspan=3, columnspan=3, padx=5, pady=5)
-        self.label_com.grid(column=1, row=2)
-        self.drop_com.grid(column=2, row=2, padx=self.padx)
-        self.btn_refresh.grid(column=3, row=2, padx=self.padx)
-        self.btn_connect.grid(column=3, row=3, padx=self.padx)
+        self.frame.grid(row=0, column=0, rowspan=3, columnspan=3, padx=5, pady=5, sticky="n")
+        self.label_com.grid(column=1, row=0)
+        self.drop_com.grid(column=2, row=0, padx=self.padx)
+        self.btn_refresh.grid(column=3, row=0, padx=self.padx)
+        self.btn_connect.grid(column=3, row=1, padx=self.padx)
 
     def ComOptionMenu(self):
         """
@@ -447,8 +447,8 @@ class MeasGUI:
         self.add_btn_image3 = ctk.CTkImage(Image.open("Images/Fine_Adjust_Btn_Down.png"), size=(40,40))
         self.add_btn_image4 = ctk.CTkImage(Image.open("Images/Start_Tip_Approach.png"), size=(100,35))
         self.add_btn_image5 = ctk.CTkImage(Image.open("Images/Stop_Btn.png"), size=(90,35))
-        self.add_btn_image6 = ctk.CTkImage(Image.open("Images/Acquire_IV.png"), size=(90,35))
-        self.add_btn_image7 = ctk.CTkImage(Image.open("Images/Acquire_IZ.png"), size=(90,35))
+        self.add_btn_image6 = ctk.CTkImage(Image.open("Images/Acquire_IV.png"), size=(100,35))
+        self.add_btn_image7 = ctk.CTkImage(Image.open("Images/Acquire_IZ.png"), size=(100,35))
         self.add_btn_image12 = ctk.CTkImage(Image.open("Images/Start_Cap_Approach.png"), size=(100,45))
         self.add_btn_image13 = ctk.CTkImage(Image.open("Images/Start_Periodic_Data.png"), size=(100,45))
         
@@ -456,7 +456,7 @@ class MeasGUI:
         self.add_btn_image8 = ctk.CTkImage(Image.open("Images/Stop_LED.png"), size=(35,35))
         self.add_btn_image9 = ctk.CTkImage(Image.open("Images/Start_LED.png"), size=(35,35))
         
-        self.add_btn_image10 = ctk.CTkImage(Image.open("Images/Save_Home_Btn.png"), size=(90,35))
+        self.add_btn_image10 = ctk.CTkImage(Image.open("Images/Save_Home_Btn.png"), size=(100,35))
         self.add_btn_image11 = ctk.CTkImage(Image.open("Images/Return_Home_Btn.png"), size=(35,35))
         
         # create buttons with proper sizes															   
@@ -470,9 +470,9 @@ class MeasGUI:
         
         # sweep windows frame and buttons
         self.sweep_windows_frame = LabelFrame(self.root, text="Sweep Windows", labelanchor="n", padx=10, pady=10, bg="#eeeeee")
-        self.acquire_iv_btn = ctk.CTkButton(self.sweep_windows_frame, image=self.add_btn_image6, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.open_iv_window)
-        self.acquire_iz_btn = ctk.CTkButton(self.sweep_windows_frame, image=self.add_btn_image7, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.open_iz_window)
-        self.save_home_pos = ctk.CTkButton(self.root, image=self.add_btn_image10, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.save_home)
+        self.acquire_iv_btn = ctk.CTkButton(self.sweep_windows_frame, image=self.add_btn_image6, text="", width=100, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.open_iv_window)
+        self.acquire_iz_btn = ctk.CTkButton(self.sweep_windows_frame, image=self.add_btn_image7, text="", width=100, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.open_iz_window)
+        self.save_home_pos = ctk.CTkButton(self.root, image=self.add_btn_image10, text="", width=100, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.save_home)
         
         # Return/save home position buttons
         self.return_to_home_frame = LabelFrame(self.root, text="Return Home", labelanchor= "s", padx=10, pady=5, bg="#eeeeee")
@@ -697,7 +697,7 @@ class MeasGUI:
         self.fine_adjust_btn_down.grid(row=1, column=0)
         
         # start/stop buttons
-        self.start_stop_frame.grid(row=3, column=9, columnspan=4)
+        self.start_stop_frame.grid(row=0, column=9, columnspan=4, rowspan=4)
         self.tip_approach_btn.grid(row=0, column=0, sticky="e")
         self.cap_approach_btn.grid(row=1, column=0, sticky="e")
 
@@ -707,16 +707,16 @@ class MeasGUI:
         self.stop_led_btn.grid(row=0, column=1, sticky="")
 
         # sweep windows buttons
-        self.sweep_windows_frame.grid(row=8, column=10, rowspan=2)
-        self.acquire_iv_btn.grid(row=0, column=0, sticky="")
-        self.acquire_iz_btn.grid(row=1, column=0, sticky="")
+        self.sweep_windows_frame.grid(row=7, column=9, columnspan=4)
+        self.acquire_iv_btn.grid(row=0, column=0, sticky="e")
+        self.acquire_iz_btn.grid(row=0, column=1, padx=15, sticky="e")
 
         # save home position
-        self.save_home_pos.grid(row=8, column=9)
+        self.save_home_pos.grid(row=8, column=9, padx=10, sticky="w")
         
         # reset home position
-        self.return_to_home_frame.grid(row=9, column=9)
-        self.return_to_home_pos.grid(row=0, column=0)
+        self.return_to_home_frame.grid(row=9, column=9, sticky="w", padx=20)
+        self.return_to_home_pos.grid(row=0, column=0, padx=18)
 
     
     def send_msg_retry(self, port, msg_type, cmd, status, status_response, *params, max_attempts=globals.MAX_ATTEMPTS, sleep_time=globals.TENTH_SECOND):
