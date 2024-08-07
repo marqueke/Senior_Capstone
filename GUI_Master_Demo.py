@@ -12,7 +12,9 @@ import time
 import queue
 import csv
 #import sys
+import asyncio
 import datetime
+import cProfile
 import threading
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
@@ -94,40 +96,40 @@ class RootGUI:
         """
         #print("\nQUITTING APPLICATION")
         if self.serial_ctrl:
-            self.serial_ctrl.stop()
+            asyncio.run(self.serial_ctrl.stop())
         
         self.root.quit()
     
-    def start_reading(self):
+    async def start_reading(self):
         """
         Opens the serial read thread and enables the start of periodic data reading.
         """
         #print("Starting to read data...")
         if self.serial_ctrl:
             #print("Serial controller is initialized, starting now...")
-            if(TUNN_APPR_FLAG):
-                self.meas_gui.tunneling_approach()
-            elif(CAP_APPR_FLAG):
-                self.meas_gui.cap_approach()
-            elif(PERIODICS_FLAG):
-                self.meas_gui.enable_periodics()
+            if TUNN_APPR_FLAG:
+                await self.meas_gui.tunneling_approach()
+            elif CAP_APPR_FLAG:
+                await self.meas_gui.cap_approach()
+            elif PERIODICS_FLAG:
+                await self.meas_gui.enable_periodics()
             self.serial_ctrl.running = True
         #else:
             #print("Serial controller is not initialized.")
     
-    def stop_reading(self):
+    async def stop_reading(self):
         """
         Disables the reading of periodic data in a background thread.
         """
-        def stop_reading_task():
+        async def stop_reading_task():
             # Clear buffer
             self.clear_buffer()
             
             start_time = time.time()
-            success = self.meas_gui.send_msg_retry(self.serial_ctrl.serial_port, globals.MSG_C, ztmCMD.CMD_PERIODIC_DATA_DISABLE.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value)
+            success = await self.meas_gui.send_msg_retry(self.serial_ctrl.serial_port, globals.MSG_C, ztmCMD.CMD_PERIODIC_DATA_DISABLE.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value)
 
             while not success and (time.time() - start_time) < globals.TIMEOUT:
-                success = self.meas_gui.send_msg_retry(self.serial_ctrl.serial_port, globals.MSG_C, ztmCMD.CMD_PERIODIC_DATA_DISABLE.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value)
+                success = await self.meas_gui.send_msg_retry(self.serial_ctrl.serial_port, globals.MSG_C, ztmCMD.CMD_PERIODIC_DATA_DISABLE.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value)
             
             if success:
                 #print("Stopped reading data...")
@@ -174,7 +176,7 @@ class ComGUI:
 
         # Add the control buttons for refreshing the COMs & Connect
         self.btn_refresh = Button(self.frame, text="Refresh", width=10, command=self.com_refresh)
-        self.btn_connect = Button(self.frame, text="Connect", width=10, state="disabled", command=self.serial_connect)
+        self.btn_connect = Button(self.frame, text="Connect", width=10, state="disabled", command=self.serial_connect_callback)
         
         # Optional Graphic parameters
         self.padx = 7
@@ -224,7 +226,11 @@ class ComGUI:
         logic = []
         self.connect_ctrl(logic)
 
-    def serial_connect(self):
+    def serial_connect_callback(self):
+        loop = asyncio.get_event_loop
+        loop.create_task(self.serial_connect())
+        
+    async def serial_connect(self):
         """
         Verifies the connection of a port.
         """
@@ -238,12 +244,13 @@ class ComGUI:
 
                 # If the port is available, proceed with the connection
                 self.parent.serial_ctrl.port = port
+                serial_response = await self.parent.serial_ctrl.start() # Await to ensure serial port starts
                 #print(f"Connecting to {port}...")
                 
-                serial_response = self.parent.serial_ctrl.start()
+                #serial_response = self.parent.serial_ctrl.start()
 
                 if serial_response:
-                    self.startup_routine()
+                    await self.startup_routine()
                 else:
                     self.btn_connect["text"] = "Connect"
                     self.btn_refresh["state"] = "active"
@@ -252,7 +259,6 @@ class ComGUI:
                     messagebox.showerror("Connection Error", InfoMsg)
                     #print(f"Failed to connect to {port}.")
                     self.parent.serial_ctrl.running = False
-                
                 
             except serial.SerialException as e:
                 self.btn_connect["text"] = "Connect"
@@ -264,7 +270,7 @@ class ComGUI:
                 self.parent.serial_ctrl.running = False
         else:
             if self.parent.serial_ctrl:
-                self.parent.serial_ctrl.stop()
+                await self.parent.serial_ctrl.stop()
             self.btn_connect["text"] = "Connect"
             self.btn_refresh["state"] = "active"
             self.drop_com["state"] = "active"
@@ -273,8 +279,9 @@ class ComGUI:
             #print("\nDisconnected.")
             
             startup_flag = 0
+        pass
 
-    def startup_routine(self):
+    async def startup_routine(self):
         """
         A message sent to the MCU upon valid connection of a port, starting the MCU program.
         """
@@ -286,7 +293,7 @@ class ComGUI:
         #if port is None:
             #print("Port is not connected.")
         
-        msg_response = self.parent.meas_gui.send_msg_retry(port, globals.MSG_C, ztmCMD.CMD_CLR.value, ztmSTATUS.STATUS_RDY.value, ztmSTATUS.STATUS_ACK.value)   
+        msg_response = await self.parent.meas_gui.send_msg_retry(port, globals.MSG_C, ztmCMD.CMD_CLR.value, ztmSTATUS.STATUS_RDY.value, ztmSTATUS.STATUS_ACK.value)   
         
         if msg_response:
             #print("SUCCESS. Startup routine completed.")
@@ -749,7 +756,7 @@ class MeasGUI:
         self.return_to_home_pos.grid(row=0, column=0)
 
     
-    def send_msg_retry(self, port, msg_type, cmd, status, status_response, *params, max_attempts=globals.MAX_ATTEMPTS, sleep_time=globals.TENTH_SECOND):
+    async def send_msg_retry(self, port, msg_type, cmd, status, status_response, *params, max_attempts=globals.MAX_ATTEMPTS, sleep_time=globals.TENTH_SECOND):
         """
         Function to send a message to the MCU and retry if we do
         not receive expected response.
@@ -786,22 +793,22 @@ class MeasGUI:
         while attempt < max_attempts:
             #print(f"\n========== ATTEMPT NUMBER: {attempt+1} ==========")
             if msg_type == globals.MSG_A:
-                msg_response = self.parent.ztm_serial.sendMsgA(port, cmd, status, *params)
+                msg_response = await self.parent.ztm_serial.sendMsgA(port, cmd, status, *params)
             elif msg_type == globals.MSG_B:
-                msg_response = self.parent.ztm_serial.sendMsgB(port, cmd, status, *params)
+                msg_response = await self.parent.ztm_serial.sendMsgB(port, cmd, status, *params)
             elif msg_type == globals.MSG_C:
-                msg_response = self.parent.ztm_serial.sendMsgC(port, cmd, status)
+                msg_response = await self.parent.ztm_serial.sendMsgC(port, cmd, status)
             elif msg_type == globals.MSG_D:
-                msg_response = self.parent.ztm_serial.sendMsgD(port, cmd, status, *params)
+                msg_response = await self.parent.ztm_serial.sendMsgD(port, cmd, status, *params)
             elif msg_type == globals.MSG_E:
-                msg_response = self.parent.ztm_serial.sendMsgE(port, *params)
+                msg_response = await self.parent.ztm_serial.sendMsgE(port, *params)
             else:
                 messagebox.showerror("ERROR", "Internal error. Please try again.")
             
             if msg_response:
                 # returns 11 bytes of payload FALSE or byte response
                 #testMsg = self.parent.serial_ctrl.ztmGetMsg()
-                testMsg = self.parent.serial_ctrl.receive_serial()
+                testMsg = await self.parent.serial_ctrl.receive_serial()
                 #print(f"Test msg: {testMsg}")
                 
                 ### Unpack data and display on the GUI
@@ -878,7 +885,7 @@ class MeasGUI:
             else:
                 return False
     
-    def sendMsgCapApproach(self, port, msg_type, cmd, status, status_response, *params, max_attempts=globals.MAX_ATTEMPTS, timeout=globals.TIMEOUT):
+    async def sendMsgCapApproach(self, port, msg_type, cmd, status, status_response, *params, max_attempts=globals.MAX_ATTEMPTS, timeout=globals.TIMEOUT):
         """
         Function to send a message to the MCU and retry if we do
         not receive the expected response, using a timeout instead of a fixed sleep.
@@ -915,14 +922,14 @@ class MeasGUI:
         while attempt < max_attempts:
             #print(f"\n========== ATTEMPT NUMBER: {attempt + 1} ==========")
 
-            msg_response = self.parent.ztm_serial.sendMsgC(port, cmd, status)
+            msg_response = await self.parent.ztm_serial.sendMsgC(port, cmd, status)
             
             if msg_response:
                 start_time = time.time()
                 while (time.time() - start_time) < timeout:
                     # Check if data is available in the serial buffer
                     if self.parent.serial_ctrl.serial_port.in_waiting == 11:
-                        testMsg = self.parent.serial_ctrl.ztmGetMsg()
+                        testMsg = await self.parent.serial_ctrl.ztmGetMsg()
                         #print(f"Test msg: {testMsg}")
                         
                         if testMsg:
@@ -1466,14 +1473,15 @@ class MeasGUI:
                         break
                     
                     response = self.parent.serial_ctrl.ztmGetMsg()
-                    if response[2] == ztmSTATUS.STATUS_MEASUREMENTS.value or response[2] == ztmSTATUS.STATUS_ACK.value:
-                        #print(f"Received correct response: {response[2]}")
-                        
-                        curr_data = round(struct.unpack('f', bytes(response[3:7]))[0], 3) 
-                        cStr = str(curr_data) 
-                        #print("Received values\n\tCurrent: " + cStr + " nA\n")
-                    #else:
-                        #print(f"Did not receive correct response: {response[2]}")
+                    if response:
+                        if response[2] == ztmSTATUS.STATUS_MEASUREMENTS.value or response[2] == ztmSTATUS.STATUS_ACK.value:
+                            #print(f"Received correct response: {response[2]}")
+                            
+                            curr_data = round(struct.unpack('f', bytes(response[3:7]))[0], 3) 
+                            cStr = str(curr_data) 
+                            #print("Received values\n\tCurrent: " + cStr + " nA\n")
+                        #else:
+                            #print(f"Did not receive correct response: {response[2]}")
                     
                     # Use this to call update_graph() everytime a data point is recieved
                     self.adc_curr = curr_data
@@ -2170,34 +2178,64 @@ class GraphGUI:
         self.root = root
         self.meas_gui = meas_gui
 
+        # Batch size parameters
+        self.batch_size = 10    
+        self.data_count = 0
+        
         #configures plot
         self.fig, self.ax = plt.subplots()
         self.ax.set_xlabel('Time (s)')
         self.ax.set_ylabel('Current (nA)')
-       
-        # initializes graphical data
-        self.y_data = []
-        self.x_data = []
-        # use this to export data with milliseconds included
-        self.time_data = []
+
+        # Initializes circular buffer for data storage
+        self.y_data_buffer = CircularBuffer(1000)
+        self.x_data_buffer = CircularBuffer(1000)
         self.line, = self.ax.plot([], [], 'r-')
+    
+        # initializes graphical data
+        #self.y_data = []
+        #self.x_data = []
+        # use this to export data with milliseconds included
+        #self.time_data = []
+        #self.line, = self.ax.plot([], [], 'r-')
 
         # Create a canvas to embed the figure in Tkinter
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.root)
         self.canvas.get_tk_widget().grid(row=0, column=3, columnspan=6, rowspan=10, padx=10, pady=5)
         
     
-    def update_graph(self):
+    async def update_graph(self):
         """
         This will update the visual graph with the data points obtained during
         the Piezo Voltage Sweep. The data points are appended to the data arrays.
         *Updates every 36ms
         """
         global curr_data
-
-        # Fetch current data from label 2
-        #current_data = self.meas_gui.get_current_label2()
-        #current_data = curr_data
+        
+        # Append current data
+        self.y_data_buffer.append(curr_data)
+        self.x_data_buffer.append(datetime.datetime.now())
+        
+        self.data_count += 1
+        
+        # Only update graph when batch size is reached (updates every 10 data points)
+        if self.data_count % self.batch_size == 0:
+            self.line.set_data(self.x_data_buffer.get_all(), self.y_data_buffer.get_all())
+            self.ax.relim()
+            
+            # Set x-axis parameters
+            self.ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M:%S'))
+            self.ax.xaxis.set_major_locator(mdates.SecondLocator(interval=2))
+            self.ax.set_xlim(datetime.datetime.now() - datetime.timedelta(seconds=globals.ROLLOVER_GRAPH_TIME), datetime.datetime.now())
+            self.ax.autoscale_view()
+            
+            # Redraw canvas
+            self.canvas.draw()
+            self.canvas.flush_events()
+        
+        '''
+        global curr_data
+        
         
         # update data with next data points
         self.y_data.append(curr_data)
@@ -2210,20 +2248,27 @@ class GraphGUI:
         self.time_data.append(formatted_time)
         
         # update graph with new data
-        self.line.set_data(self.x_data, self.y_data)
-        self.ax.relim()
+        #self.line.set_data(self.x_data, self.y_data)
+        #self.ax.relim()
 
         # set x-axis parameters
         self.ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M:%S'))
         self.ax.xaxis.set_major_locator(mdates.SecondLocator(interval=2))
         # controls how much time is shown within the graph, currently displays the most recent 10 seconds
         self.ax.set_xlim(datetime.datetime.now() - datetime.timedelta(seconds=globals.ROLLOVER_GRAPH_TIME), datetime.datetime.now())
-        self.ax.autoscale_view()
+        #self.ax.autoscale_view()
         
+        if len(self.y_data) % 10 == 0:      # Updates every 50 data points
+            self.line.set_data(self.x_data, self.y_data)
+            self.ax.relim()
+            self.ax.autoscale_view()
+            self.canvas.draw()
+            self.canvas.flush_events()
+            
         # redraw canvas
-        self.canvas.draw()
-        self.canvas.flush_events()
-
+        #self.canvas.draw()
+        #self.canvas.flush_events()
+        '''
         
     def reset_graph(self):
         """
@@ -2232,14 +2277,63 @@ class GraphGUI:
         self.ax.clear()
         self.ax.set_xlabel('Time (s)')
         self.ax.set_ylabel('Tunneling Current (nA)')
-        self.y_data = []
-        self.x_data = []
-        self.time_data = []
+        #self.y_data = []
+        #self.x_data = []
+        #self.time_data = []
+        self.y_data_buffer = CircularBuffer(1000)
+        self.x_data_buffer = CircularBuffer(1000)
         self.line, = self.ax.plot([], [], 'r-')
         self.canvas.draw()
         self.canvas.flush_events()
 
+###################################################################################################################
+#                                                 CircularBuffer CLASS                                                  #
+###################################################################################################################
+class CircularBuffer:
+    def __init__(self, size):
+        self.size = size
+        self.buffer = [None] * size
+        self.index = 0
+
+    def append(self, data):
+        self.buffer[self.index] = data
+        self.index = (self.index + 1) % self.size
+
+    def get_all(self):
+        return self.buffer[self.index:] + self.buffer[:self.index]
+
+def run_asyncio_tkinter(root, interval=100):
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    def start_loop(loop):
+        asyncio.set_event_loop(loop)
+        loop.run_forever()
+
+    threading.Thread(target=start_loop, args=(loop,), daemon=True).start()
+
+    def callback():
+        # Schedule the asyncio event loop to run inside Tkinter's loop
+        loop.call_soon_threadsafe(loop.stop)
+        root.after(interval, callback)
+
+    root.after(interval, callback)
+
+def run_profiler():
+    profiler = cProfile.Profile()
+    profiler.enable()
+    
+    # Initialize the RootGUI
+    root_gui = RootGUI()
+    
+    # Start the Tkinter mainloop with asyncio integration
+    run_asyncio_tkinter(root_gui.root)
+    root_gui.root.mainloop()
+
+    profiler.disable()
+    profiler.print_stats(sort='time')
 
 if __name__ == "__main__":
     root_gui = RootGUI()
+    run_asyncio_tkinter(root_gui.root)
     root_gui.root.mainloop()

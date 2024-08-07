@@ -2,6 +2,7 @@ from enum import Enum
 import struct
 from value_conversion import Convert
 import serial
+import asyncio
 
 import globals
 ###########################################
@@ -78,7 +79,7 @@ class usbMsgFunctions:
     ################################################
 
 # MSG A 
-    def sendMsgA(self, port, msgCmd, msgStatus, current_nA, vbias, vpzo):
+    async def sendMsgA(self, port, msgCmd, msgStatus, current_nA, vbias, vpzo):
         ''' - port       = COM port variable assigned using pySerial functions
             - msgCmd     = ztmCMD value - see documentation for valid commands
             - msgStatus  = ztmStatus value
@@ -98,9 +99,9 @@ class usbMsgFunctions:
         maxRetries = 10
         while retry < maxRetries:  
             try:   
-                port.write(serial.to_bytes(messageA)) 
+                await asyncio.to_thread(port.write, serial.to_bytes(messageA))
                 # clear buffer
-                port.flush() 
+                await asyncio.to_thread(port.flush) 
                 return True
             except serial.SerialException as e:
                 #print(f"Write operation failed: {e}")
@@ -110,7 +111,7 @@ class usbMsgFunctions:
 
     # MSG B
     # Note: account for parsing different commands and rateHz vs. sample size
-    def sendMsgB(self, port, msgCmd, msgStatus, uint16_rateHz):
+    async def sendMsgB(self, port, msgCmd, msgStatus, uint16_rateHz):
         ''' - port          = COM port variable assigned using pySerial functions
             - msgCmd        = ztmCMD value - see documentation for valid commands
             - msgStatus     = ztmStatus value - usually STATUS_CLR
@@ -127,9 +128,9 @@ class usbMsgFunctions:
         maxRetries = 10
         while retry < maxRetries:  
             try:      
-                port.write(serial.to_bytes(messageB)) 
+                await asyncio.to_thread(port.write, serial.to_bytes(messageB)) 
                 # clear buffer    
-                port.flush()       
+                await asyncio.to_thread(port.flush)       
                 return True
             except serial.SerialException as e:
                 #print(f"Write operation failed: {e}")
@@ -138,7 +139,7 @@ class usbMsgFunctions:
         return False        
 
     # MSG C
-    def sendMsgC(self, port, msgCmd, msgStatus):
+    async def sendMsgC(self, port, msgCmd, msgStatus):
         ''' - port          = COM port variable assigned using pySerial functions
             - msgCmd        = ztmCMD value - see documentation for valid commands
             - msgStatus     = ztmStatus value - usually STATUS_CLR
@@ -152,10 +153,10 @@ class usbMsgFunctions:
         maxRetries = 10
         while retry < maxRetries:
             try:   
-                port.write(serial.to_bytes(messageC))
+                await asyncio.to_thread(port.write, serial.to_bytes(messageC))
                 # clear buffer    
                 #time.sleep(0.001)
-                port.flush()  
+                await asyncio.to_thread(port.flush)  
                 return True
             except serial.SerialException as e:
                 #print(f"Write operation failed: {e}")
@@ -166,7 +167,7 @@ class usbMsgFunctions:
         return False  
 
     # MSG D
-    def sendMsgD(self, port, msgCmd, msgStatus, size, dir, count):
+    async def sendMsgD(self, port, msgCmd, msgStatus, size, dir, count):
         ''' - port          = COM port variable assigned using pySerial functions
             - msgCmd        = ztmCMD value - see documentation for valid commands
             - msgStatus     = ztmStatus value - usually STATUS_CLR
@@ -183,9 +184,9 @@ class usbMsgFunctions:
         maxRetries = 10
         while retry < maxRetries:
             try:     
-                port.write(serial.to_bytes(messageD))
+                await asyncio.to_thread(port.write, serial.to_bytes(messageD))
                 ## clear buffer    
-                port.flush()   
+                await asyncio.to_thread(port.flush)   
                 return True  
             except serial.SerialException as e:
                 #print(f"Write operation failed: {e}")
@@ -195,7 +196,7 @@ class usbMsgFunctions:
 
     # MSG E
     # Not needed for GUI
-    def sendMsgE(self, port, sineVbiasAmp, uint16_rateHz):
+    async def sendMsgE(self, port, sineVbiasAmp, uint16_rateHz):
         ''' - port          = COM port variable assigned using pySerial functions
             - uint16_rateHz = vbias frequency, units of Hz, max valid freq = 5000 Hz
             - Function transmits Msg E, does not return anything. '''           
@@ -212,9 +213,9 @@ class usbMsgFunctions:
         maxRetries = 10
         while retry < maxRetries:
             try:    
-                port.write(serial.to_bytes(messageE))
+                await asyncio.to_thread(port.write, serial.to_bytes(messageE))
                 # clear buffer    
-                port.flush()
+                await asyncio.to_thread(port.flush)
                 return True
             except serial.SerialException as e:
                 #print(f"Write operation failed: {e}")
