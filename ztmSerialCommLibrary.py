@@ -103,9 +103,9 @@ class usbMsgFunctions:
                 port.flush() 
                 return True
             except serial.SerialException as e:
-                print(f"Write operation failed: {e}")
+                #print(f"Write operation failed: {e}")
                 retry += 1
-        print("Failed to send message.\n")    
+        #print("Failed to send message.\n")    
         return False 
 
     # MSG B
@@ -132,9 +132,9 @@ class usbMsgFunctions:
                 port.flush()       
                 return True
             except serial.SerialException as e:
-                print(f"Write operation failed: {e}")
+                #print(f"Write operation failed: {e}")
                 retry += 1
-        print("Failed to send message.\n")    
+        #print("Failed to send message.\n")    
         return False        
 
     # MSG C
@@ -158,11 +158,11 @@ class usbMsgFunctions:
                 port.flush()  
                 return True
             except serial.SerialException as e:
-                print(f"Write operation failed: {e}")
+                #print(f"Write operation failed: {e}")
                 if "Write timeout" in str(e) and msgStatus == ztmSTATUS.STATUS_RDY.value:
                     return False
                 retry += 1
-        print("Failed to send message.\n")    
+        #print("Failed to send message.\n")    
         return False  
 
     # MSG D
@@ -188,9 +188,9 @@ class usbMsgFunctions:
                 port.flush()   
                 return True  
             except serial.SerialException as e:
-                print(f"Write operation failed: {e}")
+                #print(f"Write operation failed: {e}")
                 retry += 1
-        print("Failed to send message.\n")    
+        #print("Failed to send message.\n")    
         return False   
 
     # MSG E
@@ -217,9 +217,9 @@ class usbMsgFunctions:
                 port.flush()
                 return True
             except serial.SerialException as e:
-                print(f"Write operation failed: {e}")
+                #print(f"Write operation failed: {e}")
                 retry += 1
-        print("Failed to send message.\n")    
+        #print("Failed to send message.\n")    
         return False    
         
     ###############################################
@@ -227,12 +227,13 @@ class usbMsgFunctions:
     def unpackRxMsg(self, rxMsg):
         ################################
         # DEBUG - PRINT CMD AND STATUS #
+        
         try:
             cmdRx = ztmCMD(rxMsg[cmdByte])
-            print("Received : " + cmdRx.name)
+            #print("Received : " + cmdRx.name)
             statRx = ztmSTATUS(rxMsg[statByte])
-            print("Received : " + statRx.name + "\n")
-   
+            #print("Received : " + statRx.name + "\n")
+        
         ################################
         
         # EXTRACT THE DATA FROM RX MSG #
@@ -284,6 +285,6 @@ class usbMsgFunctions:
                     return adcRxFFT_nA, freqRxFFT_Hz
 
         except:
-            print("Bytes not yet received.\n")   
+            #print("Bytes not yet received.\n")   
             return False  
             
