@@ -28,6 +28,7 @@ from IZ_Window import IZWindow  # import the IV Window Class
 from value_conversion import Convert
 from ztmSerialCommLibrary import usbMsgFunctions, ztmCMD, ztmSTATUS
 from SPI_Data_Ctrl import SerialCtrl
+from GUI_Widgets import HomepageWidgets
 
 # global variables
 curr_setpoint = 0.0
@@ -90,6 +91,10 @@ class RootGUI:
         self.graph_gui = GraphGUI(self.root, self.meas_gui)
         self.com_gui = ComGUI(self.root, self)
         
+        # Initialize MeasGUI components
+        self.widget_initializer = HomepageWidgets(self.root, self)
+        self.widget_initializer.initialize_widgets(self.meas_gui)
+        
     def quit_application(self):
         """
         Quits the application and closes the serial read thread.
@@ -133,7 +138,7 @@ class RootGUI:
             
             if success:
                 #print("Stopped reading data...")
-                self.meas_gui.enable_widgets()
+                self.widget_initializer.enable_widgets(self.meas_gui)
                 self.meas_gui.stop_leds()
             #else:
                 #print("Did not receive valid response within timeout period. Moving on.")
@@ -326,6 +331,13 @@ class MeasGUI:
         """
         self.root = root
         self.parent = parent
+
+        # Initialize MeasGUI widgets
+        self.initializer = HomepageWidgets(root, parent)
+        self.initializer.initialize_widgets(self)
+        self.initializer.publish(self)
+        
+        self.DropDownMenu()
         
         # Local variables for distnace and adc current readings
         self.distance   = 0.0
@@ -341,202 +353,9 @@ class MeasGUI:
         self.step_down  = 0
         
         # Initialize measurement widgets
-        self.initialize_widgets()
+        #self.initialize_widgets()
         self.update_label()
 
-    def initialize_widgets(self):
-        """
-        Initializes widgets needed for data.
-        """
-        # Optional graphic parameters
-        self.padx = 20
-        self.pady = 10
-        
-        # Sample rate drop-down list   ### ADJUST LATER
-        self.frame8 = LabelFrame(self.root, text="", padx=5, pady=5, bg="#ADD8E6")
-        self.label_sample_rate = Label(self.frame8, text="Sample Rate: ", bg="#ADD8E6", width=11, anchor="w")
-        self.sample_rate_var = StringVar()
-        self.sample_rate_var.set("-")
-        self.sample_rate_menu = OptionMenu(self.frame8, self.sample_rate_var, "25 kHz", "12.5 kHz", "37.5 kHz", "10 kHz", "5 kHz", command=self.saveSampleRate)  
-        self.sample_rate_menu.config(width=7)
-        
-        self.label_sample_rate.grid(column=1, row=1)
-        self.sample_rate_menu.grid(column=2, row=1) 
-        self.frame8.grid(row=13, column=4, padx=5, pady=5, sticky="")
-        
-        # Sample size user entry
-        self.sample_size = Entry(self.frame8, width=13)
-        self.sample_size_label = Label(self.frame8, text="Sample Size: ", bg="#ADD8E6", width=11, anchor="w")
-        self.sample_size.bind("<Return>", self.saveSampleSize)
-        
-        self.sample_size.grid(column=2, row=2, pady=5)
-        self.sample_size_label.grid(column=1, row=2)
-
-        # Stepper motor adjust step size
-        self.frame9 = LabelFrame(self.root, text="", padx=5, pady=5, bg="#ADD8E6")
-        self.label_coarse_adjust = Label(self.frame9, text="Step Size: ", bg="#ADD8E6", width=8, anchor="w")
-        self.coarse_adjust_var = StringVar()
-        self.coarse_adjust_var.set("-")
-        self.coarse_adjust_menu = OptionMenu(self.frame9, self.coarse_adjust_var, "Full", "Half", "Quarter", "Eighth", command=self.saveStepperMotorAdjust) 
-        self.coarse_adjust_menu.config(width=6)
-
-        self.label_coarse_adjust.grid(column=1, row=1)
-        self.coarse_adjust_menu.grid(column=1, row=2) 
-        self.frame9.grid(row=12, column=2, rowspan=2, columnspan=2, padx=5, pady=5, sticky="")
-        self.label_coarse_adjust_inc = Label(self.frame9, text="Approx. Dist", bg="#ADD8E6", width=9, anchor="w")
-
-        self.label5 = Label(self.frame9, bg="white", width=10)
-        self.label_coarse_adjust_inc.grid(column=2, row=1)
-        self.label5.grid(column=2, row=2, padx=5, pady=5)
-
-        # Vpiezo adjust step size
-        self.frame10 = LabelFrame(self.root, text="", padx=5, pady=5, bg="#d0cee2")
-        self.label_vpeizo_delta = Label(self.frame10, text="Vpiezo ΔV (V):", bg="#d0cee2", width=11, anchor="w")
-        self.label_vpeizo_delta.grid(column=1, row=1)
-        self.frame10.grid(row=7, column=2, rowspan=4, columnspan=2, padx=5, pady=5, sticky="")
-        
-        ### ADJUST LATER
-        self.label_vpeizo_delta_distance = Label(self.frame10, text="Approx. Dist", bg="#d0cee2", width=9, anchor="w")
-        self.label_vpeizo_delta_distance.grid(column=2, row=1)
-        self.label10 = Entry(self.frame10, bg="white", width=10)
-        self.label10.bind("<Return>", self.savePiezoValue)
-        self.label11 = Label(self.frame10, bg="white", width=10)
-        self.label10.grid(column=1, row=2, padx=5)
-        self.label11.grid(column=2, row=2, padx=5)
-        self.label_vpeizo_total = Label(self.frame10, text="Total Voltage", bg="#d0cee2", width=10, anchor="w")
-        self.label_vpeizo_total.grid(column=1, row=3, columnspan=2)
-        self.label12 = Label(self.frame10, bg="white", width=10)
-        self.label12.grid(column=1, row=4, columnspan=2)
-
-        # distance  ### ADJUST LATER
-        self.frame1 = LabelFrame(self.root, text="Distance (nm)", padx=10, pady=2, bg="gray", width=20)
-        self.label1 = Label(self.frame1, bg="white", width=20)
-        
-        # current
-        self.frame2 = LabelFrame(self.root, text="Current (nA)", padx=10, pady=2, bg="gray")
-        self.label2 = Label(self.frame2, bg="white", width=20)
-        
-        # current setpoint
-        self.frame3 = LabelFrame(self.root, text="Current Setpoint (nA)", padx=10, pady=2, bg="#ADD8E6")
-        self.label3 = Entry(self.frame3, bg="white", width=24)
-        self.label3.bind("<Return>", self.saveCurrentSetpoint)
-        
-        # current offset
-        self.frame4 = LabelFrame(self.root, text="Current Offset (nA)", padx=10, pady=2, bg="#ADD8E6")
-        self.label4 = Entry(self.frame4, bg="white", width=24)
-        self.label4.bind("<Return>", self.saveCurrentOffset)
-                
-        # sample bias
-        self.frame6 = LabelFrame(self.root, text="Sample Bias (V)", padx=10, pady=2, bg="#ADD8E6")
-        self.label6 = Entry(self.frame6, bg="white", width=24)
-        self.label6.bind("<Return>", self.saveSampleBias)
-
-        # user notes text box
-        self.frame7 = LabelFrame(self.root, text="NOTES", padx=10, pady=5, bg="#ADD8E6")
-        self.label7 = Text(self.frame7, height=7, width=30)
-        self.label7.bind("<Return>", self.save_notes)
-        
-        self.label8 = Entry(self.frame7, width=10)
-        self.label9 = Label(self.frame7, padx=10, text="Date:", height=1, width=5)
-        self.label8.bind("<Return>", self.save_date)
-    
-        # define images
-        self.add_btn_image0 = ctk.CTkImage(Image.open("Images/Vpzo_Up_Btn.png"), size=(40,40))
-        self.add_btn_image1 = ctk.CTkImage(Image.open("Images/Vpzo_Down_Btn.png"), size=(40,40))
-        self.add_btn_image2 = ctk.CTkImage(Image.open("Images/Fine_Adjust_Btn_Up.png"), size=(40,40))
-        self.add_btn_image3 = ctk.CTkImage(Image.open("Images/Fine_Adjust_Btn_Down.png"), size=(40,40))
-        self.add_btn_image4 = ctk.CTkImage(Image.open("Images/Start_Tip_Approach.png"), size=(100,35))
-        self.add_btn_image5 = ctk.CTkImage(Image.open("Images/Stop_Btn.png"), size=(90,35))
-        self.add_btn_image6 = ctk.CTkImage(Image.open("Images/Acquire_IV.png"), size=(100,35))
-        self.add_btn_image7 = ctk.CTkImage(Image.open("Images/Acquire_IZ.png"), size=(100,35))
-        self.add_btn_image12 = ctk.CTkImage(Image.open("Images/Start_Cap_Approach.png"), size=(100,45))
-        self.add_btn_image13 = ctk.CTkImage(Image.open("Images/Start_Periodic_Data.png"), size=(100,45))
-        
-    
-        self.add_btn_image8 = ctk.CTkImage(Image.open("Images/Stop_LED.png"), size=(35,35))
-        self.add_btn_image9 = ctk.CTkImage(Image.open("Images/Start_LED.png"), size=(35,35))
-        
-        self.add_btn_image10 = ctk.CTkImage(Image.open("Images/Save_Home_Btn.png"), size=(100,35))
-        self.add_btn_image11 = ctk.CTkImage(Image.open("Images/Return_Home_Btn.png"), size=(35,35))
-        
-        # create buttons with proper sizes															   
-        self.start_stop_frame = LabelFrame(self.root, text="Start/Stop Processes", labelanchor="n", padx=10, pady=10, bg="#eeeeee")
-        self.tip_approach_btn = ctk.CTkButton(self.start_stop_frame, image=self.add_btn_image4, text="", width=100, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.start_tip_appr)
-        self.cap_approach_btn = ctk.CTkButton(self.start_stop_frame, image=self.add_btn_image12, text="", width=100, height=45, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.start_cap_appr)
-        self.enable_periodics_btn = ctk.CTkButton(self.start_stop_frame, image = self.add_btn_image13, text="", width=100, height=45, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.start_periodics)
-        self.stop_btn = ctk.CTkButton(self.start_stop_frame, image=self.add_btn_image5, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.stop_reading)
-        self.stop_led_btn = ctk.CTkLabel(self.start_stop_frame, image=self.add_btn_image8, text="", width=35, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0)
-        self.start_led_btn = ctk.CTkLabel(self.start_stop_frame, image=self.add_btn_image9, text="", width=30, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0)
-        
-        # sweep windows frame and buttons
-        self.sweep_windows_frame = LabelFrame(self.root, text="Sweep Windows", labelanchor="n", padx=10, pady=10, bg="#eeeeee")
-        self.acquire_iv_btn = ctk.CTkButton(self.sweep_windows_frame, image=self.add_btn_image6, text="", width=100, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.open_iv_window)
-        self.acquire_iz_btn = ctk.CTkButton(self.sweep_windows_frame, image=self.add_btn_image7, text="", width=100, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.open_iz_window)
-        self.save_home_pos = ctk.CTkButton(self.root, image=self.add_btn_image10, text="", width=100, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.save_home)
-        
-        # Return/save home position buttons
-        self.return_to_home_frame = LabelFrame(self.root, text="Return Home", labelanchor= "s", padx=10, pady=5, bg="#eeeeee")
-        self.return_to_home_pos = ctk.CTkButton(self.return_to_home_frame, image=self.add_btn_image11, text="", width=30, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.return_home)
-        
-        # Piezo adjust frame and buttons
-        self.vpiezo_btn_frame = LabelFrame(self.root, text="Piezo Tip Adjust", padx=10, pady=5, bg="#eeeeee")
-        self.vpiezo_adjust_btn_up = ctk.CTkButton(master=self.vpiezo_btn_frame, image=self.add_btn_image0, text = "", width=40, height=40, compound="bottom", fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.piezo_inc)
-        self.vpiezo_adjust_btn_down = ctk.CTkButton(master=self.vpiezo_btn_frame, image=self.add_btn_image1, text="", width=40, height=40, compound="bottom", fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.piezo_dec)
-        
-        # Stepper motor adjust frame and buttons
-        self.fine_adjust_frame = LabelFrame(self.root, text="Stepper Motor", padx=10, pady=5, bg="#eeeeee")
-        self.fine_adjust_btn_up = ctk.CTkButton(master=self.fine_adjust_frame, image=self.add_btn_image2, text = "", width=40, height=40, compound="bottom", fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.stepper_motor_up)
-        self.fine_adjust_btn_down = ctk.CTkButton(master=self.fine_adjust_frame, image=self.add_btn_image3, text="", width=40, height=40, compound="bottom", fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.stepper_motor_down)
-
-        # setup the drop option menu
-        self.DropDownMenu()
-        
-        # put on the grid all the elements
-        self.publish()
-
-    def disable_widgets(self):
-        '''
-        Function to disable entry widgets when we start seeking
-        Disabling:
-            - current setpoint
-            - sample rate
-            - stepper motor step size
-            - stepper motor up
-            - stepper motor down
-            - iv window
-            - iz window
-            - reset home
-            - save home
-            - start btn
-            - stop btn
-        '''
-        self.label3.configure(state="disabled")
-        self.sample_rate_menu.configure(state="disabled")
-        self.coarse_adjust_menu.configure(state="disabled")
-        self.sample_size.configure(state="disabled")
-        self.acquire_iv_btn.configure(state="disabled")
-        self.acquire_iz_btn.configure(state="disabled")
-        self.save_home_pos.configure(state="disabled")
-        self.return_to_home_pos.configure(state="disabled")
-        self.tip_approach_btn.configure(state="disabled")
-        self.cap_approach_btn.configure(state="disabled")
-        self.enable_periodics_btn.configure(state="disabled")
-        self.stop_btn.configure(state="normal")
-    
-    def enable_widgets(self):
-        self.label3.configure(state="normal")
-        self.sample_rate_menu.configure(state="normal")
-        self.coarse_adjust_menu.configure(state="normal")
-        self.sample_size.configure(state="normal")
-        self.acquire_iv_btn.configure(state="normal")
-        self.acquire_iz_btn.configure(state="normal")
-        self.save_home_pos.configure(state="normal")
-        self.return_to_home_pos.configure(state="normal")
-        self.tip_approach_btn.configure(state="normal")
-        self.cap_approach_btn.configure(state="normal")
-        self.enable_periodics_btn.configure(state="normal")
-        self.stop_btn.configure(state="disable")
-      
     def open_iv_window(self):
         """
         Method to open the I-V Sweep window when the "Acquire I-V" button is clicked.
@@ -655,69 +474,6 @@ class MeasGUI:
             #print("ButtonGUI: Stop button pressed")
             STOP_BTN_FLAG = 1
             self.parent.stop_reading()
-
-    def publish(self):
-        """
-        Method to publish widgets in the MeasGUI class.
-        """
-        # positioning distance text box
-        self.frame1.grid(row=11, column=4, padx=5, pady=5, sticky="sw")
-        self.label1.grid(row=0, column=0, padx=5, pady=5)
-
-        # positioning current text box
-        self.frame2.grid(row=11, column=5, padx=5, pady=5, sticky="sw")
-        self.label2.grid(row=0, column=1, padx=5, pady=5)   
-        
-        # positioning current setpoint text box
-        self.frame3.grid(row=12, column=4, padx=5, pady=5, sticky="w")
-        self.label3.grid(row=1, column=0, padx=5, pady=5) 
-        
-        # positioning current offset text box
-        self.frame4.grid(row=12, column=5, padx=5, pady=5, sticky="w")
-        self.label4.grid(row=1, column=1, padx=5, pady=5) 
-
-        # positioning sample bias text box
-        self.frame6.grid(row=13, column=5, padx=5, pady=5, sticky="nw")
-        self.label6.grid(row=2, column=0, padx=5, pady=5) 
-
-        # positioning the notes text box
-        self.frame7.grid(row=11, column=7, rowspan=3, pady=5, sticky="n")
-        self.label7.grid(row=1, column=0, pady=5, columnspan=3, rowspan=3) 
-        self.label8.grid(row=0, column=2, pady=5, sticky="e")
-        self.label9.grid(row=0, column=2, pady=5, sticky="w")
-
-        # vpiezo tip fine adjust
-        self.vpiezo_btn_frame.grid(row=8, column=0, rowspan=3, columnspan=2, padx=5, sticky="e")
-        self.vpiezo_adjust_btn_up.grid(row=0, column=0)
-        self.vpiezo_adjust_btn_down.grid(row=1, column=0)
-        
-        # stepper motor adjust
-        self.fine_adjust_frame.grid(row=11, column=0, rowspan=4, columnspan=2, padx=5, sticky="e")
-        self.fine_adjust_btn_up.grid(row=0, column=0)
-        self.fine_adjust_btn_down.grid(row=1, column=0)
-        
-        # start/stop buttons
-        self.start_stop_frame.grid(row=0, column=9, columnspan=4, rowspan=4)
-        self.tip_approach_btn.grid(row=0, column=0, sticky="e")
-        self.cap_approach_btn.grid(row=1, column=0, sticky="e")
-
-        self.enable_periodics_btn.grid(row=2, column=0, sticky="e")
-        self.stop_btn.grid(row=1, column=1, sticky="ne", padx=20, pady=10)
-        # led
-        self.stop_led_btn.grid(row=0, column=1, sticky="")
-
-        # sweep windows buttons
-        self.sweep_windows_frame.grid(row=7, column=9, columnspan=4)
-        self.acquire_iv_btn.grid(row=0, column=0, sticky="e")
-        self.acquire_iz_btn.grid(row=0, column=1, padx=15, sticky="e")
-
-        # save home position
-        self.save_home_pos.grid(row=8, column=9, padx=10, sticky="w")
-        
-        # reset home position
-        self.return_to_home_frame.grid(row=9, column=9, sticky="w", padx=20)
-        self.return_to_home_pos.grid(row=0, column=0, padx=18)
-
     
     def send_msg_retry(self, port, msg_type, cmd, status, status_response, *params, max_attempts=globals.MAX_ATTEMPTS, sleep_time=globals.TENTH_SECOND):
         """
@@ -1000,41 +756,39 @@ class MeasGUI:
                 plt.ion()
                 
                 self.startup_leds()
-                self.disable_widgets()
+                self.initializer.disable_widgets(self)
                 
                 while True:
                     if STOP_BTN_FLAG == 1:
                         plt.ioff()
                         break
                     
-                    self.send_msg_retry(port, globals.MSG_C, ztmCMD.CMD_REQ_DATA.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_MEASUREMENTS.value)
+                    success = self.send_msg_retry(port, globals.MSG_C, ztmCMD.CMD_REQ_DATA.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_MEASUREMENTS.value)
                     
-                    # Immediately step back and return if current >= target
-                    if(curr_data >= curr_setpoint):
-                        adjust_success = self.send_msg_retry(port, globals.MSG_D, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, globals.EIGHTH_STEP, globals.DIR_DOWN, globals.NUM_STEPS)
-                        if adjust_success:
-                            #print("ADJUST SUCCESS.")
-                            tunneling_steps -= globals.INC_EIGHT
-                            plt.ioff()
-                            return 1, curr_data, vb_V, vp_V, tunneling_steps
+                    if success:
+                        # Immediately step back and return if current >= target
+                        if(curr_data >= curr_setpoint):
+                            adjust_success = self.send_msg_retry(port, globals.MSG_D, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, globals.EIGHTH_STEP, globals.DIR_DOWN, globals.NUM_STEPS)
+                            if adjust_success:
+                                #print("ADJUST SUCCESS.")
+                                tunneling_steps -= globals.INC_EIGHT
+                                #plt.ioff()
+                                #return 1, curr_data, vb_V, vp_V, tunneling_steps
+                            else:
+                                #print("Did not receive correct response back.")
+                                messagebox.showerror("ERROR", "Error. Unable to adjust the stepper motor.")
                         else:
-                            #print("Did not receive correct response back.")
-                            messagebox.showerror("ERROR", "Error. Unable to adjust the stepper motor.")
-                    else:
-                        # Update the graph with new data
-                        self.parent.graph_gui.update_graph()
-                        
-                        vpiezo_tip, tunneling_steps = self.auto_move_tip(tunneling_steps, globals.APPROACH_STEP_SIZE_NM, globals.DIR_DOWN)
+                            vpiezo_tip, tunneling_steps = self.auto_move_tip(tunneling_steps, globals.APPROACH_STEP_SIZE_NM, globals.DIR_DOWN)
 
-                    self.update_label()
-                    self.parent.graph_gui.update_graph()
+                        self.update_label()
+                        self.parent.graph_gui.update_graph()
                 STOP_BTN_FLAG = 0
             else:
                 #print("Did not receive correct response back.")
                 messagebox.showerror("ERROR", "Error. Did not receive correct response back.")
             
-                # Turns interactive graph off
-                plt.ioff()
+        # Turns interactive graph off
+        plt.ioff()
             
     
     def auto_move_tip(self, steps, dist, dir):
@@ -1138,6 +892,7 @@ class MeasGUI:
                 piezoSet = self.send_msg_retry(port, globals.MSG_A, ztmCMD.CMD_PIEZO_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, 0, 0, vpiezo_tip)
         return vpiezo_tip
 
+
     def cap_approach(self):
         """
         @brief: This function gets the tip close to the sample by using the displacement current
@@ -1150,79 +905,83 @@ class MeasGUI:
         global STOP_BTN_FLAG
         
         delay_line = [0] * (globals.DELAY_LINE_LEN + 1) # Initialize delay_line with zeros
-        port = self.parent.serial_ctrl.serial_port
         
-        # Start Sinusoidal Vbias
-        success = self.send_msg_retry(port, globals.MSG_E, ztmCMD.CMD_VBIAS_SET_SINE.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, globals.CAP_APPROACH_AMPL, globals.CAP_APPROACH_FREQ)
-        
-        if success:
-            #print("\n----------BEGINNING CAP APPROACH ALGORITHM----------")
-            # Resets visual graph and data
-            self.parent.graph_gui.reset_graph()
+        if self.check_connection():
+            return
+        else:
+            port = self.parent.serial_ctrl.serial_port
             
-            # Turns interactive graph on
-            plt.ion()
-            self.startup_leds()
-            self.disable_widgets()
+            # Start Sinusoidal Vbias
+            success = self.send_msg_retry(port, globals.MSG_E, ztmCMD.CMD_VBIAS_SET_SINE.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, globals.CAP_APPROACH_AMPL, globals.CAP_APPROACH_FREQ)
             
-            # Get first fft measurement
-            fft_meas = self.get_fft_peak()
-            if fft_meas is None:
-                #print("ERROR. Unable to start cap approach due to invalid FFT measurements.")
-                return
-            
-            for i in range(globals.DELAY_LINE_LEN + 1): delay_line[i] = fft_meas
-            notDone = 1
-            fft_count = 0
-            peaks = [0] * globals.FFT_AVG_LENGTH # Initialize peaks list
-            detector_count = 0
-            delay_index = 0
-            
-            while(notDone):
-                if STOP_BTN_FLAG == 1:
-                    plt.ioff()
-                    break
+            if success:
+                #print("\n----------BEGINNING CAP APPROACH ALGORITHM----------")
+                # Resets visual graph and data
+                self.parent.graph_gui.reset_graph()
                 
-                # Measure fft peak
-                peaks[fft_count] = self.get_fft_peak()
+                # Turns interactive graph on
+                plt.ion()
+                self.startup_leds()
+                self.initializer.disable_widgets(self)
+                
+                # Get first fft measurement
+                fft_meas = self.get_fft_peak()
+                if fft_meas is None:
+                    #print("ERROR. Unable to start cap approach due to invalid FFT measurements.")
+                    return
+                
+                for i in range(globals.DELAY_LINE_LEN + 1): delay_line[i] = fft_meas
+                notDone = 1
+                fft_count = 0
+                peaks = [0] * globals.FFT_AVG_LENGTH # Initialize peaks list
+                detector_count = 0
+                delay_index = 0
+                
+                while(notDone):
+                    if STOP_BTN_FLAG == 1:
+                        plt.ioff()
+                        break
+                    
+                    # Measure fft peak
+                    peaks[fft_count] = self.get_fft_peak()
 
-                if(fft_count >= globals.FFT_AVG_LENGTH-1):
-                    fft_meas = self.get_avg_meas(peaks)
-                    delay_line[delay_index] = fft_meas # Store the new displacement current
+                    if(fft_count >= globals.FFT_AVG_LENGTH-1):
+                        fft_meas = self.get_avg_meas(peaks)
+                        delay_line[delay_index] = fft_meas # Store the new displacement current
 
-                    # Increments index of circular buffer
-                    delay_index = (delay_index + 1) % (globals.DELAY_LINE_LEN+1) 
+                        # Increments index of circular buffer
+                        delay_index = (delay_index + 1) % (globals.DELAY_LINE_LEN+1) 
 
-                    # takes difference between the new current and the current 
-                    diff = fft_meas - delay_line[delay_index] 
-                    if(diff > globals.CRIT_CAP_SLOPE):
-                        detector_count += 1
-                        if(detector_count >= 3):
-                            notDone = 0
+                        # takes difference between the new current and the current 
+                        diff = fft_meas - delay_line[delay_index] 
+                        if(diff > globals.CRIT_CAP_SLOPE):
+                            detector_count += 1
+                            if(detector_count >= 3):
+                                notDone = 0
+                            else:
+                                notDone = 1
                         else:
+                            detector_count = 0
                             notDone = 1
+                            success_move = self.send_msg_retry(port, globals.MSG_D, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, globals.EIGHTH_STEP, globals.DIR_DOWN, globals.CAP_APPROACH_NUM_STEPS)
+                            #if success_move:
+                                #print("SUCCESS. Stepper motor moved in cap approach.")
+                            #else:
+                                #print("ERROR. Stepper motor failed to move in capacitance approach.")
+                        self.update_label()
+                        self.parent.graph_gui.update_graph()
                     else:
-                        detector_count = 0
-                        notDone = 1
-                        success_move = self.send_msg_retry(port, globals.MSG_D, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, globals.EIGHTH_STEP, globals.DIR_DOWN, globals.CAP_APPROACH_NUM_STEPS)
-                        #if success_move:
-                            #print("SUCCESS. Stepper motor moved in cap approach.")
-                        #else:
-                            #print("ERROR. Stepper motor failed to move in capacitance approach.")
-                    self.update_label()
-                    self.parent.graph_gui.update_graph()
-                else:
-                    fft_count = fft_count + 1
-            STOP_BTN_FLAG = 0    
-            plt.ioff()
-            self.stop_leds()
-            self.enable_widgets()
-            self.parent.clear_buffer()
-            success_stop_vbias = self.send_msg_retry(port, globals.MSG_C, ztmCMD.CMD_VBIAS_STOP_SINE.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value)
-            #if success_stop_vbias:
-                #print("SUCCESS. Sinusoidal vbias has stopped.")
-            #else:
-                #print("ERROR. Sinusoidal vbias failed to stop.")
+                        fft_count = fft_count + 1
+                STOP_BTN_FLAG = 0    
+                plt.ioff()
+                self.stop_leds()
+                self.initializer.enable_widgets(self)
+                self.parent.clear_buffer()
+                success_stop_vbias = self.send_msg_retry(port, globals.MSG_C, ztmCMD.CMD_VBIAS_STOP_SINE.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value)
+                #if success_stop_vbias:
+                    #print("SUCCESS. Sinusoidal vbias has stopped.")
+                #else:
+                    #print("ERROR. Sinusoidal vbias failed to stop.")
                 
     def get_fft_peak(self):
         """
@@ -1265,66 +1024,12 @@ class MeasGUI:
 
         avg = total / count
         return avg
-        '''
-        sum = 0
-        for i in range(len(measurements)): sum += measurements[i]
-        sum /= len(measurements)
-        return sum
-        '''
-
-    '''
-    def enable_periodics(self):
-        """
-        Function to enable and read periodic data from the MCU.
-        """
-        global STOP_BTN_FLAG
-        global curr_data
         
-        if self.check_connection():
-            return
-        else:
-            port = self.parent.serial_ctrl.serial_port
-            enable_data_success = self.send_msg_retry(port, globals.MSG_C, ztmCMD.CMD_PERIODIC_DATA_ENABLE.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value)
-            
-            if enable_data_success:
-                self.parent.graph_gui.reset_graph()
-                plt.ion()  # Turn on interactive mode
+        #sum = 0
+        #for i in range(len(measurements)): sum += measurements[i]
+        #sum /= len(measurements)
+        #return sum
 
-                self.startup_leds()
-                self.disable_widgets()
-
-                # Ensure the graph is set up and updated initially
-                self.parent.graph_gui.update_graph()
-                
-                self.collect_data_periodically()  # Start the periodic data collection
-                
-            else:
-                messagebox.showerror("ERROR", "Failed to enable periodic data. Try again.")
-                plt.ioff()  # Turn off interactive mode
-
-    def collect_data_periodically(self):
-        global STOP_BTN_FLAG
-        global curr_data
-
-        if STOP_BTN_FLAG == 1:
-            plt.ioff()  # Turn off interactive mode
-            return  # Stop collecting data
-
-        response = self.parent.serial_ctrl.ztmGetMsg()
-        if response:
-            if response[2] == ztmSTATUS.STATUS_MEASUREMENTS.value or response[2] == ztmSTATUS.STATUS_ACK.value:
-                curr_data = round(struct.unpack('f', bytes(response[3:7]))[0], 3)
-                #print(f"Collected data: {curr_data}")
-                self.update_label()
-                self.parent.graph_gui.update_graph()
-            else:
-                print("No valid response received.")
-                
-        # Schedule the next data collection after 50 ms
-        self.root.after(50, self.collect_data_periodically)
-    '''
-
-    
     def enable_periodics(self):
         """
         Function to enable and read periodic data from the MCU.
@@ -1350,7 +1055,7 @@ class MeasGUI:
                 plt.ion()
                 
                 self.startup_leds()
-                self.disable_widgets()
+                self.initializer.disable_widgets(self)
                 
                 while True:
                     if STOP_BTN_FLAG == 1:
@@ -1984,6 +1689,7 @@ class MeasGUI:
             date = self.label8.get()
             return date
     
+    
     def DropDownMenu(self):
         """
         Method to list all the File menu options in a drop menu.
@@ -2046,93 +1752,11 @@ class MeasGUI:
                 writer.writerows(data_to_export)
 
             messagebox.showinfo("Export Data", f"Data exported as {file_path}")
-
+    
+    
 ###################################################################################################################
 #                                                 GraphGUI CLASS                                                  #
 ###################################################################################################################
-'''
-class GraphGUI:
-    def __init__(self, root, meas_gui):
-        self.root = root
-        self.meas_gui = meas_gui
-
-        # Initialize plot
-        self.fig, self.ax = plt.subplots()
-        self.ax.set_xlabel('Time (s)')
-        self.ax.set_ylabel('Current (nA)')
-
-        # initializes graphical data
-        self.y_data = []
-        self.x_data = []
-        self.line, = self.ax.plot([], [], 'r-')
-
-        # Create a canvas to embed the figure in Tkinter
-        self.canvas = FigureCanvasTkAgg(self.fig, master=self.root)
-        self.canvas.get_tk_widget().grid(row=0, column=3, columnspan=6, rowspan=10, padx=10, pady=5)
-
-        # Queue for sharing data between processes
-        self.data_queue = multiprocessing.Queue()
-
-        # Process control flag
-        self.process = None
-
-    def start_graph(self):
-        if self.process is None:
-            self.process = multiprocessing.Process(target=self.run_graph, args=(self.data_queue,))
-            self.process.start()
-            self.root.after(50, self.update_graph)
-
-    def stop_graph(self):
-        if self.process is not None:
-            self.process.terminate()
-            self.process = None
-
-    def run_graph(self, data_queue):
-        while True:
-            # Simulate data collection
-            response = self.parent.serial_ctrl.ztmGetMsg()
-            if response:
-                if response[2] == ztmSTATUS.STATUS_MEASUREMENTS.value or response[2] == ztmSTATUS.STATUS_ACK.value:
-                    #print(f"Received correct response: {response[2]}")
-                    
-                    curr_data = round(struct.unpack('f', bytes(response[3:7]))[0], 3) 
-                    time_now = datetime.datetime.now()
-                    # Put data in the queue to send it back to the main process
-                    data_queue.put((curr_data, time_now))
-
-            time.sleep(0.1)  # Control update rate
-
-    def update_graph(self):
-        # Process any data received from the graphing process
-        while not self.data_queue.empty():
-            curr_data, time_now = self.data_queue.get()
-            self.y_data.append(curr_data)
-            self.x_data.append(time_now)
-
-        if len(self.y_data) % 100 == 0:  # Update every 100 data points
-            self.line.set_data(self.x_data, self.y_data)
-            self.ax.relim()
-            self.ax.autoscale_view()
-            self.ax.set_xlim(datetime.datetime.now() - datetime.timedelta(seconds=globals.ROLLOVER_GRAPH_TIME),
-                             datetime.datetime.now())
-            self.canvas.draw()
-            self.canvas.flush_events()
-
-        if self.process is not None:
-            self.root.after(50, self.update_graph)  # Schedule next update
-
-    def reset_graph(self):
-        self.ax.clear()
-        self.ax.set_xlabel('Time (s)')
-        self.ax.set_ylabel('Tunneling Current (nA)')
-        self.y_data = []
-        self.x_data = []
-        self.line, = self.ax.plot([], [], 'r-')
-        self.canvas.draw()
-        self.canvas.flush_events()
-'''
-
-
 class GraphGUI:
     """
     Function to initialize the data arrays and the graphical display.
@@ -2174,6 +1798,9 @@ class GraphGUI:
         # Global variables
         global curr_data
         global sample_size_save
+        global PERIODICS_FLAG
+        global CAP_APPR_FLAG
+        global TUNN_APPR_FLAG
         
         # Local variables - calculate update interval based on sample size
         A = 1900    # Scaling factor
@@ -2197,20 +1824,39 @@ class GraphGUI:
         self.ax.set_xlim(datetime.datetime.now() - datetime.timedelta(seconds=globals.ROLLOVER_GRAPH_TIME), datetime.datetime.now())
         #self.ax.autoscale_view()
 
-        if sample_size_save == None:
-            if len(self.y_data) % 100 == 0:  # Updates every 100 data points
+        if PERIODICS_FLAG:
+            # sample size can be set by the user, but default is 1024
+            if sample_size_save == None:
+                if len(self.y_data) % 100 == 0:  # Updates every 100 data points
+                    self.line.set_data(self.x_data, self.y_data)
+                    self.ax.relim()
+                    self.ax.autoscale_view()
+                    self.canvas.draw()
+                    self.canvas.flush_events()
+            else:
+                # Calculate update interval using exponential decay
+                update_interval = int(A* math.exp(-k * sample_size_save) + B)
+                # Ensure interval doesn't fall below minimum value
+                update_interval = max(update_interval, B)
+                
+                if len(self.y_data) % update_interval == 0: 
+                    self.line.set_data(self.x_data, self.y_data)
+                    self.ax.relim()
+                    self.ax.autoscale_view()
+                    self.canvas.draw()
+                    self.canvas.flush_events()
+        
+        elif TUNN_APPR_FLAG:
+            # sample size is set to 24
+            if len(self.y_data) % 150 == 0: 
                 self.line.set_data(self.x_data, self.y_data)
                 self.ax.relim()
                 self.ax.autoscale_view()
                 self.canvas.draw()
                 self.canvas.flush_events()
-        else:
-            # Calculate update interval using exponential decay
-            update_interval = int(A* math.exp(-k * sample_size_save) + B)
-            # Ensure interval doesn't fall below minimum value
-            update_interval = max(update_interval, B)
             
-            if len(self.y_data) % update_interval == 0: 
+        elif CAP_APPR_FLAG:
+            if len(self.y_data) % 15 == 0: 
                 self.line.set_data(self.x_data, self.y_data)
                 self.ax.relim()
                 self.ax.autoscale_view()
