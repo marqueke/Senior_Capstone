@@ -490,7 +490,7 @@ class MeasGUI:
         self.add_btn_image11 = ctk.CTkImage(Image.open("Images/Return_Home_Btn.png"), size=(35,35))
         
         # create buttons with proper sizes															   
-        self.start_stop_frame = LabelFrame(self.root, text="Start/Stop Processes", labelanchor="s", padx=10, pady=10, bg="#eeeeee")
+        self.start_stop_frame = LabelFrame(self.root, text="Start/Stop Processes", labelanchor="n", padx=10, pady=10, bg="#eeeeee")
         self.tip_approach_btn = ctk.CTkButton(self.start_stop_frame,text="Start Tip Approach", width=180, height=45, fg_color="#ff8000", text_color="black", bg_color="#eeeeee", corner_radius=10, command=self.start_tip_appr)
         self.cap_approach_btn = ctk.CTkButton(self.start_stop_frame,text="Start Capacitance Approach", width=90, height=45, fg_color="#ffff00", text_color="black", bg_color="#eeeeee", corner_radius=10, command=self.start_cap_appr)
         self.enable_periodics_btn = ctk.CTkButton(self.start_stop_frame, text="Start Periodic Data Transfer", width=90, height=45, fg_color="#00cc00", text_color="black", bg_color="#eeeeee", corner_radius=10, command=self.start_periodics)
@@ -499,7 +499,7 @@ class MeasGUI:
         self.start_led_btn = ctk.CTkLabel(self.start_stop_frame, image=self.add_btn_image9, text="", width=30, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0)
         
         # sweep windows frame and buttons
-        self.sweep_windows_frame = LabelFrame(self.root, text="Sweep Windows", labelanchor="s", padx=10, pady=10, bg="#eeeeee")
+        self.sweep_windows_frame = LabelFrame(self.root, text="Sweep Windows", labelanchor="n", padx=10, pady=10, bg="#eeeeee")
         self.acquire_iv_btn = ctk.CTkButton(self.sweep_windows_frame, image=self.add_btn_image6, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.open_iv_window)
         self.acquire_iz_btn = ctk.CTkButton(self.sweep_windows_frame, image=self.add_btn_image7, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.open_iz_window)
         self.save_home_pos = ctk.CTkButton(self.root, image=self.add_btn_image10, text="", width=90, height=35, fg_color="#eeeeee", bg_color="#eeeeee", corner_radius=0, command=self.save_home)
@@ -1466,14 +1466,15 @@ class MeasGUI:
                         break
                     
                     response = self.parent.serial_ctrl.ztmGetMsg()
-                    if response[2] == ztmSTATUS.STATUS_MEASUREMENTS.value or response[2] == ztmSTATUS.STATUS_ACK.value:
-                        #print(f"Received correct response: {response[2]}")
-                        
-                        curr_data = round(struct.unpack('f', bytes(response[3:7]))[0], 3) 
-                        cStr = str(curr_data) 
-                        #print("Received values\n\tCurrent: " + cStr + " nA\n")
-                    #else:
-                        #print(f"Did not receive correct response: {response[2]}")
+                    if response:
+                        if response[2] == ztmSTATUS.STATUS_MEASUREMENTS.value or response[2] == ztmSTATUS.STATUS_ACK.value:
+                            #print(f"Received correct response: {response[2]}")
+                            
+                            curr_data = round(struct.unpack('f', bytes(response[3:7]))[0], 3) 
+                            cStr = str(curr_data) 
+                            #print("Received values\n\tCurrent: " + cStr + " nA\n")
+                        #else:
+                            #print(f"Did not receive correct response: {response[2]}")
                     
                     # Use this to call update_graph() everytime a data point is recieved
                     self.adc_curr = curr_data
@@ -2210,19 +2211,26 @@ class GraphGUI:
         self.time_data.append(formatted_time)
         
         # update graph with new data
-        self.line.set_data(self.x_data, self.y_data)
-        self.ax.relim()
+        #self.line.set_data(self.x_data, self.y_data)
+        #self.ax.relim()
 
         # set x-axis parameters
         self.ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M:%S'))
         self.ax.xaxis.set_major_locator(mdates.SecondLocator(interval=2))
         # controls how much time is shown within the graph, currently displays the most recent 10 seconds
         self.ax.set_xlim(datetime.datetime.now() - datetime.timedelta(seconds=globals.ROLLOVER_GRAPH_TIME), datetime.datetime.now())
-        self.ax.autoscale_view()
+        #self.ax.autoscale_view()
         
         # redraw canvas
-        self.canvas.draw()
-        self.canvas.flush_events()
+        #self.canvas.draw()
+        #self.canvas.flush_events()
+        
+        if len(self.y_data) % 100 == 0:  # Update every 100 data points
+            self.line.set_data(self.x_data, self.y_data)
+            self.ax.relim()
+            self.ax.autoscale_view()
+            self.canvas.draw()
+            self.canvas.flush_events()
 
         
     def reset_graph(self):

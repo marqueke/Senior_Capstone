@@ -52,7 +52,7 @@ class SerialCtrl:
         """
         while self.send_running:
             try:
-                data = self.send_queue.get(timeout=0.1)  # Wait for data with a timeout
+                data = self.send_queue.get(timeout=0.01)  # Wait for data with a timeout
                 if data:
                     self.serial_port.write(data)
                     #print(f"Sent data: {data.hex()}")
