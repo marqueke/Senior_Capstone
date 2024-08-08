@@ -9,6 +9,7 @@ import serial, os, struct, time, csv, datetime, threading
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from threading import Thread
 
 # import other files
 import globals
@@ -44,6 +45,9 @@ TIP_APPR_FLAG = 0
 CAP_APPR_FLAG = 0
 PERIODICS_FLAG = 0
 STOP_BTN_FLAG = 0
+
+THREADED_PLOTTING_FLAG = False
+UPDATE_THREADED_GRAPH_DATA_FLAG = False
 
 class RootGUI:
     def __init__(self):
@@ -972,6 +976,7 @@ class MeasGUI:
         global curr_data
         global vb_V
         global vp_V
+        global UPDATE_THREADED_GRAPH_DATA_FLAG
         
         if self.check_connection():
             return
@@ -991,7 +996,7 @@ class MeasGUI:
             if success:
                 print("\n----------BEGINNING TIP APPROACH ALGORITHM----------")
                 # Resets visual graph and data
-                self.parent.graph_gui.reset_graph()
+                self.parent.graph_gui.start_threaded_graph()
                 
                 # Turns interactive graph on
                 plt.ion()
@@ -1010,24 +1015,25 @@ class MeasGUI:
                         if adjust_success:
                             tunneling_steps -= globals.INC_EIGHT
                             plt.ioff()
-                            return 1, curr_data, vb_V, vp_V, tunneling_steps
+                            self.parent.graph_gui.stop_threaded_graph()
+                            #return 1, curr_data, vb_V, vp_V, tunneling_steps
                         else:
                             print("Did not receive correct response back.")
                             messagebox.showerror("ERROR", "Error. Unable to adjust the stepper motor.")
                     else:
-                        # Update the graph with new data
-                        self.parent.graph_gui.update_graph()
-                        
+
+                        UPDATE_THREADED_GRAPH_DATA_FLAG = False
                         vpiezo_tip, tunneling_steps = self.auto_move_tip(tunneling_steps, globals.APPROACH_STEP_SIZE_NM, globals.DIR_DOWN)
-                        #plt.ioff()
-                        
+                        UPDATE_THREADED_GRAPH_DATA_FLAG = True
                         #return 0, curr_data, vb_V, vp_V, tunneling_steps
+                self.parent.graph_gui.stop_threaded_graph()
                 STOP_BTN_FLAG = 0
                 TIP_APPR_FLAG = 0
+
             else:
                 print("Did not receive correct response back.")
                 messagebox.showerror("ERROR", "Error. Did not receive correct response back.")
-            
+                
                 TIP_APPR_FLAG = 0
                 # Turns interactive graph off
                 plt.ioff()
@@ -1143,6 +1149,8 @@ class MeasGUI:
 
         @retval: None
         """
+        global UPDATE_THREADED_GRAPH_DATA_FLAG
+
         delay_line = []
         port = self.parent.serial_ctrl.serial_port
         # Start Sinusoidal Vbias
@@ -1155,6 +1163,8 @@ class MeasGUI:
         fft_count = 0
         peaks = []
         detector_count = 0
+        plt.ion()
+        self.parent.graph_gui.start_threaded_graph()
         while(notDone):
             # Measure fft peak
             peaks[fft_count] = self.get_fft_peak()
@@ -1177,11 +1187,15 @@ class MeasGUI:
                 else:
                     detector_count = 0
                     notDone = 1
+                    UPDATE_THREADED_GRAPH_DATA_FLAG = False
                     self.send_msg_retry(port, globals.MSG_D, ztmCMD.CMD_STEPPER_ADJ.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value, globals.EIGHTH_STEP, globals.DIR_DOWN, globals.cap_approach_num_steps)
+                    UPDATE_THREADED_GRAPH_DATA_FLAG = True
             else:
                 fft_count = fft_count + 1
             
         self.send_msg_retry(port, globals.MSG_C, ztmCMD.CMD_VBIAS_STOP_SINE.value, ztmSTATUS.STATUS_CLR.value, ztmSTATUS.STATUS_DONE.value)
+        plt.ioff()
+        self.parent.graph_gui.stop_threaded_graph()
             
     def get_fft_peak(self):
         port = self.parent.serial_ctrl.serial_port
@@ -1978,6 +1992,72 @@ class GraphGUI:
         self.canvas.draw()
         self.canvas.flush_events()
 
+    def start_threaded_graph(self):
+        global THREADED_PLOTTING_FLAG
+        
+        if not THREADED_PLOTTING_FLAG:
+            THREADED_PLOTTING_FLAG = True
+
+            """
+            Resets the visual graph and clears the data points.
+            """
+            self.ax.clear()
+            self.ax.set_xlabel('Time (s)')
+            self.ax.set_ylabel('Current (nA)')
+            self.y_data = []
+            self.x_data = []
+            self.time_data = []
+            self.line, = self.ax.plot([], [], 'r-')
+            self.canvas.draw()
+            self.canvas.flush_events()
+
+            self.thread = Thread(target=self.threaded_graph_update())
+            self.thread.start()
+                            # self.parent.plotting = True
+                # self.parent.thread = Thread(target=self.parent.graph_gui.update_graph())
+                # self.parent.thread.start()
+    def threaded_graph_update(self):
+        global curr_data
+        global THREADED_PLOTTING_FLAG
+        global UPDATE_THREADED_GRAPH_DATA_FLAG
+
+        while THREADED_PLOTTING_FLAG:
+            if UPDATE_THREADED_GRAPH_DATA_FLAG:
+                # update data with next data points
+                self.y_data.append(curr_data)
+                time_now = datetime.datetime.now()
+                # append current time to x axis on graph
+                self.x_data.append(time_now)
+                
+                # append time to include milliseconds for exported data
+                formatted_time = time_now.strftime('%H:%M:%S.%f')[:-3]
+                self.time_data.append(formatted_time)
+
+            if(curr_data != self.curr_data_PREVIOUS):
+                self.curr_data_PREVIOUS = curr_data
+                
+                # update graph with new data
+                self.line.set_data(self.x_data, self.y_data)
+                self.ax.relim()
+
+                # set x-axis parameters
+                self.ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M:%S'))
+                self.ax.xaxis.set_major_locator(mdates.SecondLocator(interval=2))
+                # controls how much time is shown within the graph, currently displays the most recent 10 seconds
+                self.ax.set_xlim(datetime.datetime.now() - datetime.timedelta(seconds=10), datetime.datetime.now())
+                self.ax.autoscale_view()
+                
+                # redraw canvas
+                self.canvas.draw()
+                self.canvas.flush_events()
+
+    def stop_threaded_graph(self):
+        global THREADED_PLOTTING_FLAG
+
+        THREADED_PLOTTING_FLAG = False
+        if self.thread is not None:
+            self.thread.join()
+            
     def reset_graph(self):
         """
         Resets the visual graph and clears the data points.
