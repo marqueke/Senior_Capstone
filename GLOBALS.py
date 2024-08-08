@@ -7,6 +7,12 @@ HEADER_BYTES    = 3
 PAYLOAD_BYTES   = 8
 MSG_BYTES = HEADER_BYTES + PAYLOAD_BYTES
 
+### USB MESSAGE FORMAT
+# -header-
+ID_BYTE      = 0    # MSG ID -> 1 byte
+CMD_BYTE     = 1    # CMD    -> 1 byte
+STAT_BYTE    = 2    # STATUS -> 1 byte
+
 """
 TIP APPROACH GLOBAL VARIABLES
 """
