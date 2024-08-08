@@ -1,3 +1,9 @@
+"""
+Filename:   Master_Demo.py
+Author:     Jacob Kucinscki and Kelsey Marquez
+Date:       8/8/24
+Description:
+"""
 from GUI_Master_Demo import RootGUI, MeasGUI, GraphGUI, ComGUI
 
 # Initialize the root GUI

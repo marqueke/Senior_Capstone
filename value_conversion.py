@@ -1,3 +1,9 @@
+"""
+Filename:   value_conversion.py
+Author:     Sean Follo
+Date:       8/8/24
+Description:
+"""
 class Convert:
     def get_curr_float(curr_int):
         '''

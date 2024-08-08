@@ -1,10 +1,11 @@
-import tkinter as tk
+"""
+Filename:   GUI_Widgets.py
+Author:     Jacob Kucinscki and Kelsey Marquez
+Date:       8/8/24
+Description:
+"""
 from tkinter import Label, LabelFrame, Entry, StringVar, OptionMenu, Text, Image
 import customtkinter as ctk
-import os
-import csv
-from tkinter import messagebox 
-from tkinter import filedialog
 from PIL import Image
 
 class HomepageWidgets:

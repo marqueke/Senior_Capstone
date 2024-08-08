@@ -1,3 +1,9 @@
+"""
+Filename:   GUI_Master_Demo.py
+Author:     Jacob Kucinscki and Kelsey Marquez
+Date:       8/8/24
+Description:
+"""
 from tkinter import Label, LabelFrame, Button, StringVar, OptionMenu, END
 from tkinter import messagebox 
 from tkinter import filedialog

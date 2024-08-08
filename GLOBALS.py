@@ -1,4 +1,9 @@
-# GLOBALS.py
+"""
+Filename:   globals.py
+Author:     Jacob Kucinscki and Kelsey Marquez
+Date:       8/8/24
+Description:
+"""
 
 """
 LENGTH OF MESSAGE

@@ -1,3 +1,9 @@
+"""
+Filename:   ztmSerialCommLibrary.py
+Author:     Dustin Matthews
+Date:       8/8/24
+Description:
+"""
 from enum import Enum
 import struct
 import serial
