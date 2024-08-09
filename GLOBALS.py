@@ -1,6 +1,6 @@
 """
 Filename:   globals.py
-Author:     Jacob Kucinscki and Kelsey Marquez
+Author:     Jacob Kucinski and Kelsey Marquez
 Date:       8/8/24
 Description:
 """
